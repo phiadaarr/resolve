@@ -22,9 +22,6 @@ from .calibration_distributor import CalibrationDistributor
 
 
 def sqrt_n_operator(var, key):
-    '''
-    TODO
-    '''
     dom = var.domain
     scale_q = ift.DiagonalOperator(1/(0.5*var))
     N_amp = scale_q @ ift.InverseGammaOperator(dom, alpha=0.5, q=1) @ scale_q
@@ -32,9 +29,6 @@ def sqrt_n_operator(var, key):
 
 
 def make_calibration(dh, cal_ops):
-    '''
-    TODO
-    '''
     dom = list(cal_ops.values())[0].target
 
     dtr_a1 = CalibrationDistributor(dom, dh.ant1, dh.time)
@@ -64,9 +58,6 @@ def make_calibration(dh, cal_ops):
 
 
 def make_signal_response(dh, R, sky, cal_ops):
-    '''
-    TODO
-    '''
     if isinstance(sky, ift.Field) and len(cal_ops) == 0:
         raise NotImplementedError
     rsky = R(sky)
@@ -82,9 +73,6 @@ def make_signal_response(dh, R, sky, cal_ops):
 
 
 def make_likelihood(dh, R, sky, cal_ops):
-    '''
-    TODO
-    '''
     resi = ift.Adder(-dh.vis) @ make_signal_response(dh, R, sky, cal_ops)
     var = ift.makeOp(dh.var)
     # if noise_inference:
@@ -93,33 +81,3 @@ def make_likelihood(dh, R, sky, cal_ops):
     return ift.GaussianEnergy(domain=resi.target, covariance=var) @ resi
 
 
-# if fast_resolve:
-#     raise NotImplementedError('fastRESOLVE is not working yet')
-#     ht = ift.HarmonicTransformOperator(
-#         sky_space[0].get_default_codomain(), target=interf.domain[0]).adjoint
-
-#     R = sum_op.adjoint @ interf
-#     target['var'] = ift.from_global_data(
-#         target['var'].domain,
-#         np.array(target['var'].to_global_data(), dtype=np.float64))
-#     psf = R.adjoint(1/target['var'])
-
-#     npix = sky_space.shape
-#     psf = psf.to_global_data()
-#     psf = np.roll(psf, npix[0]//2, axis=0)
-#     psf = np.roll(psf, npix[1]//2, axis=1)
-#     psf = ift.from_global_data(sky_space, psf)
-
-#     self._R_t = ift.makeOp(ht(psf).weight(-2.5)) @ ht
-#     gridder = ht @ interf.adjoint
-
-#     target['vis'] = (gridder @ sum_op)(target['vis']/target['var'])
-
-#     target['var'] = ht(psf)
-#     var = target['var'].to_global_data()
-#     target['var'] = ift.from_global_data(target['var'].domain, abs(var))
-
-#     p = ift.Plot()
-#     p.add(target['vis'], title='Gridded vis')
-#     p.add(target['var'], title='Gridded var')
-#     p.output(name='gridded_vis.png', xsize=8, ysize=16, nx=1, ny=2)
