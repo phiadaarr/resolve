@@ -20,7 +20,7 @@ import numpy as np
 
 import nifty5 as ift
 import resolve as rve
-from power_spectrum import pspec
+from powerspectrum import pspec
 from resolve import getfloat, getint
 
 
