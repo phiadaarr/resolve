@@ -297,7 +297,7 @@ def paper_plot_pspec(position, name, op, res_samples, ground_truth):
     plt.xlim([xcoord[1], np.max(xcoord)])
     plt.xscale('log')
     plt.yscale('log')
-    plt.ylabel(r'Power $[\mathrm{Jy}]$')
+    plt.ylabel(r'Power $[1]$')
     plt.savefig('{}.{}'.format(name, savefig_cfg['format']), **savefig_cfg)
     plt.close()
 

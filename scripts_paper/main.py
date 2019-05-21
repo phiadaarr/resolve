@@ -30,7 +30,7 @@ def _print_section(s):
 
 def resolve(cfg_file, preimaging):
     np.seterr(all='raise', under='warn')
-    np.random.seed(42)
+    np.random.seed(17)
     ift.fft.enable_fftw()
 
     cfg = rve.ConfigurationParser(cfg_file)
