@@ -89,9 +89,12 @@ def pickle(obj, fname):
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
 
-def load_pickle(f):
+def load_pickle(fname):
+    import pickle
     try:
-        return np.load(f)
+        with open(fname, 'rb') as f:
+            pos = pickle.load(f)
+        return pos
     except FileNotFoundError:
         raise FileNotFoundError('Input file not found.')
     except OSError:
