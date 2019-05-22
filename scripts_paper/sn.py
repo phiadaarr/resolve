@@ -28,9 +28,10 @@ def _print_section(s):
     print(80*'-')
 
 
-def resolve(cfg_file, preimaging):
+if __name__ == '__main__':
+    cfg_file = 'sn.cfg'
     np.seterr(all='raise', under='warn')
-    np.random.seed(17)
+    np.random.seed(42)
     ift.fft.enable_fftw()
 
     cfg = rve.ConfigurationParser(cfg_file)
@@ -95,7 +96,7 @@ def resolve(cfg_file, preimaging):
         saver.save(position, 'precal')
 
     _print_section('Pre-imaging')
-    for ii in range(preimaging):
+    for ii in range(5):
         _, lh_only_image = lh.simplify_for_constant_input(
             position.extract(lh_c.domain))
         minimizer = cfg.min_imaging['minimizer']
@@ -145,8 +146,3 @@ def resolve(cfg_file, preimaging):
                      'samples_adjvar_{}'.format(ii))
         position = diffuse.adjust_variances(position, minimizer, e.samples)
         saver.save(position, 'imaging_adjvar')
-
-
-if __name__ == '__main__':
-    resolve('mock.cfg', 1)
-    resolve('sn.cfg', 5)
