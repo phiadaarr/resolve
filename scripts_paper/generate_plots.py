@@ -8,8 +8,8 @@ import nifty5 as ift
 import resolve as rve
 from problem import Problem
 from utils import (paper_plot_antenna, paper_plot_calib_solutions,
-                   plot_amplitude_op, paper_plot_pspec, paper_plot_timeline,
-                   paper_plot_uv, plot_integrated, plot_sky)
+                   paper_plot_pspec, paper_plot_timeline, paper_plot_uv,
+                   plot_amplitude_op, plot_integrated, plot_sky, plot_weighted)
 
 
 def myplots(directory, cglimit, nsamps, position):
@@ -77,12 +77,8 @@ def myplots(directory, cglimit, nsamps, position):
         res = abs(gt - sc.mean)
         plot_sky(res, directory + 'sky_residual', disable_axes, cblabel)
 
-        plot_sky(
-            res/sc.var.sqrt(),
-            directory + 'sky_resoversd',
-            disable_axes,
-            '',
-            vmin=0)
+        res = gt - sc.mean
+        plot_weighted(directory + 'weighted', res/sc.var.sqrt())
 
         n = res.domain.size
         onesig = np.sum((res < sc.var.sqrt()).to_global_data())/n

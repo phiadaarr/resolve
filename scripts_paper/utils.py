@@ -291,7 +291,7 @@ def paper_plot_pspec(position, name, op, res_samples, ground_truth):
             linewidth=0.5)
     plt.plot(xcoord, sc.mean.to_global_data(), color=c_mean, linewidth=1)
     if ground_truth is not None:
-        from power_spectrum import pspec
+        from powerspectrum import pspec
         plt.plot(xcoord, pspec(xcoord), color=c_truth, linewidth=1)
     plt.xlabel('Spatial frequency [1/rad]')
     plt.xlim([xcoord[1], np.max(xcoord)])
@@ -369,6 +369,26 @@ def plot_integrated(position, name, diffuse, ground_truth, samples, xmi, xma,
     plt.xticks([])
     plt.yticks([])
 
+    plt.savefig('{}.{}'.format(name, savefig_cfg['format']), **savefig_cfg)
+    plt.close()
+
+
+def plot_weighted(name, weighted_diff):
+    plt.figure(figsize=set_size())
+    lim = 6
+    plt.xlim([-lim, lim])
+
+    plt.hist(
+        weighted_diff.to_global_data().flatten(),
+        bins=30,
+        density=True)
+
+    xs = np.linspace(-lim, lim)
+    ys = np.exp(-0.5*xs**2)/np.sqrt(2*np.pi)
+    plt.plot(xs, ys, color=c_truth)
+
+    plt.xlabel('Normalized error [1]')
+    plt.ylabel(r'\# pixels/bin')
     plt.savefig('{}.{}'.format(name, savefig_cfg['format']), **savefig_cfg)
     plt.close()
 
