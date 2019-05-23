@@ -30,7 +30,8 @@ def myplots(directory, cglimit, nsamps, position):
     if nsamps > 1:
         print('Draw samples')
         ic = ift.GradientNormController(iteration_limit=cglimit)
-        res_samples = rve.MetricGaussianKL(position, lh, ic, nsamps).samples
+        ham = ift.StandardHamiltonian(lh, ic)
+        res_samples = rve.MetricGaussianKL(position, ham, nsamps).samples
         with open(fname, 'wb') as f:
             pickle.dump(res_samples, f, pickle.HIGHEST_PROTOCOL)
     else:
@@ -142,8 +143,8 @@ if __name__ == '__main__':
     np.random.seed(42)
     plot_amplitude_op()
 
-    np.random.seed(42)
     myplots('mock', 400, 100, '20_imaging')
+    np.random.seed(17)
 
     np.random.seed(42)
     myplots('sn', 400, 100, '32_imaging_adjvar')
