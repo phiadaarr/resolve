@@ -80,6 +80,9 @@ def myplots(directory, cglimit, nsamps, position):
 
         res = gt - sc.mean
         plot_weighted(directory + 'weighted', res/sc.var.sqrt())
+        plot_sky(
+            abs(gt - sc.mean)/sc.var.sqrt(), directory + 'sky_weighted',
+            disable_axes, cblabel)
 
         n = res.domain.size
         onesig = np.sum((res < sc.var.sqrt()).to_global_data())/n
@@ -143,8 +146,8 @@ if __name__ == '__main__':
     np.random.seed(42)
     plot_amplitude_op()
 
-    myplots('mock', 400, 100, '20_imaging')
     np.random.seed(17)
+    myplots('mock', 400, 100, '10_imaging')
 
     np.random.seed(42)
     myplots('sn', 400, 100, '32_imaging_adjvar')
