@@ -21,8 +21,15 @@ class Polarization:
     def __init__(self, indices):
         self._ind = list(indices)
         my_assert(len(self._ind) <= 4)
+        self._trivial = indices == []
+
+    @staticmethod
+    def trivial():
+        return Polarization([])
 
     def circular(self):
+        if self._trivial:
+            raise RuntimeError
         if set(self._ind) <= set([5, 6, 7, 8]):
             return True
         if set(self._ind) <= set([9, 10, 11, 12]):
@@ -30,10 +37,14 @@ class Polarization:
         raise RuntimeError
 
     def stokes_i_indices(self):
+        if self._trivial:
+            raise RuntimeError
         keys = ["LL", "RR"] if self.circular else ["XX", "YY"]
-        return [self._ind.index(self.INVTABLE[kk]) for kk in keys]
+        return [self._ind.index(INVTABLE[kk]) for kk in keys]
 
     def __len__(self):
+        if self._trivial:
+            return 1
         return len(self._ind)
 
     def to_list(self):

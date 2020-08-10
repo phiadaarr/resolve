@@ -54,12 +54,18 @@ def ms2observations(ms, data_column, spectral_window=None):
     else:
         freqs = freqs[0]
 
+    if weight.ndim == 2:
+        weight = weight[:, None]
+    weight[flags] = 0
+
     observations = []
     for ii in set(fieldid):
         mask = fieldid == ii
         if nspws > 1:
             mask = np.logical_and(mask, spwmask)
-        observations.append(Observation(uvw[mask], vis[mask], weight[mask],
-                                        flags[mask], polarization, freqs,
-                                        dirs[ii]))
+        myvis, myweight = vis[mask], weight[mask]
+        myvis = np.ascontiguousarray(np.transpose(vis[mask], (2, 0, 1)))
+        myweight = np.ascontiguousarray(np.transpose(weight[mask], (2, 0, 1)))
+        observations.append(Observation(uvw[mask], myvis, myweight,
+                                        polarization, freqs, dirs[ii]))
     return observations

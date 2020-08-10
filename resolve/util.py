@@ -2,6 +2,8 @@
 # Copyright(C) 2020 Max-Planck-Society
 # Author: Philipp Arras
 
+import numpy as np
+
 
 def my_assert(cond):
     if not cond:
@@ -26,3 +28,11 @@ def compare_attributes(obj0, obj1, attribute_list):
         if compare.any():
             return False
     return True
+
+
+def complex2float_dtype(dtype):
+    if dtype == np.complex128:
+        return np.float64
+    if dtype == np.complex64:
+        return np.float32
+    raise RuntimeError
