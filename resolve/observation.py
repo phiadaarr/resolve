@@ -7,7 +7,7 @@ import numpy as np
 
 from .direction import Direction
 from .polarization import Polarization
-from .util import my_assert
+from .util import compare_attributes, my_assert
 
 
 class Observation:
@@ -20,11 +20,38 @@ class Observation:
         my_assert(len(freq) == vis.shape[1])
         my_assert(len(polarization) == vis.shape[2])
         # Fallunterscheidung weight weightspectrum
-        # spw = t.getcol("DATA_DESC_ID")
+
+        self._uvw = uvw
+        self._vis = vis
+        self._weight = weight
+        self._flags = flags
+        self._polarization = polarization
+        self._freq = freq
+        self._direction = direction
 
     def save_to_hdf5(self, file_name):
-        raise NotImplementedError
+        with h5py.File(file_name, 'w') as f:
+            f.create_dataset('uvw', data=self._uvw)
+            f.create_dataset('vis', data=self._vis)
+            f.create_dataset('weight', data=self._weight)
+            f.create_dataset('flags', data=self._flags)
+            f.create_dataset('freq', data=self._freq)
+            f.create_dataset('polarization', data=self._polarization.to_list())
+            f.create_dataset('direction', data=self._direction.to_list())
 
     @staticmethod
-    def load_from_hdf5(self, file_name):
-        raise NotImplementedError
+    def load_from_hdf5(file_name):
+        with h5py.File(file_name, 'r') as f:
+            uvw = np.array(f['uvw'])
+            vis = np.array(f['vis'])
+            weight = np.array(f['weight'])
+            flags = np.array(f['flags'])
+            polarization = list(f['polarization'])
+            freq = np.array(f['freq'])
+            direction = list(f['direction'])
+        return Observation(uvw, vis, weight, flags, Polarization.from_list(polarization), freq, Direction.from_list(direction))
+
+    def __eq__(self, other):
+        if not isinstance(other, Observation):
+            return False
+        return compare_attributes(self, other, ('_direction', '_polarization', '_freq', '_flags', '_uvw', '_vis', '_weight'))

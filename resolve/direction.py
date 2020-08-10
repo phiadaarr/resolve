@@ -2,18 +2,14 @@
 # Copyright(C) 2020 Max-Planck-Society
 # Author: Philipp Arras
 
-from .util import my_assert
+from .util import my_assert, compare_attributes
 
 
 class Direction:
     def __init__(self, phase_center, equinox):
         my_assert(len(phase_center) == 2)
-        equinox = str(equinox)[1:]
-        if equinox == "1950_VLA":
-            equinox = 1950
-        self._e = float(equinox)
         self._pc = phase_center
-        self._e = equinox
+        self._e = float(equinox)
 
     @property
     def phase_center(self):
@@ -25,3 +21,15 @@ class Direction:
 
     def __repr__(self):
         return f'Direction({self._pc}, equinox {self._e})'
+
+    def to_list(self):
+        return [*self._pc, self._e]
+
+    @staticmethod
+    def from_list(lst):
+        return Direction(lst[0:2], lst[2])
+
+    def __eq__(self, other):
+        if not isinstance(other, Direction):
+            return False
+        return compare_attributes(self, other, ('_pc', '_e'))

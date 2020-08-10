@@ -1,4 +1,5 @@
 # custom
+*.hdf5
 *.ms
 .pytest_cache
 git_version.py

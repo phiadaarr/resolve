@@ -2,7 +2,7 @@
 # Copyright(C) 2019-2020 Max-Planck-Society
 # Author: Philipp Arras
 
-from .util import my_assert
+from .util import compare_attributes, my_assert
 
 TABLE = {
     5: "RR",
@@ -35,3 +35,18 @@ class Polarization:
 
     def __len__(self):
         return len(self._ind)
+
+    def to_list(self):
+        return self._ind
+
+    @staticmethod
+    def from_list(lst):
+        return Polarization(lst)
+
+    def __eq__(self, other):
+        if not isinstance(other, Polarization):
+            return False
+        return compare_attributes(self, other, ('_ind',))
+
+    def __repr__(self):
+        return f'Polarization({self._ind})'

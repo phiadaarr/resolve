@@ -26,11 +26,14 @@ def ms2observations(ms, data_column, spectral_window=None):
         my_assert(polarization.shape[0] == 1)
         polarization = Polarization(polarization[0])
     with table(join(ms, 'FIELD'), **CFG) as t:
-        equ = t.coldesc('REFERENCE_DIR')['desc']['keywords']['MEASINFO']['Ref']
+        equinox = t.coldesc('REFERENCE_DIR')['desc']['keywords']['MEASINFO']['Ref']
+        equinox = str(equinox)[1:]
+        if equinox == "1950_VLA":
+            equinox = 1950
         dirs = []
         for pc in t.getcol('REFERENCE_DIR'):
             my_assert(pc.shape == (1, 2))
-            dirs.append(Direction(pc[0], equ))
+            dirs.append(Direction(pc[0], equinox))
         dirs = tuple(dirs)
     with table(ms, **CFG) as t:
         vis = t.getcol(data_column)
