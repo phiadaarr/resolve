@@ -7,20 +7,54 @@ from ducc0.wgridder import dirty2ms, ms2dirty
 
 import nifty7 as ift
 
-from .util import complex2float_dtype, my_assert
+from .util import complex2float_dtype, my_assert, my_asserteq
 
 
 def StokesIResponse(observation, domain, nthreads, epsilon, wstacking):
     npol = observation.vis.shape[0]
     my_assert(npol in [1, 2])
     mask = (observation.weight > 0).astype(complex2float_dtype(observation.vis.dtype))
+    sr0 = SingleResponse(domain, observation.uvw, observation.freq, mask[0],
+                         nthreads, epsilon, wstacking)
     if npol == 1 or (npol == 2 and np.all(mask[0] == mask[1])):
-        sr = SingleResponse(domain, observation.uvw, observation.freq, mask[0],
-                            nthreads, epsilon, wstacking)
+        contr = ift.ContractionOperator((ift.UnstructuredDomain(npol), sr0.target[0]), 0)
+        return contr.adjoint @ sr0
     elif npol == 2:
-        raise NotImplementedError
-    contr = ift.ContractionOperator((ift.UnstructuredDomain(npol), sr.target[0]), 0)
-    return contr.adjoint @ sr
+        sr1 = SingleResponse(domain, observation.uvw, observation.freq, mask[1],
+                             nthreads, epsilon, wstacking)
+        return ResponseDistributor(sr0, sr1)
+
+
+class ResponseDistributor(ift.LinearOperator):
+    def __init__(self, *ops):
+        dom, tgt = ops[0].domain, ops[0].target
+        cap = self.TIMES | self.ADJOINT_TIMES
+        for op in ops:
+            my_assert(isinstance(op, ift.LinearOperator))
+            my_assert(dom is op.domain)
+            my_assert(tgt is op.target)
+            my_asserteq(cap, op.capability)
+        self._domain = ift.makeDomain(dom)
+        my_asserteq(len(tgt), 1)
+        self._target = ift.makeDomain((ift.UnstructuredDomain(len(ops)), tgt[0]))
+        self._capability = cap
+        self._ops = ops
+
+    def apply(self, x, mode):
+        self._check_input(x, mode)
+        if mode == self.TIMES:
+            res = []
+            for op in self._ops:
+                res.append(op(x).val)
+            res = np.array(res)
+            return ift.makeField(self._tgt(mode), np.array(res))
+        for ii, op in enumerate(self._ops):
+            new = op.adjoint(ift.makeField(self._ops[0].target, x.val[ii]))
+            if ii == 0:
+                res = new
+            else:
+                res = res + new
+        return res
 
 
 class FullResponse(ift.LinearOperator):

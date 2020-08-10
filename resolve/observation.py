@@ -85,6 +85,14 @@ class Observation:
         return Observation(self._uvw, vis, weight, Polarization.trivial(),
                            self._freq, self._direction)
 
+    def restrict_to_stokes_i(self):
+        inds = self._polarization.stokes_i_indices()
+        vis = self._vis[inds]
+        weight = self._weight[inds]
+        pol = self._polarization.restrict_to_stokes_i()
+        return Observation(self._uvw, vis, weight, pol, self._freq,
+                           self._direction)
+
     @property
     def uvw(self):
         return self._uvw

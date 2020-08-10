@@ -27,6 +27,10 @@ class Polarization:
     def trivial():
         return Polarization([])
 
+    def restrict_to_stokes_i(self):
+        inds = (8, 5) if self.circular() else (9, 12)
+        return Polarization(inds)
+
     def circular(self):
         if self._trivial:
             raise RuntimeError

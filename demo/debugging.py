@@ -20,6 +20,17 @@ def save_and_load_hdf5(obs):
 
 
 def main():
+    ob = rve.ms2observations('./CYG-ALL-2052-2MHZ.ms', 'DATA')[0]
+    args = {'offset_mean': 0,
+            'offset_std': (1e-3, 1e-6),
+            'fluctuations': (2., 1.),
+            'loglogavgslope': (-4., 1),
+            'flexibility': (5, 2.),
+            'asperity': (0.5, 0.5)}
+    sky = ift.SimpleCorrelatedField(ift.RGSpace((256, 256)), **args)
+    lh = rve.ImagingLikelihood(ob.restrict_to_stokes_i(), sky, nthreads, epsilon)
+    lh = rve.ImagingLikelihood(ob.average_stokes_i(), sky, nthreads, epsilon)
+
     obs = rve.ms2observations('./CYG-ALL-2052-2MHZ.ms', 'DATA')
     save_and_load_hdf5(obs)
     obs = rve.ms2observations('./CYG-D-6680-64CH-10S.ms', 'DATA')
@@ -28,18 +39,6 @@ def main():
     save_and_load_hdf5(obs)
     obs = rve.ms2observations('./AM754_A030124_flagged.ms', 'DATA', 1)
     save_and_load_hdf5(obs)
-    del obs
-
-    ob = rve.ms2observations('./CYG-ALL-2052-2MHZ.ms', 'DATA')[0]
-    ob = ob.average_stokes_i()
-    args = {'offset_mean': 0,
-            'offset_std': (1e-3, 1e-6),
-            'fluctuations': (2., 1.),
-            'loglogavgslope': (-4., 1),
-            'flexibility': (5, 2.),
-            'asperity': (0.5, 0.5)}
-    sky = ift.SimpleCorrelatedField(ift.RGSpace((256, 256)), **args)
-    lh = rve.ImagingLikelihood(ob, sky, nthreads, epsilon)
 
 
 if __name__ == '__main__':
