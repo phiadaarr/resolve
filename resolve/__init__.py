@@ -1,1 +1,1 @@
-from .version import gitversion
+from .ms_import import ms2observations
