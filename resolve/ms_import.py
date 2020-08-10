@@ -9,7 +9,7 @@ import numpy as np
 from .direction import Direction
 from .observation import Observation
 from .polarization import Polarization
-from .util import my_assert
+from .util import my_asserteq
 
 
 def ms2observations(ms, data_column, spectral_window=None):
@@ -22,8 +22,8 @@ def ms2observations(ms, data_column, spectral_window=None):
         freqs = t.getcol('CHAN_FREQ')
     with table(join(ms, 'POLARIZATION'), **CFG) as t:
         polarization = t.getcol('CORR_TYPE')
-        my_assert(polarization.ndim == 2)
-        my_assert(polarization.shape[0] == 1)
+        my_asserteq(polarization.ndim, 2)
+        my_asserteq(polarization.shape[0], 1)
         polarization = Polarization(polarization[0])
     with table(join(ms, 'FIELD'), **CFG) as t:
         equinox = t.coldesc('REFERENCE_DIR')['desc']['keywords']['MEASINFO']['Ref']
@@ -32,7 +32,7 @@ def ms2observations(ms, data_column, spectral_window=None):
             equinox = 1950
         dirs = []
         for pc in t.getcol('REFERENCE_DIR'):
-            my_assert(pc.shape == (1, 2))
+            my_asserteq(pc.shape, (1, 2))
             dirs.append(Direction(pc[0], equinox))
         dirs = tuple(dirs)
     with table(ms, **CFG) as t:

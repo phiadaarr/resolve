@@ -8,6 +8,14 @@ def my_assert(cond):
         raise RuntimeError
 
 
+def my_asserteq(*args):
+    for aa in args[1:]:
+        if args[0] != aa:
+            print(args[0])
+            print(aa)
+            raise RuntimeError
+
+
 def compare_attributes(obj0, obj1, attribute_list):
     for a in attribute_list:
         compare = getattr(obj0, a) != getattr(obj1, a)

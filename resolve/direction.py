@@ -2,12 +2,12 @@
 # Copyright(C) 2020 Max-Planck-Society
 # Author: Philipp Arras
 
-from .util import my_assert, compare_attributes
+from .util import my_asserteq, compare_attributes
 
 
 class Direction:
     def __init__(self, phase_center, equinox):
-        my_assert(len(phase_center) == 2)
+        my_asserteq(len(phase_center), 2)
         self._pc = phase_center
         self._e = float(equinox)
 

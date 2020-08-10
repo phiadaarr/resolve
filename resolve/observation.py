@@ -7,7 +7,7 @@ import numpy as np
 
 from .direction import Direction
 from .polarization import Polarization
-from .util import compare_attributes, my_assert
+from .util import compare_attributes, my_assert, my_asserteq
 
 
 class Observation:
@@ -15,11 +15,20 @@ class Observation:
         nrows = uvw.shape[0]
         my_assert(isinstance(direction, Direction))
         my_assert(isinstance(polarization, Polarization))
-        my_assert(nrows == vis.shape[0])
-        my_assert(flags.shape == vis.shape)
-        my_assert(len(freq) == vis.shape[1])
-        my_assert(len(polarization) == vis.shape[2])
-        # Fallunterscheidung weight weightspectrum
+        my_asserteq(nrows, vis.shape[0])
+        my_asserteq(flags.shape, vis.shape)
+        my_asserteq(len(freq), vis.shape[1])
+        my_asserteq(len(polarization), vis.shape[2])
+
+        if weight.ndim == 2:
+            my_asserteq(weight.shape[0], vis.shape[0])
+            my_asserteq(weight.shape[1], vis.shape[2])
+        elif weight.ndim == 3:
+            my_asserteq(weight.shape, vis.shape)
+        else:
+            raise RuntimeError
+
+        # FIXME Try to estimate epsilon for response here
 
         self._uvw = uvw
         self._vis = vis
