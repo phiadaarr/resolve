@@ -10,14 +10,9 @@ Resolve is in beta stage: You are more than welcome to test it and help to make
 it applicable. Resolve is published in chunks whenever a new publication is
 finished. If you would like to try resolve, please make sure to ask
 `parras@mpa-garching.mpg.de` for the latest private version. In the likely case
-that you encounter bugs, please send a bug report to parras@mpg-garching.mpg.de.
+that you encounter bugs, please send a bug report to `parras@mpg-garching.mpg.de`.
 
 ## Requirements
-- [NIFTy5](https://gitlab.mpcdf.mpg.de/ift/NIFTy) tag `v5.0.1`
-- [pyNFFT](https://pypi.python.org/pypi/pyNFFT)
+- [NIFTy7](https://gitlab.mpcdf.mpg.de/ift/NIFTy) branch `NIFTy_7`
+- [ducc0](https://gitlab.mpcdf.mpg.de/mtr/ducc) branch `ducc0`
 - python-casacore
-
-## Reproduce plots in paper
-In order to reproduce the results of the latest resolve paper please contact
-`parras@mpa-garching.mpg.de` for the data. All scripts needed for the plots in
-the paper can be found in `scripts_paper/`.
