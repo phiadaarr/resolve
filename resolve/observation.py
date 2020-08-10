@@ -6,6 +6,7 @@ import h5py
 import numpy as np
 
 from .direction import Direction
+from .polarization import Polarization
 from .util import my_assert
 
 
@@ -13,6 +14,7 @@ class Observation:
     def __init__(self, uvw, vis, weight, flags, polarization, freq, direction):
         nrows = uvw.shape[0]
         my_assert(isinstance(direction, Direction))
+        my_assert(isinstance(polarization, Polarization))
         my_assert(nrows == vis.shape[0])
         my_assert(flags.shape == vis.shape)
         my_assert(len(freq) == vis.shape[1])

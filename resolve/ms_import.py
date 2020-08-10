@@ -8,6 +8,7 @@ import numpy as np
 
 from .direction import Direction
 from .observation import Observation
+from .polarization import Polarization
 from .util import my_assert
 
 
@@ -21,6 +22,9 @@ def ms2observations(ms, data_column, spectral_window=None):
         freqs = t.getcol('CHAN_FREQ')
     with table(join(ms, 'POLARIZATION'), **CFG) as t:
         polarization = t.getcol('CORR_TYPE')
+        my_assert(polarization.ndim == 2)
+        my_assert(polarization.shape[0] == 1)
+        polarization = Polarization(polarization[0])
     with table(join(ms, 'FIELD'), **CFG) as t:
         equ = t.coldesc('REFERENCE_DIR')['desc']['keywords']['MEASINFO']['Ref']
         dirs = []
@@ -52,9 +56,7 @@ def ms2observations(ms, data_column, spectral_window=None):
         mask = fieldid == ii
         if nspws > 1:
             mask = np.logical_and(mask, spwmask)
-        my_assert(polarization.ndim == 2)
-        my_assert(polarization.shape[0] == 1)
         observations.append(Observation(uvw[mask], vis[mask], weight[mask],
-                                        flags[mask], polarization[0], freqs,
+                                        flags[mask], polarization, freqs,
                                         dirs[ii]))
     return observations
