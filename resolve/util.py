@@ -13,9 +13,15 @@ def my_assert(cond):
 def my_asserteq(*args):
     for aa in args[1:]:
         if args[0] != aa:
-            print(args[0])
-            print(aa)
-            raise RuntimeError
+            raise RuntimeError(args[0], aa)
+
+
+def my_assert_isinstance(*args):
+    args = list(args)
+    cls = args.pop()
+    for aa in args:
+        if not isinstance(aa, cls):
+            raise RuntimeError(aa, cls)
 
 
 def compare_attributes(obj0, obj1, attribute_list):

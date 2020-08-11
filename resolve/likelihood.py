@@ -6,20 +6,28 @@ import nifty7 as ift
 
 from .observation import Observation
 from .response import StokesIResponse
-from .util import my_assert, my_asserteq
+from .util import my_assert_isinstance, my_asserteq
 
 
-class ImagingLikelihood(ift.Operator):
-    def __init__(self, observation, sky_operator):
-        my_assert(isinstance(observation, Observation))
-        my_assert(isinstance(sky_operator, ift.Operator))
-        R = StokesIResponse(observation, sky_operator.target)
-        my_asserteq(R.target.shape, observation.vis.shape)
-        invcov = ift.makeOp(ift.makeField(R.target, observation.weight))
-        vis = ift.makeField(R.target, observation.vis)
-        op = ift.GaussianEnergy(mean=vis, inverse_covariance=invcov) @ R @ sky_operator
-        self._domain, self._target = op.domain, op.target
-        self.apply = op.apply
+def ImagingLikelihood(observation, sky_operator):
+    my_assert_isinstance(observation, Observation)
+    my_assert_isinstance(sky_operator, ift.Operator)
+    R = StokesIResponse(observation, sky_operator.target)
+    my_asserteq(R.target, observation.vis.domain)
+    invcov = ift.makeOp(observation.weight)
+    return ift.GaussianEnergy(mean=observation.vis, inverse_covariance=invcov) @ R @ sky_operator
+
+
+def ImagingLikelihoodVariableCovariance(observation, sky_operator, inverse_covariance_operator):
+    my_assert_isinstance(observation, Observation)
+    my_assert_isinstance(sky_operator, inverse_covariance_operator, ift.Operator)
+    my_assert_isinstance(inverse_covariance_operator.domain, sky_operator.domain, ift.MultiDomain)
+    my_assert_isinstance(inverse_covariance_operator.target, sky_operator.target, ift.DomainTuple)
+    R = StokesIResponse(observation, sky_operator.target)
+    my_asserteq(R.target.shape, observation.vis.shape)
+    residual = ift.Adder(observation.vis, neg=True) @ R @ sky_operator
+    op = residual.ducktape_left('r') + inverse_covariance_operator.ducktape_left('ic')
+    return ift.VariableCovarianceGaussianEnergy(observation.vis.domain, 'r', 'ic', observation.vis.dtype) @ op
 
 
 class ImagingCalibrationLikelihood(ift.Operator):

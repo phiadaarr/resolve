@@ -8,16 +8,17 @@ from ducc0.wgridder import dirty2ms, ms2dirty
 import nifty7 as ift
 
 from .global_config import epsilon, nthreads, wstacking
-from .util import complex2float_dtype, my_assert, my_asserteq
+from .util import (complex2float_dtype, my_assert, my_assert_isinstance,
+                   my_asserteq)
 
 
 def StokesIResponse(observation, domain):
     npol = observation.vis.shape[0]
     my_assert(npol in [1, 2])
-    mask = (observation.weight > 0).astype(complex2float_dtype(observation.vis.dtype))
+    mask = (observation.weight.val > 0).astype(complex2float_dtype(observation.vis.dtype))
     sr0 = SingleResponse(domain, observation.uvw, observation.freq, mask[0])
     if npol == 1 or (npol == 2 and np.all(mask[0] == mask[1])):
-        contr = ift.ContractionOperator((ift.UnstructuredDomain(npol), sr0.target[0]), 0)
+        contr = ift.ContractionOperator(observation.vis.domain, 0)
         return contr.adjoint @ sr0
     elif npol == 2:
         sr1 = SingleResponse(domain, observation.uvw, observation.freq, mask[1])
@@ -29,13 +30,12 @@ class ResponseDistributor(ift.LinearOperator):
         dom, tgt = ops[0].domain, ops[0].target
         cap = self.TIMES | self.ADJOINT_TIMES
         for op in ops:
-            my_assert(isinstance(op, ift.LinearOperator))
+            my_assert_isinstance(op, ift.LinearOperator)
             my_assert(dom is op.domain)
             my_assert(tgt is op.target)
             my_asserteq(cap, op.capability)
         self._domain = ift.makeDomain(dom)
-        my_asserteq(len(tgt), 1)
-        self._target = ift.makeDomain((ift.UnstructuredDomain(len(ops)), tgt[0]))
+        self._target = ift.makeDomain((ift.UnstructuredDomain(len(ops)), *tgt))
         self._capability = cap
         self._ops = ops
 
@@ -64,7 +64,7 @@ class FullResponse(ift.LinearOperator):
 class SingleResponse(ift.LinearOperator):
     def __init__(self, domain, uvw, freq, mask):
         self._domain = ift.DomainTuple.make(domain)
-        self._target = ift.makeDomain(ift.UnstructuredDomain((uvw.shape[0], freq.size)))
+        self._target = ift.makeDomain(ift.UnstructuredDomain(ss) for ss in (uvw.shape[0], freq.size))
         self._capability = self.TIMES | self.ADJOINT_TIMES
         self._args = {
             'uvw': uvw,

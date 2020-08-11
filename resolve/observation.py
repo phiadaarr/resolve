@@ -5,16 +5,19 @@
 import h5py
 import numpy as np
 
+import nifty7 as ift
+
+from .constants import SPEEDOFLIGHT
 from .direction import Direction
 from .polarization import Polarization
-from .util import compare_attributes, my_assert, my_asserteq
+from .util import compare_attributes, my_assert_isinstance, my_asserteq
 
 
 class Observation:
     def __init__(self, uvw, vis, weight, polarization, freq, direction):
         nrows = uvw.shape[0]
-        my_assert(isinstance(direction, Direction))
-        my_assert(isinstance(polarization, Polarization))
+        my_assert_isinstance(direction, Direction)
+        my_assert_isinstance(polarization, Polarization)
         my_asserteq(weight.shape, vis.shape)
         my_asserteq(vis.shape, (len(polarization), nrows, len(freq)))
 
@@ -33,7 +36,8 @@ class Observation:
         return np.sum(self._weight == 0)/self._weight.size
 
     def compress(self):
-        shp0 = self._vis.size
+        shp0 = self._vis.shape
+        # TODO Iterate between rows and frequencies until nothing can be removed anymore
         # Remove flagged rows
         sel = np.any(self._weight != 0, axis=2)
         sel = np.any(sel != 0, axis=0)
@@ -97,13 +101,19 @@ class Observation:
     def uvw(self):
         return self._uvw
 
+    def effective_uvwlen(self):
+        uvlen = np.linalg.norm(self._uvw, axis=1)
+        return np.outer(uvlen, self._freq/SPEEDOFLIGHT)
+
     @property
     def vis(self):
-        return self._vis
+        dom = [ift.UnstructuredDomain(ss) for ss in self._vis.shape]
+        return ift.makeField(dom, self._vis)
 
     @property
     def weight(self):
-        return self._weight
+        dom = [ift.UnstructuredDomain(ss) for ss in self._weight.shape]
+        return ift.makeField(dom, self._weight)
 
     @property
     def freq(self):
