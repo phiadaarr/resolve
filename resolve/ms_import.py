@@ -6,6 +6,7 @@ from os.path import isdir, join, splitext
 
 import numpy as np
 
+from .antenna_positions import AntennaPositions
 from .direction import Direction
 from .observation import Observation
 from .polarization import Polarization
@@ -44,6 +45,10 @@ def ms2observations(ms, data_column, spectral_window=None):
         flags = t.getcol('FLAG')
         fieldid = t.getcol('FIELD_ID')
         spw = t.getcol("DATA_DESC_ID")
+        ant1 = t.getcol("ANTENNA1")
+        ant2 = t.getcol("ANTENNA2")
+        time = t.getcol("TIME")
+        antpos = AntennaPositions(uvw, ant1, ant2, time)
 
     nspws = len(np.unique(spw))
     if nspws > 1:
@@ -66,6 +71,6 @@ def ms2observations(ms, data_column, spectral_window=None):
         myvis, myweight = vis[mask], weight[mask]
         myvis = np.ascontiguousarray(np.transpose(vis[mask], (2, 0, 1)))
         myweight = np.ascontiguousarray(np.transpose(weight[mask], (2, 0, 1)))
-        observations.append(Observation(uvw[mask], myvis, myweight,
+        observations.append(Observation(antpos[mask], myvis, myweight,
                                         polarization, freqs, dirs[ii]))
     return observations

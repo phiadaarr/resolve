@@ -16,6 +16,7 @@ rve.set_nthreads(nthreads)
 rve.set_epsilon(1e-4)
 rve.set_wstacking(False)
 OBSERVATION = rve.ms2observations('data/CYG-ALL-2052-2MHZ.ms', 'DATA')[0]
+OBS = [OBSERVATION.restrict_to_stokes_i(), OBSERVATION.average_stokes_i()]
 npix, fov = 256, 1*rve.DEG2RAD
 dom = ift.RGSpace((npix, npix), (fov/npix, fov/npix))
 sky0 = ift.SimpleCorrelatedField(dom, 21, (1, 0.1), (5, 1), (1.2, 0.4), (0.2, 0.2), (-2, 0.5)).exp()
@@ -47,33 +48,32 @@ def try_operator(op):
     # ift.extra.check_operator(op, pos, ntries=10)
 
 
-@pmp('mode', (True, False))
-@pmp('noisemodel', range(4))
-def test_imaging_likelihoods(mode, noisemodel):
-    ob = OBSERVATION
+@pmp('obs', OBS)
+def test_imaging_likelihood(obs):
+    lh = rve.ImagingLikelihood(obs, sky)
+    try_operator(lh)
 
-    oo = ob.restrict_to_stokes_i() if mode else ob.average_stokes_i()
-    if noisemodel == 0:
-        lh = rve.ImagingLikelihood(oo, sky)
-        try_operator(lh)
-        return
-    elif noisemodel == 1:
-        invcovop = ift.InverseGammaOperator(oo.vis.domain, 1, 1/oo.weight).reciprocal().ducktape('invcov')
-        lh = rve.ImagingLikelihoodVariableCovariance(oo, sky, invcovop)
-        try_operator(lh)
-        return
-    efflen = oo.effective_uvwlen()
+
+@pmp('obs', OBS)
+def test_varcov_likelihood(obs):
+    invcovop = ift.InverseGammaOperator(obs.vis.domain, 1, 1/obs.weight).reciprocal().ducktape('invcov')
+    lh = rve.ImagingLikelihoodVariableCovariance(obs, sky, invcovop)
+    try_operator(lh)
+
+
+@pmp('obs', OBS)
+@pmp('noisemodel', range(4))
+def test_imaging_likelihoods(obs, noisemodel):
+    efflen = obs.effective_uvwlen()
     npix = 2500
     dom = ift.RGSpace(npix, 2*max(efflen)/npix)
     baseline_distributor = ift.LinearInterpolator(dom, efflen.T)
-    pol_freq_copy = ift.ContractionOperator(oo.vis.domain, (0, 2)).adjoint
+    pol_freq_copy = ift.ContractionOperator(obs.vis.domain, (0, 2)).adjoint
     cf = ift.SimpleCorrelatedField(dom, 0, (2, 2), (2, 2), (1.2, 0.4), (0.5, 0.2), (-2, 0.5), 'invcov').exp()
     correction = pol_freq_copy @ baseline_distributor @ cf
-    if noisemodel == 2:
-        # Multiplicative noise model TODO Try without **(-2)
-        invcovop = ift.makeOp(oo.weight) @ correction**(-2)
-    else:
-        # Additive noise model
-        invcovop = (ift.Adder(1/oo.weight) @ correction**2).reciprocal()
-    lh = rve.ImagingLikelihoodVariableCovariance(oo, sky, invcovop)
+    if noisemodel == 2:  # Multiplicative noise model TODO Try without **(-2)
+        invcovop = ift.makeOp(obs.weight) @ correction**(-2)
+    else:  # Additive noise model
+        invcovop = (ift.Adder(1/obs.weight) @ correction**2).reciprocal()
+    lh = rve.ImagingLikelihoodVariableCovariance(obs, sky, invcovop)
     try_operator(lh)
