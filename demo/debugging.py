@@ -5,8 +5,9 @@
 import resolve as rve
 import nifty7 as ift
 
-nthreads = 2
-epsilon = 1e-4
+rve.set_nthreads(2)
+rve.set_epsilon(1e-4)
+rve.set_wstacking(False)
 
 
 def save_and_load_hdf5(obs):
@@ -27,9 +28,11 @@ def main():
             'loglogavgslope': (-4., 1),
             'flexibility': (5, 2.),
             'asperity': (0.5, 0.5)}
-    sky = ift.SimpleCorrelatedField(ift.RGSpace((256, 256)), **args)
-    lh = rve.ImagingLikelihood(ob.restrict_to_stokes_i(), sky, nthreads, epsilon)
-    lh = rve.ImagingLikelihood(ob.average_stokes_i(), sky, nthreads, epsilon)
+    npix, fov = 256, 1*rve.DEG2RAD
+    dom = ift.RGSpace((npix, npix), (fov/npix, fov/npix))
+    sky = rve.vla_beam(dom, 2e9) @ ift.SimpleCorrelatedField(dom, **args).exp()
+    lh = rve.ImagingLikelihood(ob.restrict_to_stokes_i(), sky)
+    lh = rve.ImagingLikelihood(ob.average_stokes_i(), sky)
 
     obs = rve.ms2observations('./CYG-ALL-2052-2MHZ.ms', 'DATA')
     save_and_load_hdf5(obs)

@@ -6,22 +6,20 @@ import nifty7 as ift
 
 from .observation import Observation
 from .response import StokesIResponse
-from .util import my_assert, my_asserteq, complex2float_dtype
+from .util import my_assert, my_asserteq
 
 
 class ImagingLikelihood(ift.Operator):
-    def __init__(self, observation, sky_operator, nthreads, epsilon):
+    def __init__(self, observation, sky_operator):
         my_assert(isinstance(observation, Observation))
         my_assert(isinstance(sky_operator, ift.Operator))
-
-        # FIXME Will be removed as soon as ducc can figure that out itself
-        wstacking = False
-        R = StokesIResponse(observation, sky_operator.target, nthreads, epsilon, wstacking)
-        # TEMP
-        ift.extra.check_linear_operator(R, target_dtype=observation.vis.dtype,
-                                        domain_dtype=complex2float_dtype(observation.vis.dtype),
-                                        only_r_linear=True, rtol=epsilon, atol=epsilon)
+        R = StokesIResponse(observation, sky_operator.target)
         my_asserteq(R.target.shape, observation.vis.shape)
+        invcov = ift.makeOp(ift.makeField(R.target, observation.weight))
+        vis = ift.makeField(R.target, observation.vis)
+        op = ift.GaussianEnergy(mean=vis, inverse_covariance=invcov) @ R @ sky_operator
+        self._domain, self._target = op.domain, op.target
+        self.apply = op.apply
 
 
 class ImagingCalibrationLikelihood(ift.Operator):

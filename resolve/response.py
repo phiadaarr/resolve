@@ -7,21 +7,20 @@ from ducc0.wgridder import dirty2ms, ms2dirty
 
 import nifty7 as ift
 
+from .global_config import epsilon, nthreads, wstacking
 from .util import complex2float_dtype, my_assert, my_asserteq
 
 
-def StokesIResponse(observation, domain, nthreads, epsilon, wstacking):
+def StokesIResponse(observation, domain):
     npol = observation.vis.shape[0]
     my_assert(npol in [1, 2])
     mask = (observation.weight > 0).astype(complex2float_dtype(observation.vis.dtype))
-    sr0 = SingleResponse(domain, observation.uvw, observation.freq, mask[0],
-                         nthreads, epsilon, wstacking)
+    sr0 = SingleResponse(domain, observation.uvw, observation.freq, mask[0])
     if npol == 1 or (npol == 2 and np.all(mask[0] == mask[1])):
         contr = ift.ContractionOperator((ift.UnstructuredDomain(npol), sr0.target[0]), 0)
         return contr.adjoint @ sr0
     elif npol == 2:
-        sr1 = SingleResponse(domain, observation.uvw, observation.freq, mask[1],
-                             nthreads, epsilon, wstacking)
+        sr1 = SingleResponse(domain, observation.uvw, observation.freq, mask[1])
         return ResponseDistributor(sr0, sr1)
 
 
@@ -58,12 +57,12 @@ class ResponseDistributor(ift.LinearOperator):
 
 
 class FullResponse(ift.LinearOperator):
-    def __init__(self, observation, sky_domain, nthreads, epsilon, wstacking):
+    def __init__(self, observation, sky_domain):
         raise NotImplementedError
 
 
 class SingleResponse(ift.LinearOperator):
-    def __init__(self, domain, uvw, freq, mask, nthreads, epsilon, wstacking):
+    def __init__(self, domain, uvw, freq, mask):
         self._domain = ift.DomainTuple.make(domain)
         self._target = ift.makeDomain(ift.UnstructuredDomain((uvw.shape[0], freq.size)))
         self._capability = self.TIMES | self.ADJOINT_TIMES
@@ -75,9 +74,9 @@ class SingleResponse(ift.LinearOperator):
             'nv': 0,
             'pixsize_x': self._domain[0].distances[0],
             'pixsize_y': self._domain[0].distances[1],
-            'epsilon': epsilon,
-            'do_wstacking': wstacking,
-            'nthreads': nthreads
+            'epsilon': epsilon(),
+            'do_wstacking': wstacking(),
+            'nthreads': nthreads()
         }
         self._vol = self._domain[0].scalar_dvol
 
