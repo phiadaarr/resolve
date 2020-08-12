@@ -8,23 +8,22 @@ from ducc0.wgridder import dirty2ms, ms2dirty
 import nifty7 as ift
 
 from .global_config import epsilon, nthreads, wstacking
-from .util import (complex2float_dtype, my_assert, my_assert_isinstance,
-                   my_asserteq)
-
-# FIXME Use flagging functionality from ducc0
+from .util import my_assert, my_assert_isinstance, my_asserteq
 
 
 def StokesIResponse(observation, domain):
     npol = observation.vis.shape[0]
     my_assert(npol in [1, 2])
-    mask = (observation.weight.val > 0).astype(complex2float_dtype(observation.vis.dtype))
-    sr0 = SingleResponse(domain, observation.uvw, observation.freq, mask[0])
+    mask = (observation.weight.val == 0).astype(np.uint8)
+    sp = observation.vis.dtype == np.complex64
+    sr0 = SingleResponse(domain, observation.uvw, observation.freq, mask[0], sp)
     if npol == 1 or (npol == 2 and np.all(mask[0] == mask[1])):
         contr = ift.ContractionOperator(observation.vis.domain, 0)
         return contr.adjoint @ sr0
     elif npol == 2:
-        sr1 = SingleResponse(domain, observation.uvw, observation.freq, mask[1])
+        sr1 = SingleResponse(domain, observation.uvw, observation.freq, mask[1], sp)
         return ResponseDistributor(sr0, sr1)
+    raise RuntimeError
 
 
 class ResponseDistributor(ift.LinearOperator):
@@ -64,14 +63,15 @@ class FullResponse(ift.LinearOperator):
 
 
 class SingleResponse(ift.LinearOperator):
-    def __init__(self, domain, uvw, freq, mask):
+    def __init__(self, domain, uvw, freq, mask, single_precision):
+        # FIXME Currently only the response uses single_precision if possible. Could be rolled out to the whole likelihood
         self._domain = ift.DomainTuple.make(domain)
         self._target = ift.makeDomain(ift.UnstructuredDomain(ss) for ss in (uvw.shape[0], freq.size))
         self._capability = self.TIMES | self.ADJOINT_TIMES
         self._args = {
             'uvw': uvw,
             'freq': freq,
-            'wgt': mask,
+            'mask': mask,
             'nu': 0,
             'nv': 0,
             'pixsize_x': self._domain[0].distances[0],
@@ -81,17 +81,23 @@ class SingleResponse(ift.LinearOperator):
             'nthreads': nthreads()
         }
         self._vol = self._domain[0].scalar_dvol
+        self._target_dtype = np.complex64 if single_precision else np.complex128
+        self._domain_dtype = np.float32 if single_precision else np.float64
 
     def apply(self, x, mode):
         self._check_input(x, mode)
+        # my_asserteq(x.dtype, self._domain_dtype if mode == self.TIMES else self._target_dtype)
+        x = x.val.astype(self._domain_dtype if mode == self.TIMES else self._target_dtype)
         if mode == self.TIMES:
-            args1 = {'dirty': x.val.astype(self._args['wgt'].dtype)}
+            args1 = {'dirty': x}
             f = dirty2ms
         else:
             args1 = {
-                'ms': x.val,
+                'ms': x,
                 'npix_x': self._domain[0].shape[0],
                 'npix_y': self._domain.shape[1]
             }
             f = ms2dirty
-        return ift.makeField(self._tgt(mode), f(**self._args, **args1)*self._vol)
+        res = ift.makeField(self._tgt(mode), f(**self._args, **args1)*self._vol)
+        my_asserteq(res.dtype, self._target_dtype if mode == self.TIMES else self._domain_dtype)
+        return res

@@ -45,7 +45,7 @@ def try_operator(op):
     pos = ift.from_random(op.domain)
     op(pos)
     lin = op(ift.Linearization.make_var(pos))
-    # lin.gradient
+    lin.gradient
 
 
 @pmp('obs', OBS)

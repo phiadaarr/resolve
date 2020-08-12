@@ -32,7 +32,8 @@ def ImagingLikelihoodVariableCovariance(observation, sky_operator, inverse_covar
 
 class ImagingCalibrationLikelihood(ift.Operator):
     def __init__(self, observation, sky_operator, calibration_operator):
-        # Warn if npols=1
+        if observation.vis.shape[0] == 1:
+            print('Warning: Use calibration with only one polarization present.')
         raise NotImplementedError
 
 
