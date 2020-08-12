@@ -20,9 +20,11 @@ def calibration_distribution(observation, phase_operator, logamplitude_operator,
     ap = observation.antenna_positions
     cop1 = CalibrationDistributor(dom, tgt, ap.ant1, ap.time, antenna_dct, time_dct)
     cop2 = CalibrationDistributor(dom, tgt, ap.ant2, ap.time, antenna_dct, time_dct)
+    # FIXME Move to tests
+    ift.extra.check_linear_operator(cop1)
     my_asserteq(cop1.domain, cop2.domain)
     my_asserteq(cop1.target, cop2.target)
-    res0 = (cop1 + cop2) @ logamplitude_operator
+    res0 = (cop1 + cop2).real @ logamplitude_operator
     res1 = (1j*(cop1 - cop2).real) @ phase_operator
     return (res0 + res1).exp()
 
@@ -48,25 +50,38 @@ class CalibrationDistributor(ift.LinearOperator):
         if isinstance(self._domain[1], ift.RGSpace):
             my_assert(time_dct is None)
             mytime = time_col
+            self._ntimes = self._domain[1].size
         else:
             mytime = np.empty(time_col.size, int)
             for kk, vv in time_dct.items():
                 mytime[time_col == kk] = vv
+            self._ntimes = len(time_dct)
         self._li = MyLinearInterpolator(self._domain[1], self._nantennas, myants, mytime)
 
     def apply(self, x, mode):
         self._check_input(x, mode)
+        res = None
+        x = x.val
         if mode == self.TIMES:
-            res = None
-            x = x.val.reshape(self._target.shape[0], self._nantennas, -1, self._target.shape[2])
-            for pol in range(self._target.shape[0]):
-                for freq in range(self._target.shape[2]):
+            x = x.reshape(self._target.shape[0], self._nantennas, -1, self._target.shape[2])
+        for pol in range(self._target.shape[0]):
+            for freq in range(self._target.shape[2]):
+                if mode == self.TIMES:
                     tmp = self._li(ift.makeField(self._li.domain, x[pol, :, :, freq])).val
-                    if res is None:
-                        res = np.empty(self._target.shape, dtype=tmp.dtype)
+                else:
+                    tmp = self._li.adjoint(ift.makeField(self._li.target, x[pol, :, freq])).val
+                if res is None:
+                    shp = self._target.shape
+                    if mode == self.ADJOINT_TIMES:
+                        shp = self._target.shape[0], self._nantennas, self._ntimes, self._target.shape[2]
+                    res = np.empty(shp, dtype=tmp.dtype)
+                if mode == self.TIMES:
                     res[pol, :, freq] = tmp
-            return ift.makeField(self.target, res)
-        raise NotImplementedError
+                else:
+                    res[pol, :, :, freq] = tmp
+        if mode == self.ADJOINT_TIMES:
+            res = res.reshape(self._domain.shape)
+        return ift.makeField(self._tgt(mode), res)
 
 
 class MyLinearInterpolator(ift.LinearOperator):

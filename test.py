@@ -44,8 +44,8 @@ def test_save_and_load_hdf5(ms):
 def try_operator(op):
     pos = ift.from_random(op.domain)
     op(pos)
-    op(ift.Linearization.make_var(pos))
-    # ift.extra.check_operator(op, pos, ntries=10)
+    lin = op(ift.Linearization.make_var(pos))
+    # lin.gradient
 
 
 @pmp('obs', OBS)
