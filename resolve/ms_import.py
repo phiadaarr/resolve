@@ -63,6 +63,8 @@ def ms2observations(ms, data_column, spectral_window=None):
         weight = weight[:, None]
     weight[flags] = 0
 
+    # FIXME Determine which observation is calibration observation
+    # FIXME Import name of source
     observations = []
     for ii in set(fieldid):
         mask = fieldid == ii

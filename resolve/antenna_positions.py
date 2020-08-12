@@ -4,7 +4,8 @@
 
 import numpy as np
 
-from .util import compare_attributes, my_assert, my_asserteq
+from .util import (compare_attributes, my_assert, my_assert_isinstance,
+                   my_asserteq)
 
 
 class AntennaPositions:
@@ -17,13 +18,24 @@ class AntennaPositions:
         my_assert(np.issubdtype(time.dtype, np.floating))
         self._uvw, self._time = uvw, time
         self._ant1, self._ant2 = ant1, ant2
+        self._t0 = None
 
     def to_list(self):
         return [self._uvw, self._ant1, self._ant2, self._time]
 
+    def unique_antennas(self):
+        return set(np.unique(self._ant1)) | set(np.unique(self._ant2))
+
+    def unique_times(self):
+        return set(np.unique(self._time))
+
     @staticmethod
     def from_list(lst):
         return AntennaPositions(*lst)
+
+    def move_time(self, t0):
+        return AntennaPositions(self._uvw, self._ant1, self._ant2,
+                                self._time+t0)
 
     def __eq__(self, other):
         if not isinstance(other, AntennaPositions):
@@ -40,3 +52,15 @@ class AntennaPositions:
     @property
     def uvw(self):
         return self._uvw
+
+    @property
+    def time(self):
+        return self._time
+
+    @property
+    def ant1(self):
+        return self._ant1
+
+    @property
+    def ant2(self):
+        return self._ant2

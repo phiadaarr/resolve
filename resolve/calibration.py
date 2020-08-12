@@ -6,28 +6,90 @@ import numpy as np
 
 import nifty7 as ift
 
-from .util import my_assert, my_asserteq
+from .observation import Observation
+from .util import my_assert, my_assert_isinstance, my_asserteq
 
 
-class Calibration:
-    def __init__(self, t_pix, t_max, antennas, xi_key, zero_padding_factor, amplitude, clip=[]):
-        tdst = t_max/(t_pix - 1)
-        tspace = ift.RGSpace(t_pix, distances=tdst)
-        sp_ant = ift.UnstructuredDomain(len(antennas))
-        dom = ift.DomainTuple.make((sp_ant, tspace))
+def calibration_distribution(observation, phase_operator, logamplitude_operator, antenna_dct, time_dct=None):
+    # FIXME Maybe change convention from phase_operator.target.shape is (npol, nants, X, nfreqs) to (npol*nants*nfreqs, X)
+    my_assert_isinstance(observation, Observation)
+    my_assert_isinstance(phase_operator, logamplitude_operator, ift.Operator)
+    dom = phase_operator.target
+    my_asserteq(dom, logamplitude_operator.target)
+    tgt = observation.vis.domain
+    ap = observation.antenna_positions
+    cop1 = CalibrationDistributor(dom, tgt, ap.ant1, ap.time, antenna_dct, time_dct)
+    cop2 = CalibrationDistributor(dom, tgt, ap.ant2, ap.time, antenna_dct, time_dct)
+    my_asserteq(cop1.domain, cop2.domain)
+    my_asserteq(cop1.target, cop2.target)
+    res0 = (cop1 + cop2) @ logamplitude_operator
+    res1 = (1j*(cop1 - cop2).real) @ phase_operator
+    return (res0 + res1).exp()
 
-        zp = ift.FieldZeroPadder(dom, (zero_padding_factor*tspace.shape[0],), space=1)
-        self._op = zp.adjoint @ ht @ hop
-        self.nozeropad = ht @ hop
+
+class CalibrationDistributor(ift.LinearOperator):
+    def __init__(self, domain, target, ant_col, time_col, antenna_dct, time_dct):
+        # Domain: pols*antennas*freqs, time
+        # Target: vis.shape
+        my_asserteq(ant_col.ndim, 1)
+        my_assert(np.issubdtype(ant_col.dtype, np.integer))
+        my_assert(set(np.unique(ant_col)) <= set(antenna_dct.keys()))
+        my_assert(np.min(ant_col) >= 0)
+        my_assert(np.max(ant_col) < len(antenna_dct))
+        self._domain = ift.DomainTuple.make(domain)
+        self._target = ift.DomainTuple.make(target)
+        self._capability = self.TIMES | self.ADJOINT_TIMES
+        self._nantennas = len(antenna_dct)
+
+        # Support missing antennas
+        myants = np.empty_like(ant_col)
+        for kk, vv in antenna_dct.items():
+            myants[ant_col == kk] = vv
+        if isinstance(self._domain[1], ift.RGSpace):
+            my_assert(time_dct is None)
+            mytime = time_col
+        else:
+            mytime = np.empty(time_col.size, int)
+            for kk, vv in time_dct.items():
+                mytime[time_col == kk] = vv
+        self._li = MyLinearInterpolator(self._domain[1], self._nantennas, myants, mytime)
+
+    def apply(self, x, mode):
+        self._check_input(x, mode)
+        if mode == self.TIMES:
+            res = None
+            x = x.val.reshape(self._target.shape[0], self._nantennas, -1, self._target.shape[2])
+            for pol in range(self._target.shape[0]):
+                for freq in range(self._target.shape[2]):
+                    tmp = self._li(ift.makeField(self._li.domain, x[pol, :, :, freq])).val
+                    if res is None:
+                        res = np.empty(self._target.shape, dtype=tmp.dtype)
+                    res[pol, :, freq] = tmp
+            return ift.makeField(self.target, res)
+        raise NotImplementedError
 
 
-def CalibrationDistributor(domain, ant, time):
-    my_asserteq(len(time.shape), 1)
-    my_asserteq(ant.shape, time.shape)
-    my_assert(time.min() >= 0)
-    my_assert(time.max() < domain[1].total_volume)
-    dd = [ift.RGSpace(domain[0].shape, distances=1.), domain[1]]
-    dd = ift.DomainTuple.make(dd)
-    positions = np.array([ant, time])
-    li = ift.LinearInterpolator(dd, positions)
-    return li @ ift.Realizer(li.domain) @ ift.GeometryRemover(dd, 0).adjoint
+class MyLinearInterpolator(ift.LinearOperator):
+    def __init__(self, time_domain, nants, ant_col, time_col):
+        my_assert_isinstance(time_domain, (ift.RGSpace, ift.UnstructuredDomain))
+        my_asserteq(len(time_domain.shape), 1)
+        floattime = isinstance(time_domain, ift.RGSpace)
+        dt = time_domain.distances[0] if floattime else 1
+        dom = ift.DomainTuple.make((ift.RGSpace((nants, time_domain.size), (1, dt))))
+        self._domain = ift.makeDomain((ift.UnstructuredDomain(nants), time_domain))
+        self._li = ift.LinearInterpolator(dom, np.array([ant_col, time_col]))
+        self._target = self._li.target
+        self._capability = self.TIMES | self.ADJOINT_TIMES
+        my_asserteq(ant_col.ndim, time_col.ndim, 1)
+        my_asserteq(ant_col.shape, time_col.shape)
+        my_assert(np.min(ant_col) >= 0)
+        my_assert(np.max(ant_col) < self._domain.shape[0]*dom[0].distances[0])
+        my_assert(np.min(time_col) >= 0)
+        my_assert(np.max(time_col) < self._domain.shape[1]*dom[0].distances[1])
+        my_assert(np.issubdtype(ant_col.dtype, np.integer))
+        my_assert(np.issubdtype(time_col.dtype, np.floating if floattime else np.integer))
+
+    def apply(self, x, mode):
+        self._check_input(x, mode)
+        op = self._li if mode == self.TIMES else self._li.adjoint
+        return op(ift.makeField(op.domain, x.val))

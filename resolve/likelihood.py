@@ -32,9 +32,14 @@ def ImagingLikelihoodVariableCovariance(observation, sky_operator, inverse_covar
 
 class ImagingCalibrationLikelihood(ift.Operator):
     def __init__(self, observation, sky_operator, calibration_operator):
+        # Warn if npols=1
         raise NotImplementedError
 
 
-class CalibrationLikelihood(ift.Operator):
-    def __init__(self, observation, calibration_operator, model_visibilities):
-        raise NotImplementedError
+def CalibrationLikelihood(observation, calibration_operator, model_visibilities):
+    if observation.vis.shape[0] == 1:
+        print('Warning: Use calibration with only one polarization present.')
+    my_assert_isinstance(calibration_operator.domain, ift.MultiDomain)
+    my_asserteq(calibration_operator.target, model_visibilities.domain, observation.vis.domain)
+    invcov = ift.makeOp(observation.weight)
+    return ift.GaussianEnergy(observation.vis, invcov) @ ift.makeOp(model_visibilities) @ calibration_operator

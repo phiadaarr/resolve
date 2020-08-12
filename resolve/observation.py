@@ -14,6 +14,8 @@ from .polarization import Polarization
 from .util import compare_attributes, my_assert_isinstance, my_asserteq
 
 
+# FIXME Introduce Observation.nfreqs, .nrows, .npol
+
 class Observation:
     def __init__(self, antenna_positions, vis, weight, polarization, freq, direction):
         nrows = len(antenna_positions)
@@ -100,12 +102,18 @@ class Observation:
         return Observation(self._antpos, vis, weight, pol, self._freq,
                            self._direction)
 
-    def convert_timestamps_to_unique(self, interval=0):
-        raise NotImplementedError
+    def move_time(self, t0):
+        antpos = self._antpos.move_time(t0)
+        return Observation(antpos, self._vis, self._weight, self._polarization,
+                           self._freq, self._direction)
 
     @property
     def uvw(self):
         return self._antpos.uvw
+
+    @property
+    def antenna_positions(self):
+        return self._antpos
 
     def effective_uvwlen(self):
         uvlen = np.linalg.norm(self.uvw, axis=1)
@@ -132,3 +140,26 @@ class Observation:
     @property
     def direction(self):
         return self._direction
+
+
+def tmin_tmax(*args):
+    my_assert_isinstance(*args, Observation)
+    mi = min([np.min(aa.antenna_positions.time) for aa in args])
+    ma = max([np.max(aa.antenna_positions.time) for aa in args])
+    return mi, ma
+
+
+def unique_antennas(*args):
+    my_assert_isinstance(*args, Observation)
+    antennas = set()
+    for oo in args:
+        antennas = antennas | oo.antenna_positions.unique_antennas()
+    return antennas
+
+
+def unique_times(*args):
+    my_assert_isinstance(*args, Observation)
+    times = set()
+    for oo in args:
+        times = times | oo.antenna_positions.unique_times()
+    return times

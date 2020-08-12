@@ -11,6 +11,8 @@ from .global_config import epsilon, nthreads, wstacking
 from .util import (complex2float_dtype, my_assert, my_assert_isinstance,
                    my_asserteq)
 
+# FIXME Use flagging functionality from ducc0
+
 
 def StokesIResponse(observation, domain):
     npol = observation.vis.shape[0]
