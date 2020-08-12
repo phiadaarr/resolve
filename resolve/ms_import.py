@@ -61,7 +61,13 @@ def ms2observations(ms, data_column, spectral_window=None):
 
     if weight.ndim == 2:
         weight = weight[:, None]
-    weight[flags] = 0
+    # Convention: can use flag as index array: vis[flags] gives out good visibilities
+    flags = ~flags
+    inds = weight == 0
+    weight[inds] = 1
+    flags[inds] = True
+    # Convention: multiply v by -1
+    uvw[:, 1] *= -1
 
     # FIXME Determine which observation is calibration observation
     # FIXME Import name of source
@@ -73,6 +79,7 @@ def ms2observations(ms, data_column, spectral_window=None):
         myvis, myweight = vis[mask], weight[mask]
         myvis = np.ascontiguousarray(np.transpose(vis[mask], (2, 0, 1)))
         myweight = np.ascontiguousarray(np.transpose(weight[mask], (2, 0, 1)))
-        observations.append(Observation(antpos[mask], myvis, myweight,
+        myflags = np.ascontiguousarray(np.transpose(flags[mask], (2, 0, 1)))
+        observations.append(Observation(antpos[mask], myvis, myweight, myflags,
                                         polarization, freqs, dirs[ii]))
     return observations

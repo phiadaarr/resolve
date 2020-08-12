@@ -19,8 +19,8 @@ def StokesIResponse(observation, domain):
     my_assert_isinstance(domain[0], ift.RGSpace)
     npol = observation.vis.shape[0]
     my_assert(npol in [1, 2])
-    mask = (observation.weight.val != 0).astype(np.uint8)
     sp = observation.vis.dtype == np.complex64
+    mask = observation.flags.val
     sr0 = SingleResponse(domain, observation.uvw, observation.freq, mask[0], sp)
     if npol == 1 or (npol == 2 and np.all(mask[0] == mask[1])):
         contr = ift.ContractionOperator(observation.vis.domain, 0)
@@ -76,7 +76,7 @@ class SingleResponse(ift.LinearOperator):
         self._args = {
             'uvw': uvw,
             'freq': freq,
-            'mask': mask,
+            'mask': mask.astype(np.uint8),
             'nu': 0,
             'nv': 0,
             'pixsize_x': self._domain[0].distances[0],
