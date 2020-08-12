@@ -19,7 +19,7 @@ def StokesIResponse(observation, domain):
     my_assert_isinstance(domain[0], ift.RGSpace)
     npol = observation.vis.shape[0]
     my_assert(npol in [1, 2])
-    mask = (observation.weight.val == 0).astype(np.uint8)
+    mask = (observation.weight.val != 0).astype(np.uint8)
     sp = observation.vis.dtype == np.complex64
     sr0 = SingleResponse(domain, observation.uvw, observation.freq, mask[0], sp)
     if npol == 1 or (npol == 2 and np.all(mask[0] == mask[1])):
