@@ -8,6 +8,8 @@ from .observation import Observation
 from .response import StokesIResponse
 from .util import my_assert_isinstance, my_asserteq
 
+# FIXME VariableCovariance version for all likelihoods
+
 
 def ImagingLikelihood(observation, sky_operator):
     my_assert_isinstance(observation, Observation)
@@ -30,11 +32,17 @@ def ImagingLikelihoodVariableCovariance(observation, sky_operator, inverse_covar
     return ift.VariableCovarianceGaussianEnergy(observation.vis.domain, 'r', 'ic', observation.vis.dtype) @ op
 
 
-class ImagingCalibrationLikelihood(ift.Operator):
-    def __init__(self, observation, sky_operator, calibration_operator):
-        if observation.vis.shape[0] == 1:
-            print('Warning: Use calibration with only one polarization present.')
-        raise NotImplementedError
+def ImagingCalibrationLikelihood(observation, sky_operator, calibration_operator):
+    if observation.vis.shape[0] == 1:
+        print('Warning: Use calibration with only one polarization present.')
+    my_assert_isinstance(observation, Observation)
+    my_assert_isinstance(sky_operator, calibration_operator, ift.Operator)
+    my_assert_isinstance(calibration_operator.domain, ift.MultiDomain)
+    R = StokesIResponse(observation, sky_operator.target)
+    my_asserteq(R.target, observation.vis.domain, calibration_operator.target)
+    invcov = ift.makeOp(observation.weight)
+    modelvis = calibration_operator*(R @ sky_operator)
+    return ift.GaussianEnergy(mean=observation.vis, inverse_covariance=invcov) @ modelvis
 
 
 def CalibrationLikelihood(observation, calibration_operator, model_visibilities):

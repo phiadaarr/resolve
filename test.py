@@ -99,48 +99,52 @@ def test_calibration_likelihood(time_mode):
         time_dct = {aa: ii for ii, aa in enumerate(utimes)}
     nants = len(uants)
     ntimes = len(utimes)
-    lh = None
+    # total_N = npol*nants*nfreqs
+    total_N = obs[0].vis.shape[0]*nants*obs[0].vis.shape[2]
+    if time_mode:
+        dct = {
+            'offset_mean': 0,
+            'offset_std': (1, 0.5),
+            'prefix': 'calibration_phases'
+        }
+        dct1 = {
+            'fluctuations': (2., 1.),
+            'loglogavgslope': (-4., 1),
+            'flexibility': (5, 2.),
+            'asperity': None
+        }
+        cfm = ift.CorrelatedFieldMaker.make(**dct, total_N=total_N)
+        cfm.add_fluctuations(time_domain, **dct1)
+        phase = cfm.finalize(0)
+        dct = {
+            'offset_mean': 0,
+            'offset_std': (1e-3, 1e-6),
+            'prefix': 'calibration_logamplitudes'
+        }
+        dct1 = {
+            'fluctuations': (2., 1.),
+            'loglogavgslope': (-4., 1),
+            'flexibility': (5, 2.),
+            'asperity': None
+        }
+        cfm = ift.CorrelatedFieldMaker.make(**dct, total_N=total_N)
+        cfm.add_fluctuations(time_domain, **dct1)
+        logampl = cfm.finalize(0)
+    lh, constantshape = None, (obs[0].vis.shape[0], obs[0].vis.shape[2])
     for ii, oo in enumerate(obs):
         oo = obs.pop(0)
-        # total_N = npol*nants*nfreqs
-        total_N = oo.vis.shape[0]*nants*oo.vis.shape[2]
-        if time_mode:
-            dct = {
-                'offset_mean': 0,
-                'offset_std': (1, 0.5),
-                'prefix': 'calibration_phases'
-            }
-            dct1 = {
-                'fluctuations': (2., 1.),
-                'loglogavgslope': (-4., 1),
-                'flexibility': (5, 2.),
-                'asperity': None
-            }
-            cfm = ift.CorrelatedFieldMaker.make(**dct, total_N=total_N)
-            cfm.add_fluctuations(time_domain, **dct1)
-            phase = cfm.finalize(0)
-            dct = {
-                'offset_mean': 0,
-                'offset_std': (1e-3, 1e-6),
-                'prefix': 'calibration_logamplitudes'
-            }
-            dct1 = {
-                'fluctuations': (2., 1.),
-                'loglogavgslope': (-4., 1),
-                'flexibility': (5, 2.),
-                'asperity': None
-            }
-            cfm = ift.CorrelatedFieldMaker.make(**dct, total_N=total_N)
-            cfm.add_fluctuations(time_domain, **dct1)
-            logampl = cfm.finalize(0)
-        else:
+        assert constantshape == (oo.vis.shape[0], oo.vis.shape[2])
+        if not time_mode:
             dom = [ift.UnstructuredDomain(ii) for ii in [total_N, ntimes]]
             mean, std = 0, np.pi/2
             phase = ift.Adder(mean, domain=dom) @ ift.ducktape(dom, None, 'calibration_phases').scale(std)
             mean, std = 0, 1
             logampl = ift.Adder(mean, domain=dom) @ ift.ducktape(dom, None, 'calibration_logamplitudes').scale(std)
         abc = rve.calibration_distribution(oo, phase, logampl, antenna_dct, time_dct)
-        model_visibilities = ift.full(oo.vis.domain, 1)
-        op = rve.CalibrationLikelihood(oo, abc, model_visibilities)
+        if ii in [1, 2]:
+            model_visibilities = ift.full(oo.vis.domain, 1)
+            op = rve.CalibrationLikelihood(oo, abc, model_visibilities)
+        else:
+            op = rve.ImagingCalibrationLikelihood(oo, sky, abc)
         lh = op if lh is None else lh + op
     try_operator(lh)

@@ -8,10 +8,15 @@ from ducc0.wgridder import dirty2ms, ms2dirty
 import nifty7 as ift
 
 from .global_config import epsilon, nthreads, wstacking
+from .observation import Observation
 from .util import my_assert, my_assert_isinstance, my_asserteq
 
 
 def StokesIResponse(observation, domain):
+    my_assert_isinstance(observation, Observation)
+    domain = ift.DomainTuple.make(domain)
+    my_asserteq(len(domain), 1)
+    my_assert_isinstance(domain[0], ift.RGSpace)
     npol = observation.vis.shape[0]
     my_assert(npol in [1, 2])
     mask = (observation.weight.val == 0).astype(np.uint8)
