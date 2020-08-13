@@ -13,28 +13,28 @@ def wstacking():
     return _wstacking
 
 
-def set_wstacking(wstacking):
-    print(f'Set wstacking to {wstacking}')
+def set_wstacking(val):
     global _wstacking
-    _wstacking = bool(wstacking)
+    _wstacking = bool(val)
+    print(f'Set wstacking to {wstacking()}')
 
 
 def epsilon():
     return _epsilon
 
 
-def set_epsilon(epsilon):
-    print(f'Set epsilon to {epsilon}')
+def set_epsilon(val):
     global _epsilon
-    _epsilon = bool(epsilon)
+    _epsilon = float(val)
+    print(f'Set epsilon to {epsilon()}')
 
 
 def nthreads():
     return _nthreads
 
 
-def set_nthreads(nthr):
-    print(f'Set nthreads to {nthr}')
+def set_nthreads(val):
     global _nthreads
-    _nthreads = int(nthr)
-    ift.fft.set_nthreads(nthr)
+    _nthreads = int(val)
+    ift.fft.set_nthreads(int(val))
+    print(f'Set nthreads to {nthreads()}')
