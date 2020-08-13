@@ -3,19 +3,30 @@
 # Author: Philipp Arras
 
 import nifty7 as ift
+import matplotlib.pyplot as plt
 from .util import my_assert_isinstance
 
 
 class Plotter:
     def __init__(self):
-        self._ops = []
-        self._kwargs = []
+        self._nifty = []
+        self._hists = []
 
-    def add(self, operator, **kwargs):
+    def add(self, operator, name, **kwargs):
         my_assert_isinstance(operator, ift.Operator)
-        self._ops.append(operator)
-        self._kwargs.append(kwargs)
+        self._nifty.append((operator, str(name), kwargs))
+
+    def add_histogram(self, operator, **kwargs):
+        my_assert_isinstance(operator, ift.Operator)
+        self._hists.append((operator, kwargs))
+
+    def add_uvscatter(self, operator, **kwargs):
+        raise NotImplementedError
 
     def plot(self, name, position):
-        for ii in range(len(self._ops)):
-            ift.single_plot(self._ops[ii].force(position), **self._kwargs[ii], name=f'{name}_{ii}.png')
+        for ii, (op, kwargs) in enumerate(self._ops):
+            ift.single_plot(op.force(position), **kwargs[ii], name=f'{name}_{ii}.png')
+        for jj, (op, kwargs) in enumerate(self._hists):
+            plt.hist(op.force(position).ravel(), **kwargs)
+            plt.savefig(f'{name}_{ii+1+jj}.png')
+            plt.close()
