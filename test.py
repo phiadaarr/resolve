@@ -16,7 +16,10 @@ rve.set_nthreads(nthreads)
 rve.set_epsilon(1e-4)
 rve.set_wstacking(False)
 OBSERVATION = rve.ms2observations('data/CYG-ALL-2052-2MHZ.ms', 'DATA')[0]
+snr = OBSERVATION.max_snr()
 OBS = [OBSERVATION.restrict_to_stokes_i(), OBSERVATION.average_stokes_i()]
+assert snr >= OBS[0].max_snr()
+assert snr >= OBS[1].max_snr()
 npix, fov = 256, 1*rve.DEG2RAD
 dom = ift.RGSpace((npix, npix), (fov/npix, fov/npix))
 sky0 = ift.SimpleCorrelatedField(dom, 21, (1, 0.1), (5, 1), (1.2, 0.4), (0.2, 0.2), (-2, 0.5)).exp()
@@ -33,12 +36,13 @@ def test_save_and_load_hdf5(ms):
     for spw in spws:
         obs = rve.ms2observations(f'data/{ms}.ms', 'DATA', spw)
         for ob in obs:
-            print('Max SNR:', ob.max_snr())
+            snr0 = ob.max_snr()
             print('Fraction useful:', ob.fraction_useful())
             ob.save_to_hdf5('foo.hdf5')
             ob1 = rve.Observation.load_from_hdf5('foo.hdf5')
             assert ob == ob1
             ob1.compress()
+            assert snr0 <= ob1.max_snr()
 
 
 def try_operator(op):

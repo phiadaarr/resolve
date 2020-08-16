@@ -79,7 +79,7 @@ def ms2observations(ms, data_column, spectral_window=None):
     flags = ~flags
     inds = weight == 0
     weight[inds] = 1
-    flags[inds] = True
+    flags[inds] = False
     # Convention: multiply v by -1
     uvw[:, 1] *= -1
 
