@@ -9,7 +9,10 @@ import resolve as rve
 
 def main():
     _, ms = sys.argv
-    obs = rve.ms2observations(ms, 'DATA')
+    if ms[:-3] == '.ms':
+        obs = rve.ms2observations(ms, 'DATA')
+    else:
+        obs = [rve.Observation.load_from_hdf5(ms)]
     print(f'{len(obs)} fields.')
     for oo in obs:
         print(f'vis.shape {oo.vis.shape} ({oo.fraction_flagged()} flagged)')
