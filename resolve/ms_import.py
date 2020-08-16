@@ -40,8 +40,15 @@ def ms2observations(ms, data_column, spectral_window=None):
         vis = t.getcol(data_column)
         print(f'vis data type is {vis.dtype}')
         uvw = t.getcol('UVW')
-        col = 'WEIGHT_SPECTRUM' if 'WEIGHT_SPECTRUM' in t.colnames() else 'WEIGHT'
-        weight = t.getcol(col)
+        if 'WEIGHT_SPECTRUM' in t.colnames():
+            try:
+                weight = t.getcol('WEIGHT_SPECTRUM')
+            except RuntimeError:
+                print('Invalid WEIGHT_SPECTRUM column. Use less informative WEIGHT column instead.')
+                weight = t.getcol('WEIGHT')
+        else:
+            print('No WEIGHT_SPECTRUM column. Use less informative WEIGHT column instead.')
+            weight = t.getcol('WEIGHT')
         flags = t.getcol('FLAG')
         fieldid = t.getcol('FIELD_ID')
         spw = t.getcol("DATA_DESC_ID")
@@ -61,8 +68,8 @@ def ms2observations(ms, data_column, spectral_window=None):
 
     if weight.ndim == 2:
         weight = weight[:, None]
+    my_asserteq(weight.shape, flags.shape, vis.shape)
     # Convention: can use flag as index array: vis[flags] gives out good visibilities
-    # FIXME Support flags for multiple channels and WEIGHT used instead of WEIGHT_SPECTRUM
     flags = ~flags
     inds = weight == 0
     weight[inds] = 1
