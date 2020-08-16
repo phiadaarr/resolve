@@ -92,6 +92,8 @@ class Observation:
     def __eq__(self, other):
         if not isinstance(other, Observation):
             return False
+        if self._vis.dtype != other._vis.dtype or self._weight.dtype != other._weight.dtype:
+            return False
         return compare_attributes(self, other, ('_direction', '_polarization', '_freq', '_antpos', '_vis', '_weight'))
 
     def average_stokes_i(self):
