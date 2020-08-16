@@ -67,7 +67,8 @@ def ms2observations(ms, data_column, spectral_window=None):
         freqs = freqs[0]
 
     if weight.ndim == 2:
-        weight = weight[:, None]
+        # TODO Memory: Do not repeat this array and tell it the likelihood instead
+        weight = np.repeat(weight[:, None], vis.shape[1], axis=1)
     my_asserteq(weight.shape, flags.shape, vis.shape)
     # Convention: can use flag as index array: vis[flags] gives out good visibilities
     flags = ~flags
