@@ -21,7 +21,7 @@ class Polarization:
     def __init__(self, indices):
         self._ind = list(indices)
         my_assert(len(self._ind) <= 4)
-        self._trivial = indices == []
+        self._trivial = len(indices) == 0
 
     @staticmethod
     def trivial():

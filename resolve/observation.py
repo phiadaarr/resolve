@@ -98,6 +98,7 @@ class Observation:
 
     def average_stokes_i(self):
         inds = self._polarization.stokes_i_indices()
+        my_asserteq(len(inds), 2)
         vis = 0.5*np.sum(self._vis[inds], axis=0)[None]
         weight = 1/(0.5*np.sum(1/self._weight[inds], axis=0))[None]
         flags = np.all(self._flags[inds], axis=0)[None]
