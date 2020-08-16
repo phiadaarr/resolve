@@ -19,16 +19,20 @@ def ms2observations(ms, data_column, spectral_window=None):
     if not isdir(ms) or splitext(ms)[1] != '.ms':
         raise RuntimeError
 
+    print('Load SPECTRAL_WINDOW table')
     with table(join(ms, 'SPECTRAL_WINDOW'), **CFG) as t:
         freqs = t.getcol('CHAN_FREQ')
+    print('Load POLARIZATION table')
     with table(join(ms, 'POLARIZATION'), **CFG) as t:
         polarization = t.getcol('CORR_TYPE')
         my_asserteq(polarization.ndim, 2)
         my_asserteq(polarization.shape[0], 1)
         polarization = Polarization(polarization[0])
+    print('Load FIELD table')
     with table(join(ms, 'FIELD'), **CFG) as t:
         equinox = t.coldesc('REFERENCE_DIR')['desc']['keywords']['MEASINFO']['Ref']
         equinox = str(equinox)[1:]
+        # TODO Put proper support for equinox here
         if equinox == "1950_VLA":
             equinox = 1950
         dirs = []
@@ -36,6 +40,7 @@ def ms2observations(ms, data_column, spectral_window=None):
             my_asserteq(pc.shape, (1, 2))
             dirs.append(Direction(pc[0], equinox))
         dirs = tuple(dirs)
+    print('Load main table')
     with table(ms, **CFG) as t:
         vis = t.getcol(data_column)
         print(f'vis data type is {vis.dtype}')
