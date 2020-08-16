@@ -39,7 +39,7 @@ class Observation:
     def max_snr(self):
         return np.max(np.abs(self._vis[self._flags])*np.sqrt(self._weight[self._flags]))
 
-    def fraction_flagged(self):
+    def fraction_useful(self):
         return np.sum(self._flags == 0)/self._weight.size
 
     def compress(self):

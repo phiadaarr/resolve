@@ -34,7 +34,7 @@ def test_save_and_load_hdf5(ms):
         obs = rve.ms2observations(f'data/{ms}.ms', 'DATA', spw)
         for ob in obs:
             print('Max SNR:', ob.max_snr())
-            print('Fraction flagged:', ob.fraction_flagged())
+            print('Fraction useful:', ob.fraction_useful())
             ob.save_to_hdf5('foo.hdf5')
             ob1 = rve.Observation.load_from_hdf5('foo.hdf5')
             assert ob == ob1

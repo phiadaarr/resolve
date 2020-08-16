@@ -13,17 +13,16 @@ def main():
         obs = rve.ms2observations(ms, 'DATA')
     else:
         obs = [rve.Observation.load_from_hdf5(ms)]
-    print(f'{len(obs)} fields.')
     for oo in obs:
-        print(f'vis.shape {oo.vis.shape} ({oo.fraction_flagged()*100:.2f}% flagged)')
+        print(f'vis.shape {oo.vis.shape} ({oo.fraction_useful()*100:.2f}% useful)')
         print(f'Max snr {oo.max_snr()}')
         oo = oo.restrict_to_stokes_i()
         print('Stokes I only')
-        print(f'vis.shape {oo.vis.shape} ({oo.fraction_flagged()*100:.2f}% flagged)')
+        print(f'vis.shape {oo.vis.shape} ({oo.fraction_useful()*100:.2f}% useful)')
         print(f'Max snr {oo.max_snr()}')
         oo = oo.average_stokes_i()
         print('Averaged Stokes I')
-        print(f'vis.shape {oo.vis.shape} ({oo.fraction_flagged()*100:.2f}% flagged)')
+        print(f'vis.shape {oo.vis.shape} ({oo.fraction_useful()*100:.2f}% useful)')
         print(f'Max snr {oo.max_snr()}')
         print()
 
