@@ -11,7 +11,7 @@ def main():
     _, ms, base = sys.argv
     obs = rve.ms2observations(ms, 'DATA')
     for ii, oo in enumerate(obs):
-        oo.save_to_hdf5(f'{base}_{ii}.hdf5')
+        oo.compress().save_to_hdf5(f'{base}_{ii}.hdf5')
 
 
 if __name__ == '__main__':
