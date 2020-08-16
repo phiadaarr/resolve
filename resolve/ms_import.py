@@ -62,6 +62,7 @@ def ms2observations(ms, data_column, spectral_window=None):
     if weight.ndim == 2:
         weight = weight[:, None]
     # Convention: can use flag as index array: vis[flags] gives out good visibilities
+    # FIXME Support flags for multiple channels and WEIGHT used instead of WEIGHT_SPECTRUM
     flags = ~flags
     inds = weight == 0
     weight[inds] = 1

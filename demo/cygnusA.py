@@ -16,6 +16,7 @@ def main():
     nthreads = 8
     rve.set_nthreads(nthreads)
     rve.set_wstacking(False)
+    # FIXME Add script that can open measurement sets and given some statistics
     obs = rve.ms2observations(ms, 'DATA')[0].restrict_to_stokes_i()
 
     rve.set_epsilon(1/10/obs.max_snr())
