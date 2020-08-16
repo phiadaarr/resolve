@@ -43,7 +43,7 @@ class Polarization:
     def stokes_i_indices(self):
         if self._trivial:
             raise RuntimeError
-        keys = ["LL", "RR"] if self.circular else ["XX", "YY"]
+        keys = ["LL", "RR"] if self.circular() else ["XX", "YY"]
         return [self._ind.index(INVTABLE[kk]) for kk in keys]
 
     def __len__(self):

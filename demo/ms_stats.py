@@ -15,7 +15,7 @@ def main():
         obs = [rve.Observation.load_from_hdf5(ms)]
     print(f'{len(obs)} fields.')
     for oo in obs:
-        print(f'vis.shape {oo.vis.shape} ({oo.fraction_flagged()} flagged)')
+        print(f'vis.shape {oo.vis.shape} ({oo.fraction_flagged()*100:.2f} flagged)')
         oo = oo.restrict_to_stokes_i()
         print(f'Stokes I only: vis.shape {oo.vis.shape} ({oo.fraction_flagged()} flagged)')
         oo = oo.average_stokes_i()
