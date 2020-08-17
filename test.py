@@ -23,7 +23,11 @@ assert snr >= OBS[1].max_snr()
 npix, fov = 256, 1*rve.DEG2RAD
 dom = ift.RGSpace((npix, npix), (fov/npix, fov/npix))
 sky0 = ift.SimpleCorrelatedField(dom, 21, (1, 0.1), (5, 1), (1.2, 0.4), (0.2, 0.2), (-2, 0.5)).exp()
-sky = rve.vla_beam(dom, np.mean(OBSERVATION.freq)) @ sky0
+inserter = rve.PointInserter(sky0.target, np.array([[0, 0]]))
+points = ift.InverseGammaOperator(inserter.domain, alpha=0.5, q=0.2/dom.scalar_dvol).ducktape('points')
+sky = rve.vla_beam(dom, np.mean(OBSERVATION.freq)) @ (sky0 + inserter @ points)
+
+# FIXME Write check_operator, check_linear_operator tests for all operators
 
 
 @pmp('ms', ('CYG-ALL-2052-2MHZ', 'CYG-D-6680-64CH-10S', 'AM754_A030124_flagged'))

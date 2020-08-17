@@ -83,8 +83,8 @@ def ms2observations(ms, data_column, spectral_window=None):
     # Convention: multiply v by -1
     uvw[:, 1] *= -1
 
-    # FIXME Determine which observation is calibration observation
-    # FIXME Import name of source
+    # TODO Determine which observation is calibration observation
+    # TODO Import name of source
     observations = []
     for ii in set(fieldid):
         mask = fieldid == ii

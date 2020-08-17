@@ -11,7 +11,6 @@ from .util import my_assert, my_assert_isinstance, my_asserteq
 
 
 def calibration_distribution(observation, phase_operator, logamplitude_operator, antenna_dct, time_dct=None):
-    # FIXME Maybe change convention from phase_operator.target.shape is (npol, nants, X, nfreqs) to (npol*nants*nfreqs, X)
     my_assert_isinstance(observation, Observation)
     my_assert_isinstance(phase_operator, logamplitude_operator, ift.Operator)
     dom = phase_operator.target
@@ -20,8 +19,6 @@ def calibration_distribution(observation, phase_operator, logamplitude_operator,
     ap = observation.antenna_positions
     cop1 = CalibrationDistributor(dom, tgt, ap.ant1, ap.time, antenna_dct, time_dct)
     cop2 = CalibrationDistributor(dom, tgt, ap.ant2, ap.time, antenna_dct, time_dct)
-    # FIXME Move to tests
-    ift.extra.check_linear_operator(cop1)
     my_asserteq(cop1.domain, cop2.domain)
     my_asserteq(cop1.target, cop2.target)
     res0 = (cop1 + cop2).real @ logamplitude_operator

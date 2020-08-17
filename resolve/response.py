@@ -17,7 +17,7 @@ def StokesIResponse(observation, domain):
     domain = ift.DomainTuple.make(domain)
     my_asserteq(len(domain), 1)
     my_assert_isinstance(domain[0], ift.RGSpace)
-    npol = observation.vis.shape[0]
+    npol = observation.npol
     my_assert(npol in [1, 2])
     sp = observation.vis.dtype == np.complex64
     mask = observation.flags.val
@@ -69,7 +69,7 @@ class FullResponse(ift.LinearOperator):
 
 class SingleResponse(ift.LinearOperator):
     def __init__(self, domain, uvw, freq, mask, single_precision):
-        # FIXME Currently only the response uses single_precision if possible. Could be rolled out to the whole likelihood
+        # TODO Currently only the response uses single_precision if possible. Could be rolled out to the whole likelihood
         self._domain = ift.DomainTuple.make(domain)
         self._target = ift.makeDomain(ift.UnstructuredDomain(ss) for ss in (uvw.shape[0], freq.size))
         self._capability = self.TIMES | self.ADJOINT_TIMES

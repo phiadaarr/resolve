@@ -8,7 +8,7 @@ from .observation import Observation
 from .response import StokesIResponse
 from .util import my_assert_isinstance, my_asserteq
 
-# FIXME VariableCovariance version for all likelihoods
+# TODO VariableCovariance version for all likelihoods
 
 
 def ImagingLikelihood(observation, sky_operator):
@@ -33,7 +33,7 @@ def ImagingLikelihoodVariableCovariance(observation, sky_operator, inverse_covar
 
 
 def ImagingCalibrationLikelihood(observation, sky_operator, calibration_operator):
-    if observation.vis.shape[0] == 1:
+    if observation.npol == 1:
         print('Warning: Use calibration with only one polarization present.')
     my_assert_isinstance(observation, Observation)
     my_assert_isinstance(sky_operator, calibration_operator, ift.Operator)
@@ -46,7 +46,7 @@ def ImagingCalibrationLikelihood(observation, sky_operator, calibration_operator
 
 
 def CalibrationLikelihood(observation, calibration_operator, model_visibilities):
-    if observation.vis.shape[0] == 1:
+    if observation.npol == 1:
         print('Warning: Use calibration with only one polarization present.')
     my_assert_isinstance(calibration_operator.domain, ift.MultiDomain)
     my_asserteq(calibration_operator.target, model_visibilities.domain, observation.vis.domain)

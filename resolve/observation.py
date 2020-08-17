@@ -14,8 +14,6 @@ from .polarization import Polarization
 from .util import (compare_attributes, my_assert, my_assert_isinstance,
                    my_asserteq)
 
-# FIXME Introduce Observation.nfreqs, .nrows, .npol
-# FIXME Wrap vis, weight, flags as a class similar to AntennaPositions
 
 class Observation:
     def __init__(self, antenna_positions, vis, weight, flags, polarization, freq, direction):
@@ -160,6 +158,18 @@ class Observation:
     @property
     def direction(self):
         return self._direction
+
+    @property
+    def npol(self):
+        return self._vis.shape[0]
+
+    @property
+    def nrow(self):
+        return self._vis.shape[1]
+
+    @property
+    def nfreq(self):
+        return self._vis.shape[2]
 
 
 def tmin_tmax(*args):
