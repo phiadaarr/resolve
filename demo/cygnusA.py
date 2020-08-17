@@ -16,7 +16,6 @@ def main():
     nthreads = 8
     rve.set_nthreads(nthreads)
     rve.set_wstacking(False)
-    # FIXME Add script that can open measurement sets and given some statistics
     obs = rve.ms2observations(ms, 'DATA')[0].restrict_to_stokes_i()
 
     rve.set_epsilon(1/10/obs.max_snr())
@@ -28,10 +27,6 @@ def main():
     sky = sky + inserter @ points
     sky = rve.vla_beam(dom, np.mean(obs.freq)) @ sky
     invcovop = ift.InverseGammaOperator(obs.vis.domain, 1, 1/obs.weight).reciprocal().ducktape('invcov')
-
-    plotter = rve.Plotter()
-    # plotter.add(invcovop)
-    plotter.add(sky, norm=LogNorm())
 
     # imaging_lh = rve.ImagingLikelihood(obs, sky)
     # ham = ift.StandardHamiltonian(imaging_lh, ift.AbsDeltaEnergyController(0.5, 3, 2000))

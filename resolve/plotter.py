@@ -9,6 +9,7 @@ from .util import my_assert_isinstance
 
 class Plotter:
     def __init__(self):
+        raise NotImplementedError
         self._nifty = []
         self._hists = []
 
