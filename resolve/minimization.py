@@ -40,10 +40,11 @@ class Minimization:
     def minimize(self, minimizer):
         self._e, _ = minimizer(self._e)
         position = ift.MultiField.union([self._position, self._e.position])
-        if self._n_samples == 0:
+        if self._n == 0:
             return MinimizationState(position, [])
-        my_asserteq(len(self._e.samples), 2*self._n if self._m else self._n)
-        return MinimizationState(position, self._e.samples, self._m)
+        samples = list(self._e.samples)
+        my_asserteq(len(samples), 2*self._n if self._m else self._n)
+        return MinimizationState(position, samples, self._m)
 
 
 class MinimizationState:
