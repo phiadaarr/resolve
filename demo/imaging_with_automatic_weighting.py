@@ -38,30 +38,30 @@ def main():
     ic = ift.AbsDeltaEnergyController(0.5, 3, 2000)
     minimizer = ift.NewtonCG(ift.GradientNormController(name='newton', iteration_limit=5))
 
-    ham_imaging = ift.StandardHamiltonian(rve.ImagingLikelihood(obs, sky), ic)
-    if args.start is None:
-        pos = 0.1*ift.from_random(ham_imaging.domain)
-        plotter.plot('initial', pos)
-        state = rve.simple_minimize(ham_imaging, pos, 0, minimizer)
-        state = rve.simple_minimize(ham_imaging, state.mean, 0, minimizer)
-        state = rve.simple_minimize(ham_imaging, state.mean, 0, minimizer)
-        plotter.plot('imagingonly', state)
-        state.save('currentstate')
-        return
     alpha = 1
     invcovop = ift.InverseGammaOperator(obs.vis.domain, alpha, 1/obs.weight).reciprocal().ducktape('invcov')
     plotter.add_uvscatter('inverse covariance', invcovop, obs)
     ham = ift.StandardHamiltonian(rve.ImagingLikelihoodVariableCovariance(obs, sky, invcovop), ic)
 
-    pos = rve.MinimizationState.load(args.start).mean.unite(ift.full(invcovop.domain, norm.ppf(invgamma.cdf(1, alpha))))
-    plotter.plot('initial', pos)
-    state = rve.simple_minimize(ham, pos, 0, minimizer, constants=sky.domain.keys())
-    plotter.plot('learnnoise', state)
-    state = rve.simple_minimize(ham, state.mean, 0, minimizer, constants=sky.domain.keys())
-    plotter.plot('learnnoise1', state)
-    state = rve.simple_minimize(ham, state.mean, 0, minimizer, constants=sky.domain.keys())
-    plotter.plot('learnnoise2', state)
-    state.save('learnnoise')
+    pos = ift.MultiField.union([0.1*ift.from_random(ham.domain), ift.full(invcovop.domain, norm.ppf(invgamma.cdf(1, alpha)))])
+    state = rve.MinimizationState(pos, [])
+
+    keys0 = sky.domain.keys()
+    keys1 = invcovop.domain.keys()
+
+    plotter.plot('initial', state)
+    state = rve.simple_minimize(ham, state.mean, 0, minimizer, constants=keys1)
+    plotter.plot('initial1', state)
+    state = rve.simple_minimize(ham, state.mean, 0, minimizer, constants=keys1)
+    plotter.plot('initialimaging', state)
+    for ii in range(5):
+        state = rve.simple_minimize(ham, state.mean, 0, minimizer, constants=keys0)
+        plotter.plot(f'noise{ii}', state)
+        state = rve.simple_minimize(ham, state.mean, 0, minimizer, constants=keys1)
+        plotter.plot(f'sky{ii}', state)
+    for ii in range(5):
+        state = rve.simple_minimize(ham, state.mean, 0, minimizer)
+        plotter.plot(f'both{ii}', state)
 
 
 if __name__ == '__main__':
