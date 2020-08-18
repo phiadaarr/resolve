@@ -94,6 +94,9 @@ class Observation:
             return False
         return compare_attributes(self, other, ('_direction', '_polarization', '_freq', '_antpos', '_vis', '_weight'))
 
+    def __getitem__(self, slc):
+        return Observation(self._antpos[slc], self._vis[:, slc], self._weight[:, slc], self._flags[:, slc], self._polarization, self._freq, self._direction)
+
     def average_stokes_i(self):
         inds = self._polarization.stokes_i_indices()
         my_asserteq(len(inds), 2)

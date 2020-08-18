@@ -21,17 +21,18 @@ class Minimization:
         self._position = position
         position = position.extract(operator.domain)
         if n_samples == 0:
-            self._e = ift.EnergyAdapter(position, operator, constants, True)
-            self._n_samples = n_samples
+            self._e = ift.EnergyAdapter(position, operator, constants, True, True)
+            self._n = n_samples
         else:
             my_assert(n_samples > 0)
-            dct = {'position': position,
+            dct = {'mean': position,
                    'hamiltonian': operator,
                    'n_samples': n_samples,
                    'constants': constants,
                    'point_estimates': point_estimates,
-                   'mirror_samples': self._mirror_samples,
-                   'comm': None  # TODO Add MPI support
+                   'mirror_samples': True,
+                   'comm': None,  # TODO Add MPI support
+                   'nanisinf': True
             }
             self._e = ift.MetricGaussianKL.make(**dct)
             self._n, self._m = dct['n_samples'], dct['mirror_samples']
