@@ -4,9 +4,11 @@
 
 import numpy as np
 
+import nifty7 as ift
 
-def my_assert(cond):
-    if not cond:
+
+def my_assert(*conds):
+    if not all(conds):
         raise RuntimeError
 
 
@@ -30,6 +32,11 @@ def compare_attributes(obj0, obj1, attribute_list):
         if type(compare) is bool:
             if compare:
                 return False
+            continue
+        if isinstance(compare, ift.MultiField):
+            for vv in compare.val.values():
+                if vv.any():
+                    return False
             continue
         if compare.any():
             return False

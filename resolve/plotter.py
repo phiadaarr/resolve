@@ -2,32 +2,91 @@
 # Copyright(C) 2020 Max-Planck-Society
 # Author: Philipp Arras
 
-import nifty7 as ift
+from os import makedirs
+from os.path import join
+
 import matplotlib.pyplot as plt
-from .util import my_assert_isinstance
+import numpy as np
+from matplotlib.colors import LogNorm
+
+import nifty7 as ift
+
+from .minimization import MinimizationState
+from .observation import Observation
+from .util import my_assert_isinstance, my_asserteq
 
 
 class Plotter:
-    def __init__(self):
-        raise NotImplementedError
-        self._nifty = []
-        self._hists = []
+    def __init__(self, fileformat, directory):
+        self._nifty, self._uvscatter = [], []
+        self._f = fileformat
+        self._dir = directory
+        makedirs(self._dir, exist_ok=True)
 
-    def add(self, operator, name, **kwargs):
+    def add(self, name, operator, **kwargs):
         my_assert_isinstance(operator, ift.Operator)
-        self._nifty.append((operator, str(name), kwargs))
+        self._nifty.append({'operator': operator,
+                            'title': str(name),
+                            'kwargs': kwargs})
 
-    def add_histogram(self, operator, **kwargs):
+    def add_uvscatter(self, name, operator, observation):
         my_assert_isinstance(operator, ift.Operator)
-        self._hists.append((operator, kwargs))
+        my_assert_isinstance(observation, Observation)
+        my_asserteq(operator.target, observation.vis.domain)
+        self._uvscatter.append({'operator': operator,
+                                'observation': observation,
+                                'title': str(name)})
 
-    def add_uvscatter(self, operator, **kwargs):
-        raise NotImplementedError
+    def plot(self, identifier, state):
+        my_assert_isinstance(state, (ift.MultiField, MinimizationState))
+        unit = 6
+        for ii, obj in enumerate(self._nifty):
+            op, kwargs = obj['operator'], obj['kwargs']
+            direc = join(self._dir, obj['title'])
+            makedirs(direc, exist_ok=True)
+            fname = join(direc, f'{identifier}.{self._f}')
 
-    def plot(self, name, position):
-        for ii, (op, kwargs) in enumerate(self._ops):
-            ift.single_plot(op.force(position), **kwargs[ii], name=f'{name}_{ii}.png')
-        for jj, (op, kwargs) in enumerate(self._hists):
-            plt.hist(op.force(position).ravel(), **kwargs)
-            plt.savefig(f'{name}_{ii+1+jj}.png')
-            plt.close()
+            if isinstance(state, MinimizationState) and len(state) > 0:
+                if len(op.target) == 1 and isinstance(op[0], ift.RGSpace) and len(op.shape) == 1:
+                    p = ift.Plot()
+                    p.add([op.force(ss) for ss in state], **kwargs)
+                    p.output(xsize=unit, ysize=unit, name=fname)
+                else:
+                    sc = ift.StatCalculator()
+                    for ss in state:
+                        sc.add(op.force(ss))
+                    p = ift.Plot()
+                    p.add(sc.mean, **kwargs)
+                    p.add(sc.var.sqrt()/sc.mean)
+                    p.output(nx=2, ny=1, xsize=2*unit, ysize=unit, name=fname)
+            else:
+                pos = state if isinstance(state, ift.MultiField) else state.mean
+                ift.single_plot(op.force(pos), **kwargs, name=fname)
+
+        for ii, obj in enumerate(self._uvscatter):
+            op, obs = obj['operator'], obj['observation']
+            direc = join(self._dir, obj['title'])
+            makedirs(direc, exist_ok=True)
+            fname = join(direc, f'{identifier}.{self._f}')
+            if isinstance(state, MinimizationState) and len(state) > 0:
+                raise NotImplementedError
+            else:
+                pos = state if isinstance(state, ift.MultiField) else state.mean
+                weights = op.force(pos).val
+                uv = obs.effective_uv()
+                u, v = uv[:, 0], uv[:, 1]
+                fig, axs = plt.subplots(obs.npol, 2, figsize=(2*unit, obs.npol*unit))
+                axs = list(axs.ravel())
+                for pol in range(obs.npol):
+                    axx = axs.pop(0)
+                    axx.set_title('Weights')
+                    sct = axx.scatter(u, v, c=weights[pol], s=1)
+                    fig.colorbar(sct, ax=axx)
+                    axx.set_aspect('equal')
+                    axx = axs.pop(0)
+                    axx.set_title('abs(vis)/sigma')
+                    sct = axx.scatter(u, v, c=np.abs(obs.vis.val[pol])*np.sqrt(weights[pol]), s=1, norm=LogNorm())
+                    fig.colorbar(sct, ax=axx)
+                    axx.set_aspect('equal')
+                fig.savefig(fname)
+                plt.close(fig)
