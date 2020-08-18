@@ -17,6 +17,7 @@ from .util import my_assert_isinstance, my_asserteq
 
 
 class Plotter:
+    # TODO Residual plots
     def __init__(self, fileformat, directory):
         self._nifty, self._uvscatter = [], []
         self._f = fileformat
@@ -47,7 +48,7 @@ class Plotter:
             fname = join(direc, f'{identifier}.{self._f}')
 
             if isinstance(state, MinimizationState) and len(state) > 0:
-                if len(op.target) == 1 and isinstance(op[0], ift.RGSpace) and len(op.shape) == 1:
+                if len(op.target) == 1 and isinstance(op.target[0], ift.RGSpace) and len(op.shape) == 1:
                     p = ift.Plot()
                     p.add([op.force(ss) for ss in state], **kwargs)
                     p.output(xsize=unit, ysize=unit, name=fname)
@@ -68,25 +69,40 @@ class Plotter:
             direc = join(self._dir, obj['title'])
             makedirs(direc, exist_ok=True)
             fname = join(direc, f'{identifier}.{self._f}')
-            if isinstance(state, MinimizationState) and len(state) > 0:
-                raise NotImplementedError
+
+            withsamples = isinstance(state, MinimizationState) and len(state) > 0
+
+            pos = state if isinstance(state, ift.MultiField) else state.mean
+            uv = obs.effective_uv()
+            u, v = uv[:, 0], uv[:, 1]
+            ncols = 3 if withsamples else 2
+            fig, axs = plt.subplots(obs.npol, ncols, figsize=(2*unit, obs.npol*unit))
+            axs = list(axs.ravel())
+            if withsamples:
+                sc = ift.StatCalculator()
+                for ss in state:
+                    sc.add(op.force(ss))
+                weights = sc.mean
+                relsd = sc.mean/sc.var.sqrt()
             else:
-                pos = state if isinstance(state, ift.MultiField) else state.mean
                 weights = op.force(pos).val
-                uv = obs.effective_uv()
-                u, v = uv[:, 0], uv[:, 1]
-                fig, axs = plt.subplots(obs.npol, 2, figsize=(2*unit, obs.npol*unit))
-                axs = list(axs.ravel())
-                for pol in range(obs.npol):
+            for axx in axs:
+                axx.set_aspect('equal')
+            for pol in range(obs.npol):
+                axx = axs.pop(0)
+                axx.set_title('Weights')
+                sct = axx.scatter(u, v, c=weights[pol], s=1)
+                fig.colorbar(sct, ax=axx)
+
+                if withsamples:
                     axx = axs.pop(0)
-                    axx.set_title('Weights')
-                    sct = axx.scatter(u, v, c=weights[pol], s=1)
+                    axx.set_title('Rel. std dev')
+                    sct = axx.scatter(u, v, c=relsd[pol], s=1)
                     fig.colorbar(sct, ax=axx)
-                    axx.set_aspect('equal')
-                    axx = axs.pop(0)
-                    axx.set_title('abs(vis)/sigma')
-                    sct = axx.scatter(u, v, c=np.abs(obs.vis.val[pol])*np.sqrt(weights[pol]), s=1, norm=LogNorm())
-                    fig.colorbar(sct, ax=axx)
-                    axx.set_aspect('equal')
-                fig.savefig(fname)
-                plt.close(fig)
+
+                axx = axs.pop(0)
+                axx.set_title('abs(vis)/sigma')
+                sct = axx.scatter(u, v, c=np.abs(obs.vis.val[pol])*np.sqrt(weights[pol]), s=1, norm=LogNorm())
+                fig.colorbar(sct, ax=axx)
+            fig.savefig(fname)
+            plt.close(fig)
