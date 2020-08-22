@@ -5,7 +5,6 @@
 import argparse
 
 import numpy as np
-from scipy.stats import invgamma, norm
 
 import nifty7 as ift
 import resolve as rve
@@ -21,8 +20,7 @@ def main():
 
     rve.set_nthreads(args.j)
     rve.set_wstacking(False)
-    # obs = rve.ms2observations(args.ms, 'DATA')[0].average_stokes_i()
-    obs = rve.ms2observations(args.ms, 'DATA')[0].restrict_to_stokes_i()
+    obs = rve.ms2observations(args.ms, 'DATA')[0].average_stokes_i()
 
     rve.set_epsilon(1/10/obs.max_snr())
     fov = np.array([3, 1.5])*rve.ARCMIN2RAD
@@ -34,36 +32,30 @@ def main():
     points = ift.InverseGammaOperator(inserter.domain, alpha=0.5, q=0.2/dom.scalar_dvol).ducktape('points')
     sky = sky + inserter @ points
     sky = rve.vla_beam(dom, np.mean(obs.freq)) @ sky
-    alpha = 1
-    invcovop = ift.InverseGammaOperator(obs.vis.domain, alpha, 1/obs.weight).reciprocal().ducktape('invcov')
+    npix = 2500
+    effuv = np.linalg.norm(obs.effective_uv().T, axis=1)
+    assert obs.nfreq == obs.npol == 1
+    dom = ift.RGSpace(npix, 2*np.max(effuv)/npix)
+    logweighting = ift.SimpleCorrelatedField(dom, 0, (2, 2), (2, 2), (1.2, 0.4), (0.5, 0.2), (-2, 0.5), 'invcov')
+    interpolation = ift.LinearInterpolator(dom, effuv)
+    weightop = ift.makeOp(obs.weight) @ (rve.AddEmptyDimension(interpolation.target) @ interpolation @ logweighting.exp())**(-2)
+
     plotter = rve.Plotter('png', 'plots')
     plotter.add('logsky', logsky)
     plotter.add('power spectrum logsky', logsky.power_spectrum)
-    plotter.add_uvscatter('inverse covariance', invcovop, obs)
+    plotter.add('bayesian weighting', logweighting.exp())
+    plotter.add('power spectrum bayesian weighting', logweighting.power_spectrum)
+    plotter.add_uvscatter('inverse covariance', weightop, obs)
 
     ic = ift.AbsDeltaEnergyController(0.5, 3, 100, name='Sampling')
     minimizer = ift.NewtonCG(ift.GradientNormController(name='newton', iteration_limit=5))
 
-    ham = ift.StandardHamiltonian(rve.ImagingLikelihoodVariableCovariance(obs, sky, invcovop), ic)
-
-    pos = ift.MultiField.union([0.1*ift.from_random(ham.domain), ift.full(invcovop.domain, norm.ppf(invgamma.cdf(1, alpha)))])
+    ham = ift.StandardHamiltonian(rve.ImagingLikelihoodVariableCovariance(obs, sky, weightop), ic)
+    pos = 0.1*ift.from_random(ham.domain)
     state = rve.MinimizationState(pos, [])
 
-    keys0 = sky.domain.keys()
-    keys1 = invcovop.domain.keys()
-
-    plotter.plot('initial', state)
-    state = rve.simple_minimize(ham, state.mean, 0, minimizer, constants=keys1)
-    plotter.plot('initial1', state)
-    state = rve.simple_minimize(ham, state.mean, 0, minimizer, constants=keys1)
-    plotter.plot('initialimaging', state)
     for ii in range(5):
-        state = rve.simple_minimize(ham, state.mean, 0, minimizer, constants=keys0)
-        plotter.plot(f'noise{ii}', state)
-        state = rve.simple_minimize(ham, state.mean, 0, minimizer, constants=keys1)
-        plotter.plot(f'sky{ii}', state)
-    for ii in range(5):
-        state = rve.simple_minimize(ham, state.mean, 0, minimizer)
+        state = rve.simple_minimize(ham, state.mean, 5, minimizer)
         plotter.plot(f'both{ii}', state)
 
 

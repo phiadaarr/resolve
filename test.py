@@ -156,3 +156,9 @@ def test_calibration_likelihood(time_mode):
             op = rve.ImagingCalibrationLikelihood(oo, sky, abc)
         lh = op if lh is None else lh + op
     try_operator(lh)
+
+
+@pmp('dtype', [np.float64, np.complex128])
+def test_simple_operator(dtype):
+    op = rve.AddEmptyDimension(ift.UnstructuredDomain(10))
+    ift.extra.check_linear_operator(op, dtype, dtype)
