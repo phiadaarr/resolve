@@ -83,6 +83,7 @@ class CalibrationDistributor(ift.LinearOperator):
 
 class MyLinearInterpolator(ift.LinearOperator):
     def __init__(self, time_domain, nants, ant_col, time_col):
+        # TODO Unify with Bayesian weighting scheme operator
         my_assert_isinstance(time_domain, (ift.RGSpace, ift.UnstructuredDomain))
         my_asserteq(len(time_domain.shape), 1)
         floattime = isinstance(time_domain, ift.RGSpace)

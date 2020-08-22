@@ -10,7 +10,7 @@ import resolve as rve
 
 pmp = pytest.mark.parametrize
 
-nthreads = 2
+nthreads = 1
 ift.fft.set_nthreads(nthreads)
 rve.set_nthreads(nthreads)
 rve.set_epsilon(1e-4)
@@ -26,8 +26,6 @@ sky0 = ift.SimpleCorrelatedField(dom, 21, (1, 0.1), (5, 1), (1.2, 0.4), (0.2, 0.
 inserter = rve.PointInserter(sky0.target, np.array([[0, 0]]))
 points = ift.InverseGammaOperator(inserter.domain, alpha=0.5, q=0.2/dom.scalar_dvol).ducktape('points')
 sky = rve.vla_beam(dom, np.mean(OBSERVATION.freq)) @ (sky0 + inserter @ points)
-
-# FIXME Write check_operator, check_linear_operator tests for all operators
 
 
 @pmp('ms', ('CYG-ALL-2052-2MHZ', 'CYG-D-6680-64CH-10S', 'AM754_A030124_flagged'))
@@ -162,3 +160,42 @@ def test_calibration_likelihood(time_mode):
 def test_simple_operator(dtype):
     op = rve.AddEmptyDimension(ift.UnstructuredDomain(10))
     ift.extra.check_linear_operator(op, dtype, dtype)
+
+
+@pmp('obs', OBS)
+def test_calibration_distributor(obs):
+    tgt = obs.vis.domain
+    utimes = rve.unique_times(obs)
+    dom = ift.UnstructuredDomain(obs.npol*obs.nfreq*len(obs.antenna_positions.unique_antennas())), ift.UnstructuredDomain(len(utimes))
+    uants = rve.unique_antennas(obs)
+    time_dct = {aa: ii for ii, aa in enumerate(utimes)}
+    antenna_dct = {aa: ii for ii, aa in enumerate(uants)}
+    op = rve.calibration.CalibrationDistributor(dom, tgt, obs.antenna_positions.ant1, obs.antenna_positions.time, antenna_dct, time_dct)
+    ift.extra.check_linear_operator(op)
+    # TODO Separate test for rve.calibration.MyLinearInterpolator()
+
+
+def test_point_inserter():
+    dom = ift.RGSpace([16, 16], [0.5, 2])
+    op = rve.PointInserter(dom, [[0, 4], [0, 0]])
+    ift.extra.check_linear_operator(op)
+    res = op(ift.full(op.domain, 1)).val_rw()
+    assert res[8, 8] == 1
+    assert res[8, 10] == 1
+    res[8, 10] = res[8, 8] = 0
+    assert np.all(res == 0)
+
+
+def test_response_distributor():
+    dom = ift.UnstructuredDomain(2), ift.UnstructuredDomain(4)
+    op0 = ift.makeOp(ift.makeField(dom, np.arange(8).reshape(2, -1)))
+    op1 = ift.makeOp(ift.makeField(dom, 2*np.arange(8).reshape(2, -1)))
+    op = rve.response.ResponseDistributor(op0, op1)
+    ift.extra.check_linear_operator(op)
+
+
+@pmp('obs', OBS)
+def test_single_response(obs):
+    mask = obs.flags.val
+    op = rve.response.SingleResponse(dom, obs.uvw, obs.freq, mask[0], False)
+    ift.extra.check_linear_operator(op, np.float64, np.complex128, only_r_linear=True)

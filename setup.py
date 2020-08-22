@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright(C) 2019 Max-Planck-Society
+# Copyright(C) 2019-2020 Max-Planck-Society
 # Author: Philipp Arras
 
 from setuptools import find_packages, setup
@@ -14,7 +14,7 @@ setup(
     packages=find_packages(include=["resolve", "resolve.*"]),
     zip_safe=True,
     dependency_links=[],
-    install_requires=["nifty7>=5.0"],
+    install_requires=["nifty7", "ducc0"],
     license="GPLv3",
     classifiers=[
         "Development Status :: 3 - Alpha", "Topic :: Utilities",

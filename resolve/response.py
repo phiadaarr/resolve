@@ -39,7 +39,7 @@ class ResponseDistributor(ift.LinearOperator):
             my_assert_isinstance(op, ift.LinearOperator)
             my_assert(dom is op.domain)
             my_assert(tgt is op.target)
-            my_asserteq(cap, op.capability)
+            my_assert(self.TIMES & op.capability, self.ADJOINT_TIMES & op.capability)
         self._domain = ift.makeDomain(dom)
         self._target = ift.makeDomain((ift.UnstructuredDomain(len(ops)), *tgt))
         self._capability = cap

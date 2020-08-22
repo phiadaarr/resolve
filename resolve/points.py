@@ -12,6 +12,7 @@ class PointInserter(ift.LinearOperator):
     def __init__(self, target, positions):
         self._target = ift.DomainTuple.make(target)
         self._capability = self.TIMES | self.ADJOINT_TIMES
+        positions = np.array(positions)
         my_asserteq(len(self._target.shape), 2)
         my_asserteq(len(self._target), 1)
         my_assert_isinstance(self._target[0], ift.RGSpace)
