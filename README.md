@@ -5,7 +5,7 @@ It is based on Bayesian principles and formulated in the language of information
 Its features include single-frequency imaging with either only a diffuse or a diffuse+point-like sky model as prior, single-channel antenna-based calibration with a regularization in temporal domain and w-stacking.
 
 Resolve is in beta stage: You are more than welcome to test it and help to make it applicable.
-In the likely case that you encounter bugs, please send a bug report to `parras@mpg-garching.mpg.de`.
+In the likely case that you encounter bugs, please contact me via [email](mailto:parras@mpg-garching.mpg.de).
 
 ## Installation
 - Install nifty7, e.g. via:
