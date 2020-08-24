@@ -43,6 +43,8 @@ class Plotter:
         unit = 6
         for ii, obj in enumerate(self._nifty):
             op, kwargs = obj['operator'], obj['kwargs']
+            if not set(op.domain.keys()) <= set(state.domain.keys()):
+                continue
             direc = join(self._dir, obj['title'])
             makedirs(direc, exist_ok=True)
             fname = join(direc, f'{identifier}.{self._f}')
@@ -66,6 +68,8 @@ class Plotter:
 
         for ii, obj in enumerate(self._uvscatter):
             op, obs = obj['operator'], obj['observation']
+            if not set(op.domain.keys()) <= set(state.domain.keys()):
+                continue
             direc = join(self._dir, obj['title'])
             makedirs(direc, exist_ok=True)
             fname = join(direc, f'{identifier}.{self._f}')

@@ -78,6 +78,10 @@ class MinimizationState:
     def mean(self):
         return self._position
 
+    @property
+    def domain(self):
+        return self._position.domain
+
     def save(self, file_name):
         with open(file_name, 'wb') as f:
             pickle.dump([self._position, self._samples, self._mirror],
