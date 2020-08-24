@@ -9,6 +9,7 @@ import nifty7 as ift
 import resolve as rve
 
 pmp = pytest.mark.parametrize
+np.seterr(all='raise')
 
 direc = '/data/'
 nthreads = 1

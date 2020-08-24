@@ -2,6 +2,8 @@
 # Copyright(C) 2020 Max-Planck-Society
 # Author: Philipp Arras
 
+import numpy as np
+
 import nifty7 as ift
 
 from .observation import Observation
@@ -11,13 +13,22 @@ from .util import my_assert_isinstance, my_asserteq
 # TODO VariableCovariance version for all likelihoods
 
 
+def _get_mask(observation):
+    my_assert_isinstance(observation, Observation)
+    vis = observation.vis
+    if np.all(observation.flags.val):
+        return ift.ScalingOperator(vis.domain, 1.), vis, observation.weight
+    mask = ift.MaskOperator(ift.makeField(vis.domain, ~observation.flags.val.astype(bool)))
+    return mask, mask(vis), mask(observation.weight)
+
+
 def ImagingLikelihood(observation, sky_operator):
     my_assert_isinstance(observation, Observation)
     my_assert_isinstance(sky_operator, ift.Operator)
     R = StokesIResponse(observation, sky_operator.target)
     my_asserteq(R.target, observation.vis.domain)
-    invcov = ift.makeOp(observation.weight)
-    return ift.GaussianEnergy(mean=observation.vis, inverse_covariance=invcov) @ R @ sky_operator
+    mask, vis, invcov = _get_mask(observation)
+    return ift.GaussianEnergy(mean=vis, inverse_covariance=ift.makeOp(invcov)) @ mask @ R @ sky_operator
 
 
 def ImagingLikelihoodVariableCovariance(observation, sky_operator, inverse_covariance_operator):
@@ -27,9 +38,11 @@ def ImagingLikelihoodVariableCovariance(observation, sky_operator, inverse_covar
     my_assert_isinstance(inverse_covariance_operator.target, sky_operator.target, ift.DomainTuple)
     R = StokesIResponse(observation, sky_operator.target)
     my_asserteq(R.target.shape, observation.vis.shape)
-    residual = ift.Adder(observation.vis, neg=True) @ R @ sky_operator
+    mask, vis, _ = _get_mask(observation)
+    residual = ift.Adder(vis, neg=True) @ mask @ R @ sky_operator
+    inverse_covariance_operator = mask @ inverse_covariance_operator
     op = residual.ducktape_left('r') + inverse_covariance_operator.ducktape_left('ic')
-    return ift.VariableCovarianceGaussianEnergy(observation.vis.domain, 'r', 'ic', observation.vis.dtype) @ op
+    return ift.VariableCovarianceGaussianEnergy(residual.target, 'r', 'ic', observation.vis.dtype) @ op
 
 
 def ImagingCalibrationLikelihood(observation, sky_operator, calibration_operator):
@@ -40,9 +53,9 @@ def ImagingCalibrationLikelihood(observation, sky_operator, calibration_operator
     my_assert_isinstance(calibration_operator.domain, ift.MultiDomain)
     R = StokesIResponse(observation, sky_operator.target)
     my_asserteq(R.target, observation.vis.domain, calibration_operator.target)
-    invcov = ift.makeOp(observation.weight)
-    modelvis = calibration_operator*(R @ sky_operator)
-    return ift.GaussianEnergy(mean=observation.vis, inverse_covariance=invcov) @ modelvis
+    mask, vis, invcov = _get_mask(observation)
+    modelvis = mask @ (calibration_operator*(R @ sky_operator))
+    return ift.GaussianEnergy(mean=vis, inverse_covariance=ift.makeOp(invcov)) @ modelvis
 
 
 def CalibrationLikelihood(observation, calibration_operator, model_visibilities):
@@ -50,5 +63,5 @@ def CalibrationLikelihood(observation, calibration_operator, model_visibilities)
         print('Warning: Use calibration with only one polarization present.')
     my_assert_isinstance(calibration_operator.domain, ift.MultiDomain)
     my_asserteq(calibration_operator.target, model_visibilities.domain, observation.vis.domain)
-    invcov = ift.makeOp(observation.weight)
-    return ift.GaussianEnergy(observation.vis, invcov) @ ift.makeOp(model_visibilities) @ calibration_operator
+    mask, vis, invcov = _get_mask(observation)
+    return ift.GaussianEnergy(vis, ift.makeOp(invcov)) @ ift.makeOp(mask(model_visibilities)) @ mask @ calibration_operator
