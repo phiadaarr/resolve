@@ -35,9 +35,3 @@ mytest:
   stage: testing
   script:
     - pytest-3 -q --cov=resolve test.py
-    - >
-      python3 -m coverage report | tee coverage.txt
-    - >
-      grep TOTAL coverage.txt | awk '{ print "TOTAL: "$4; }'
-
-
