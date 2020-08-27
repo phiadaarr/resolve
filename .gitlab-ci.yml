@@ -1,0 +1,43 @@
+image: $CONTAINER_TEST_IMAGE
+
+variables:
+  CONTAINER_TEST_IMAGE: gitlab-registry.mpcdf.mpg.de/$CI_PROJECT_PATH:$CI_BUILD_REF_NAME
+
+stages:
+  - build_docker
+  - testing
+
+build_docker_from_scratch:
+  only:
+    - schedules
+  image: docker
+  stage: build_docker
+  before_script:
+    - ls
+  script:
+    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN gitlab-registry.mpcdf.mpg.de
+    - docker build -t $CONTAINER_TEST_IMAGE --no-cache .
+    - docker push $CONTAINER_TEST_IMAGE
+
+build_docker_from_cache:
+  except:
+    - schedules
+  image: docker
+  stage: build_docker
+  before_script:
+    - ls
+  script:
+    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN gitlab-registry.mpcdf.mpg.de
+    - docker build -t $CONTAINER_TEST_IMAGE .
+    - docker push $CONTAINER_TEST_IMAGE
+
+mytest:
+  stage: testing
+  script:
+    - pytest-3 -q --cov=resolve test.py
+    - >
+      python3 -m coverage report | tee coverage.txt
+    - >
+      grep TOTAL coverage.txt | awk '{ print "TOTAL: "$4; }'
+
+

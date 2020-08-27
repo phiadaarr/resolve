@@ -10,12 +10,13 @@ import resolve as rve
 
 pmp = pytest.mark.parametrize
 
+direc = '/data/'
 nthreads = 1
 ift.fft.set_nthreads(nthreads)
 rve.set_nthreads(nthreads)
 rve.set_epsilon(1e-4)
 rve.set_wstacking(False)
-OBSERVATION = rve.ms2observations('data/CYG-ALL-2052-2MHZ.ms', 'DATA')[0]
+OBSERVATION = rve.ms2observations(f'{direc}CYG-ALL-2052-2MHZ.ms', 'DATA')[0]
 snr = OBSERVATION.max_snr()
 OBS = [OBSERVATION.restrict_to_stokes_i(), OBSERVATION.average_stokes_i()]
 assert snr >= OBS[0].max_snr()
@@ -28,15 +29,15 @@ points = ift.InverseGammaOperator(inserter.domain, alpha=0.5, q=0.2/dom.scalar_d
 sky = rve.vla_beam(dom, np.mean(OBSERVATION.freq)) @ (sky0 + inserter @ points)
 
 
-@pmp('ms', ('CYG-ALL-2052-2MHZ', 'CYG-D-6680-64CH-10S', 'AM754_A030124_flagged'))
+@pmp('ms', (f'CYG-ALL-2052-2MHZ', 'CYG-D-6680-64CH-10S', 'AM754_A030124_flagged'))
 def test_save_and_load_hdf5(ms):
     spws = [None]
     if ms == 'AM754_A030124_flagged':
         spws = [0, 1]
         with pytest.raises(RuntimeError):
-            rve.ms2observations(f'data/{ms}.ms', 'DATA', None)
+            rve.ms2observations(f'{direc}{ms}.ms', 'DATA', None)
     for spw in spws:
-        obs = rve.ms2observations(f'data/{ms}.ms', 'DATA', spw)
+        obs = rve.ms2observations(f'{direc}{ms}.ms', 'DATA', spw)
         for ob in obs:
             snr0 = ob.max_snr()
             print('Fraction useful:', ob.fraction_useful())
@@ -87,7 +88,7 @@ def test_imaging_likelihoods(obs, noisemodel):
 
 @pmp('time_mode', [True, False])
 def test_calibration_likelihood(time_mode):
-    obs = rve.ms2observations('data/AM754_A030124_flagged.ms', 'DATA', 0)
+    obs = rve.ms2observations(f'{direc}AM754_A030124_flagged.ms', 'DATA', 0)
     obs = [oo.restrict_to_stokes_i() for oo in obs]
     t0, _ = rve.tmin_tmax(*obs)
     obs = [oo.move_time(-t0) for oo in obs]
