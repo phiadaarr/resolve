@@ -35,3 +35,4 @@ mytest:
   stage: testing
   script:
     - pytest-3 -q --cov=resolve test.py
+  coverage: '/^TOTAL.+?(\d+\%)$/'
