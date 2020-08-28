@@ -7,7 +7,6 @@ from os.path import join
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import LogNorm
 
 import nifty7 as ift
 
@@ -15,11 +14,13 @@ from .minimization import MinimizationState
 from .observation import Observation
 from .util import my_assert_isinstance, my_asserteq
 
+UNIT = 6
+
 
 class Plotter:
     # TODO Residual plots
     def __init__(self, fileformat, directory):
-        self._nifty, self._uvscatter = [], []
+        self._nifty, self._uvscatter, self._calib = [], [], []
         self._f = fileformat
         self._dir = directory
         makedirs(self._dir, exist_ok=True)
@@ -38,79 +39,120 @@ class Plotter:
                                 'observation': observation,
                                 'title': str(name)})
 
+    def add_calibration_solution(self, name, operator):
+        my_assert_isinstance(operator, ift.Operator)
+        self._calib.append({'title': str(name), 'operator': operator})
+
     def plot(self, identifier, state):
         my_assert_isinstance(state, (ift.MultiField, MinimizationState))
-        unit = 6
         for ii, obj in enumerate(self._nifty):
-            op, kwargs = obj['operator'], obj['kwargs']
-            if not set(op.domain.keys()) <= set(state.domain.keys()):
+            op, fname = self._plot_init(obj, state, identifier)
+            if fname is None:
                 continue
-            direc = join(self._dir, obj['title'])
-            makedirs(direc, exist_ok=True)
-            fname = join(direc, f'{identifier}.{self._f}')
-
-            if isinstance(state, MinimizationState) and len(state) > 0:
-                if len(op.target) == 1 and isinstance(op.target[0], ift.RGSpace) and len(op.shape) == 1:
-                    p = ift.Plot()
-                    p.add([op.force(ss) for ss in state], **kwargs)
-                    p.output(xsize=unit, ysize=unit, name=fname)
-                else:
-                    sc = ift.StatCalculator()
-                    for ss in state:
-                        sc.add(op.force(ss))
-                    p = ift.Plot()
-                    p.add(sc.mean, **kwargs)
-                    p.add(sc.var.sqrt()/sc.mean)
-                    p.output(nx=2, ny=1, xsize=2*unit, ysize=unit, name=fname)
-            else:
-                pos = state if isinstance(state, ift.MultiField) else state.mean
-                ift.single_plot(op.force(pos), **kwargs, name=fname)
-
+            _plot_nifty(state, op, obj['kwargs'], fname)
         for ii, obj in enumerate(self._uvscatter):
-            op, obs = obj['operator'], obj['observation']
-            if not set(op.domain.keys()) <= set(state.domain.keys()):
+            op, fname = self._plot_init(obj, state, identifier)
+            if fname is None:
                 continue
-            direc = join(self._dir, obj['title'])
-            makedirs(direc, exist_ok=True)
-            fname = join(direc, f'{identifier}.{self._f}')
+            obs = obj['observation']
+            _plot_uvscatter(state, op, obs, fname)
+        for ii, obj in enumerate(self._calib):
+            op, fname = self._plot_init(obj, state, identifier)
+            if fname is None:
+                continue
+            _plot_calibration(state, op, fname)
 
-            withsamples = isinstance(state, MinimizationState) and len(state) > 0
+    def _plot_init(self, obj, state, identifier):
+        op = obj['operator']
+        if not set(op.domain.keys()) <= set(state.domain.keys()):
+            return None, None
+        direc = join(self._dir, obj['title'])
+        makedirs(direc, exist_ok=True)
+        fname = join(direc, f'{identifier}.{self._f}')
+        return op, fname
 
-            pos = state if isinstance(state, ift.MultiField) else state.mean
-            uv = obs.effective_uv()
-            u, v = uv[:, 0], uv[:, 1]
-            uvwlen = obs.effective_uvwlen()
-            ncols = 2 if withsamples else 1
-            fig, axs = plt.subplots(obs.npol, 2*ncols, figsize=(2*ncols*unit, obs.npol*unit))
-            axs = list(axs.ravel())
-            if withsamples:
-                sc = ift.StatCalculator()
-                for ss in state:
-                    sc.add(op.force(ss))
-                weights = sc.mean
-                relsd = sc.mean/sc.var.sqrt()
-            else:
-                weights = op.force(pos).val
-            for axx in axs[::2]:
-                axx.set_aspect('equal')
-            for pol in range(obs.npol):
-                axx = axs.pop(0)
-                axx.set_title('Mean')
-                sct = axx.scatter(u, v, c=weights[pol], s=1)
-                fig.colorbar(sct, ax=axx)
 
-                axx = axs.pop(0)
-                axx.set_title('Mean')
-                sct = axx.scatter(uvwlen, weights[pol], s=1)
+def _plot_nifty(state, op, kwargs, fname):
+    if isinstance(state, MinimizationState) and len(state) > 0:
+        if len(op.target) == 1 and isinstance(op.target[0], ift.RGSpace) and len(op.shape) == 1:
+            p = ift.Plot()
+            p.add([op.force(ss) for ss in state], **kwargs)
+            p.output(xsize=UNIT, ysize=UNIT, name=fname)
+        else:
+            sc = ift.StatCalculator()
+            for ss in state:
+                sc.add(op.force(ss))
+            p = ift.Plot()
+            p.add(sc.mean, **kwargs)
+            p.add(sc.var.sqrt()/sc.mean)
+            p.output(nx=2, ny=1, xsize=2*UNIT, ysize=UNIT, name=fname)
+    else:
+        pos = state if isinstance(state, ift.MultiField) else state.mean
+        ift.single_plot(op.force(pos), **kwargs, name=fname)
 
-                if withsamples:
-                    axx = axs.pop(0)
-                    axx.set_title('Rel. std dev')
-                    sct = axx.scatter(u, v, c=relsd[pol], s=1)
-                    fig.colorbar(sct, ax=axx)
 
-                    axx = axs.pop(0)
-                    axx.set_title('Rel. std dev')
-                    sct = axx.scatter(uvwlen, relsd[pol], s=1)
-            fig.savefig(fname)
-            plt.close(fig)
+def _plot_calibration(state, op, fname):
+    withsamples = isinstance(state, MinimizationState) and len(state) > 0
+    pos = state if isinstance(state, ift.MultiField) else state.mean
+    if withsamples:
+        raise NotImplementedError
+    npol, nants, _, nfreq = op.target.shape
+    if nfreq != 1:
+        raise NotImplementedError
+    xs = np.arange(op.target[2].shape[0])
+    if isinstance(op.target[2], ift.RGSpace):
+        xs = xs*op.target[2].distances[0]/3600
+    fig, axs = plt.subplots(2, 1, sharex=True, figsize=(4*UNIT, npol*UNIT))
+    axs = list(axs.ravel())
+    for ii in range(npol):
+        axx = axs[ii]
+        axx.set_title(f'Polarization {ii}')
+        colors = plt.cm.viridis(np.linspace(0, 1, nants))
+        for jj in range(nants):
+            ys = op.force(pos).val[ii, jj]
+            axx.plot(xs, ys, alpha=0.3, color=colors[jj])
+    axs[1].set_xlabel('Time [h]')
+    fig.savefig(fname)
+    plt.close(fig)
+
+
+def _plot_uvscatter(state, op, obs, fname):
+    withsamples = isinstance(state, MinimizationState) and len(state) > 0
+    pos = state if isinstance(state, ift.MultiField) else state.mean
+    uv = obs.effective_uv()
+    u, v = uv[:, 0], uv[:, 1]
+    uvwlen = obs.effective_uvwlen()
+    ncols = 2 if withsamples else 1
+    fig, axs = plt.subplots(obs.npol, 2*ncols, figsize=(2*ncols*UNIT, obs.npol*UNIT))
+    axs = list(axs.ravel())
+    if withsamples:
+        sc = ift.StatCalculator()
+        for ss in state:
+            sc.add(op.force(ss))
+        weights = sc.mean
+        relsd = sc.mean/sc.var.sqrt()
+    else:
+        weights = op.force(pos).val
+    for axx in axs[::2]:
+        axx.set_aspect('equal')
+    for pol in range(obs.npol):
+        axx = axs.pop(0)
+        axx.set_title('Mean')
+        sct = axx.scatter(u, v, c=weights[pol], s=1)
+        fig.colorbar(sct, ax=axx)
+
+        axx = axs.pop(0)
+        axx.set_title('Mean')
+        sct = axx.scatter(uvwlen, weights[pol], s=1)
+
+        if withsamples:
+            axx = axs.pop(0)
+            axx.set_title('Rel. std dev')
+            sct = axx.scatter(u, v, c=relsd[pol], s=1)
+            fig.colorbar(sct, ax=axx)
+
+            axx = axs.pop(0)
+            axx.set_title('Rel. std dev')
+            sct = axx.scatter(uvwlen, relsd[pol], s=1)
+    fig.savefig(fname)
+    plt.close(fig)
