@@ -104,11 +104,15 @@ def test_calibration_likelihood(time_mode):
         time_dct = None
     else:
         time_dct = {aa: ii for ii, aa in enumerate(utimes)}
+        time_domain = ift.UnstructuredDomain(len(utimes))
     nants = len(uants)
-    ntimes = len(utimes)
     # total_N = npol*nants*nfreqs
-    total_N = obs[0].vis.shape[0]*nants*obs[0].vis.shape[2]
+    npol, nfreq = obs[0].npol, obs[0].nfreq
+    total_N = npol*nants*nfreq
+    dom = [ift.UnstructuredDomain(npol), ift.UnstructuredDomain(len(uants)),
+           time_domain, ift.UnstructuredDomain(nfreq)]
     if time_mode:
+        reshaper = rve.Reshaper([ift.UnstructuredDomain(total_N), time_domain], dom)
         dct = {
             'offset_mean': 0,
             'offset_std': (1, 0.5),
@@ -122,7 +126,7 @@ def test_calibration_likelihood(time_mode):
         }
         cfm = ift.CorrelatedFieldMaker.make(**dct, total_N=total_N)
         cfm.add_fluctuations(time_domain, **dct1)
-        phase = cfm.finalize(0)
+        phase = reshaper @ cfm.finalize(0)
         dct = {
             'offset_mean': 0,
             'offset_std': (1e-3, 1e-6),
@@ -136,17 +140,17 @@ def test_calibration_likelihood(time_mode):
         }
         cfm = ift.CorrelatedFieldMaker.make(**dct, total_N=total_N)
         cfm.add_fluctuations(time_domain, **dct1)
-        logampl = cfm.finalize(0)
+        logampl = reshaper @ cfm.finalize(0)
     lh, constantshape = None, (obs[0].vis.shape[0], obs[0].vis.shape[2])
     for ii, oo in enumerate(obs):
         oo = obs.pop(0)
         assert constantshape == (oo.vis.shape[0], oo.vis.shape[2])
         if not time_mode:
-            dom = [ift.UnstructuredDomain(ii) for ii in [total_N, ntimes]]
             mean, std = 0, np.pi/2
             phase = ift.Adder(mean, domain=dom) @ ift.ducktape(dom, None, 'calibration_phases').scale(std)
             mean, std = 0, 1
             logampl = ift.Adder(mean, domain=dom) @ ift.ducktape(dom, None, 'calibration_logamplitudes').scale(std)
+
         abc = rve.calibration_distribution(oo, phase, logampl, antenna_dct, time_dct)
         if ii in [1, 2]:
             model_visibilities = ift.full(oo.vis.domain, 1)
@@ -167,7 +171,8 @@ def test_simple_operator(dtype):
 def test_calibration_distributor(obs):
     tgt = obs.vis.domain
     utimes = rve.unique_times(obs)
-    dom = ift.UnstructuredDomain(obs.npol*obs.nfreq*len(obs.antenna_positions.unique_antennas())), ift.UnstructuredDomain(len(utimes))
+    uants = obs.antenna_positions.unique_antennas()
+    dom = [ift.UnstructuredDomain(nn) for nn in [obs.npol, len(uants), len(utimes), obs.nfreq]]
     uants = rve.unique_antennas(obs)
     time_dct = {aa: ii for ii, aa in enumerate(utimes)}
     antenna_dct = {aa: ii for ii, aa in enumerate(uants)}
