@@ -79,8 +79,9 @@ class Plotter:
             pos = state if isinstance(state, ift.MultiField) else state.mean
             uv = obs.effective_uv()
             u, v = uv[:, 0], uv[:, 1]
-            ncols = 3 if withsamples else 2
-            fig, axs = plt.subplots(obs.npol, ncols, figsize=(2*unit, obs.npol*unit))
+            uvwlen = obs.effective_uvwlen()
+            ncols = 2 if withsamples else 1
+            fig, axs = plt.subplots(obs.npol, 2*ncols, figsize=(2*ncols*unit, obs.npol*unit))
             axs = list(axs.ravel())
             if withsamples:
                 sc = ift.StatCalculator()
@@ -90,13 +91,17 @@ class Plotter:
                 relsd = sc.mean/sc.var.sqrt()
             else:
                 weights = op.force(pos).val
-            for axx in axs:
+            for axx in axs[::2]:
                 axx.set_aspect('equal')
             for pol in range(obs.npol):
                 axx = axs.pop(0)
-                axx.set_title('Weights')
+                axx.set_title('Mean')
                 sct = axx.scatter(u, v, c=weights[pol], s=1)
                 fig.colorbar(sct, ax=axx)
+
+                axx = axs.pop(0)
+                axx.set_title('Mean')
+                sct = axx.scatter(uvwlen, weights[pol], s=1)
 
                 if withsamples:
                     axx = axs.pop(0)
@@ -104,9 +109,8 @@ class Plotter:
                     sct = axx.scatter(u, v, c=relsd[pol], s=1)
                     fig.colorbar(sct, ax=axx)
 
-                axx = axs.pop(0)
-                axx.set_title('abs(vis)/sigma')
-                sct = axx.scatter(u, v, c=np.abs(obs.vis.val[pol])*np.sqrt(weights[pol]), s=1, norm=LogNorm())
-                fig.colorbar(sct, ax=axx)
+                    axx = axs.pop(0)
+                    axx.set_title('Rel. std dev')
+                    sct = axx.scatter(uvwlen, relsd[pol], s=1)
             fig.savefig(fname)
             plt.close(fig)
