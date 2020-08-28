@@ -13,8 +13,6 @@ import resolve as rve
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-j', type=int, default=1)
-    parser.add_argument('--automatic-weighting', action='store_true')
-    parser.add_argument('--start')
     parser.add_argument('ms')
     args = parser.parse_args()
 
