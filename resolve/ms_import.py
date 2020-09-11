@@ -10,7 +10,7 @@ from .antenna_positions import AntennaPositions
 from .direction import Direction
 from .observation import Observation
 from .polarization import Polarization
-from .util import my_asserteq
+from .util import complex2float_dtype, my_asserteq
 
 
 def ms2observations(ms, data_column, spectral_window=None):
@@ -42,19 +42,33 @@ def ms2observations(ms, data_column, spectral_window=None):
         dirs = tuple(dirs)
     print('Load main table')
     with table(ms, **CFG) as t:
-        vis = t.getcol(data_column)
-        print(f'vis data type is {vis.dtype}')
         uvw = t.getcol('UVW')
+        nrow = uvw.shape[0]
+        nchan = freqs.shape[1]
+        npol = len(polarization)
+        vis_dtype = t.getcol(data_column, startrow=0, nrow=1).dtype
+        print(f'vis data type is {vis_dtype}')
+        vis = np.empty((nrow, nchan, npol), dtype=vis_dtype)
+        weight = np.empty((nrow, nchan, npol), complex2float_dtype(vis_dtype))
+        flags = np.empty((nrow, nchan, npol), dtype=np.bool)
+        start, step = 0, 1000
         if 'WEIGHT_SPECTRUM' in t.colnames():
             try:
-                weight = t.getcol('WEIGHT_SPECTRUM')
+                t.getcol('WEIGHT_SPECTRUM', startrow=0, nrow=1)
+                weightmode = True
             except RuntimeError:
-                print('Invalid WEIGHT_SPECTRUM column. Use less informative WEIGHT column instead.')
-                weight = t.getcol('WEIGHT')
+                weightmode = False
         else:
-            print('No WEIGHT_SPECTRUM column. Use less informative WEIGHT column instead.')
-            weight = t.getcol('WEIGHT')
-        flags = t.getcol('FLAG')
+            weightmode = False
+        while start < nrow:
+            stop = min(nrow, start+step)
+            vis[start:stop] = t.getcol(data_column, startrow=start, nrow=stop-start)
+            flags[start:stop] = t.getcol('FLAG', startrow=start, nrow=stop-start)
+            if weightmode:
+                weight[start:stop] = t.getcol('WEIGHT_SPECTRUM', startrow=start, nrow=stop-start)
+            else:
+                weight[start:stop] = np.repeat(t.getcol('WEIGHT', startrow=start, nrow=stop-start)[:, None], nchan, axis=1)
+            start = stop
         fieldid = t.getcol('FIELD_ID')
         spw = t.getcol("DATA_DESC_ID")
         ant1 = t.getcol("ANTENNA1")
@@ -71,9 +85,6 @@ def ms2observations(ms, data_column, spectral_window=None):
     else:
         freqs = freqs[0]
 
-    if weight.ndim == 2:
-        # TODO Memory: Do not repeat this array and tell it the likelihood instead
-        weight = np.repeat(weight[:, None], vis.shape[1], axis=1)
     my_asserteq(weight.shape, flags.shape, vis.shape)
     # Convention: can use flag as index array: vis[flags] gives out good visibilities
     flags = ~flags
