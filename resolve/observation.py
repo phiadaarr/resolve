@@ -100,8 +100,12 @@ class Observation:
     def average_stokes_i(self):
         inds = self._polarization.stokes_i_indices()
         my_asserteq(len(inds), 2)
-        vis = 0.5*np.sum(self._vis[inds], axis=0)[None]
-        weight = 1/(0.5*np.sum(1/self._weight[inds], axis=0))[None]
+        indL, indR = self._stokes_I_inds
+        visL, visR = self._vis[..., indL], self._vis[..., indR]
+        wgtL, wgtR = self._weight[..., indL], self._weight[..., indR]
+        vis = 0.5*(wgtL*visL+wgtR*visR)/(wgtL+wgtR)
+        cov = 0.25*(1/wgtL+1/wgtR)
+        weight = 1/cov
         flags = np.all(self._flags[inds], axis=0)[None]
         return Observation(self._antpos, vis, weight, flags, Polarization.trivial(),
                            self._freq, self._direction)
