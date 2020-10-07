@@ -14,6 +14,7 @@ from .util import complex2float_dtype, my_asserteq
 
 
 def ms2observations(ms, data_column, spectral_window=None):
+    # TODO Update import script from ift/papers/gridder
     from casacore.tables import table
     CFG = {'readonly': True, 'ack': False}
     if not isdir(ms) or splitext(ms)[1] != '.ms':
