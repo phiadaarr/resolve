@@ -20,8 +20,7 @@ rve.set_wstacking(False)
 OBSERVATION = rve.ms2observations(f'{direc}CYG-ALL-2052-2MHZ.ms', 'DATA')[0]
 snr = OBSERVATION.max_snr()
 OBS = [OBSERVATION.restrict_to_stokes_i(), OBSERVATION.average_stokes_i()]
-assert snr >= OBS[0].max_snr()
-assert snr >= OBS[1].max_snr()
+assert snr >= OBS[0].max_snr()  # Leave data out, so snr cannot increase
 npix, fov = 256, 1*rve.DEG2RAD
 dom = ift.RGSpace((npix, npix), (fov/npix, fov/npix))
 sky0 = ift.SimpleCorrelatedField(dom, 21, (1, 0.1), (5, 1), (1.2, 0.4), (0.2, 0.2), (-2, 0.5)).exp()

@@ -98,11 +98,17 @@ class Observation:
         return Observation(self._antpos[slc], self._vis[:, slc], self._weight[:, slc], self._flags[:, slc], self._polarization, self._freq, self._direction)
 
     def average_stokes_i(self):
-        inds = self._polarization.stokes_i_indices()
-        my_asserteq(len(inds), 2)
-        vis = 0.5*np.sum(self._vis[inds], axis=0)[None]
-        weight = 1/(0.5*np.sum(1/self._weight[inds], axis=0))[None]
-        flags = np.all(self._flags[inds], axis=0)[None]
+        # Compute weighted mean of visibilities
+        indL, indR = self._polarization.stokes_i_indices()
+        visL, visR = self._vis[indL], self._vis[indR]
+        weightL, weightR = self._weight[indL], self._weight[indR]
+        weight = weightL+weightR
+        vis = (weightL*visL+weightR*visR)/weight
+        # Use only data points where all polarizations are ok
+        flags = np.all(self._flags[self._polarization.stokes_i_indices()], axis=0)
+        vis, weight, flags = vis[None], weight[None], flags[None]
+        f = np.ascontiguousarray
+        vis, weight, flags = f(vis), f(weight), f(flags)
         return Observation(self._antpos, vis, weight, flags, Polarization.trivial(),
                            self._freq, self._direction)
 
@@ -112,6 +118,8 @@ class Observation:
         weight = self._weight[inds]
         flags = self._flags[inds]
         pol = self._polarization.restrict_to_stokes_i()
+        f = np.ascontiguousarray
+        vis, weight, flags = f(vis), f(weight), f(flags)
         return Observation(self._antpos, vis, weight, flags, pol, self._freq,
                            self._direction)
 
