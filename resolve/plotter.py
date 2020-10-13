@@ -19,7 +19,6 @@ UNIT = 6
 
 class Plotter:
     # TODO Residual plots
-    # TODO Plot latent fields
     def __init__(self, fileformat, directory):
         self._nifty, self._uvscatter, self._calib = [], [], []
         self._f = fileformat
@@ -62,6 +61,9 @@ class Plotter:
             if fname is None:
                 continue
             _plot_calibration(state, op, fname)
+        mydir = join(self._dir, 'zzz_latent')
+        makedirs(mydir, exist_ok=True)
+        _plot_latent_histograms(state, join(mydir, f'{identifier}.{self._f}'))
 
     def _plot_init(self, obj, state, identifier):
         op = obj['operator']
@@ -159,5 +161,34 @@ def _plot_uvscatter(state, op, obs, fname):
             axx = axs.pop(0)
             axx.set_title('Rel. std dev')
             sct = axx.scatter(uvwlen, relsd[pol], s=1)
+    fig.savefig(fname)
+    plt.close(fig)
+
+
+def _plot_latent_histograms(state, fname):
+    pos = state if isinstance(state, ift.MultiField) else state.mean
+    N = len(state.domain.keys())
+    n1 = int(np.ceil(np.sqrt(N)))
+    n2 = int(np.ceil(N/n1))
+    fig, axs = plt.subplots(n1, n2, figsize=(UNIT/2*n1, UNIT/2*n2))
+    axs = list(axs.ravel())
+    for kk in pos.keys():
+        axx = axs.pop(0)
+        if isinstance(state, ift.MultiField):
+            arr = state[kk].val
+        elif len(state) == 0:
+            arr = state.mean[kk].val
+        else:
+            arr = np.array([ss[kk].val for ss in state])
+        if arr.size == 1:
+            axx.axvline(arr.ravel()[0])
+        else:
+            mi, ma, width = np.min(arr), np.max(arr), 0.3
+            axx.hist(arr.ravel(), alpha=0.5, density=True,
+                     bins=np.arange(mi, ma + width, width))
+        xs = np.linspace(-5, 5)
+        axx.plot(xs, np.exp(-xs**2/2)/np.sqrt(2*np.pi))
+        axx.set_title(f'{kk}')
+    plt.tight_layout()
     fig.savefig(fname)
     plt.close(fig)
