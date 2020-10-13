@@ -63,13 +63,6 @@ def main():
     cfmampl.add_fluctuations(time_domain, **dct1)
     logampl = reshaper @ cfmampl.finalize(0)
 
-    plotter = rve.Plotter('png', 'plots')
-    plotter.add_calibration_solution('calibration_logamplitude', logampl)
-    plotter.add_calibration_solution('calibration_phase', phase)
-
-    abc_calib2 = rve.calibration_distribution(ocalib2, phase, logampl, antenna_dct, None)
-    lh0 = rve.CalibrationLikelihood(ocalib2, abc_calib2, ift.full(ocalib2.vis.domain, 1+0.j))
-
     fov = np.array([2, 2])*rve.DEG2RAD
     npix = np.array([1024, 1024])
     skydom = ift.RGSpace(npix, fov/npix)
@@ -85,9 +78,15 @@ def main():
     }
     logsky = ift.SimpleCorrelatedField(**dct)
     sky = logsky.exp()
+
+    abc_calib2 = rve.calibration_distribution(ocalib2, phase, logampl, antenna_dct, None)
+    lh0 = rve.CalibrationLikelihood(ocalib2, abc_calib2, ift.full(ocalib2.vis.domain, 1+0.j))
     abc_science = rve.calibration_distribution(oscience, phase, logampl, antenna_dct, None)
     lh1 = rve.ImagingCalibrationLikelihood(oscience, sky, abc_science)
 
+    plotter = rve.Plotter('png', 'plots')
+    plotter.add_calibration_solution('calibration_logamplitude', logampl)
+    plotter.add_calibration_solution('calibration_phase', phase)
     ham = ift.StandardHamiltonian(lh0)
     state = rve.MinimizationState(0.1*ift.from_random(ham.domain), [])
     minimizer = ift.NewtonCG(ift.GradientNormController(name='newton', iteration_limit=10))
