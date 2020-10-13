@@ -22,13 +22,49 @@ def _get_mask(observation):
     return mask, mask(vis), mask(observation.weight)
 
 
+class _Likelihood(ift.EnergyOperator):
+    def __init__(self, operator, normalized_residual_operator):
+        my_assert_isinstance(operator, ift.Operator)
+        my_asserteq(operator.target, ift.DomainTuple.scalar_domain())
+        my_assert_isinstance(normalized_residual_operator, ift.Operator)
+        self._op = operator
+        self._domain = operator.domain
+        self.apply = operator.apply
+        self._nres = normalized_residual_operator
+
+    @property
+    def normalized_residual(self):
+        return self._nres
+
+    def __repr__(self):
+        return self._op.__repr__()
+
+
+def _build_gauss_lh_nres(op, mean, invcov):
+    my_assert_isinstance(op, ift.Operator)
+    my_assert_isinstance(mean, invcov, (ift.Field, ift.MultiField))
+    my_asserteq(op.target, mean.domain, invcov.domain)
+    lh = ift.GaussianEnergy(mean=mean, inverse_covariance=ift.makeOp(invcov)) @ op
+    nres = ift.makeOp(invcov.sqrt()) @ ift.Adder(mean, neg=True) @ op
+    return _Likelihood(lh, nres)
+
+
+def _build_varcov_gauss_lh_nres(residual, inverse_covariance, dtype):
+    my_assert_isinstance(residual, inverse_covariance, ift.Operator)
+    my_asserteq(residual.target, inverse_covariance.target)
+    op = residual.ducktape_left('r') + inverse_covariance.ducktape_left('ic')
+    lh = ift.VariableCovarianceGaussianEnergy(residual.target, 'r', 'ic', dtype) @ op
+    nres = residual*inverse_covariance.sqrt()
+    return _Likelihood(lh, nres)
+
+
 def ImagingLikelihood(observation, sky_operator):
     my_assert_isinstance(observation, Observation)
     my_assert_isinstance(sky_operator, ift.Operator)
     R = StokesIResponse(observation, sky_operator.target)
     my_asserteq(R.target, observation.vis.domain)
     mask, vis, invcov = _get_mask(observation)
-    return ift.GaussianEnergy(mean=vis, inverse_covariance=ift.makeOp(invcov)) @ mask @ R @ sky_operator
+    return _build_gauss_lh_nres(mask @ R @ sky_operator, vis, invcov)
 
 
 def ImagingLikelihoodVariableCovariance(observation, sky_operator, inverse_covariance_operator):
@@ -41,8 +77,8 @@ def ImagingLikelihoodVariableCovariance(observation, sky_operator, inverse_covar
     mask, vis, _ = _get_mask(observation)
     residual = ift.Adder(vis, neg=True) @ mask @ R @ sky_operator
     inverse_covariance_operator = mask @ inverse_covariance_operator
-    op = residual.ducktape_left('r') + inverse_covariance_operator.ducktape_left('ic')
-    return ift.VariableCovarianceGaussianEnergy(residual.target, 'r', 'ic', observation.vis.dtype) @ op
+    dtype = observation.vis.dtype
+    return _build_varcov_gauss_lh_nres(residual, inverse_covariance_operator, dtype)
 
 
 def ImagingCalibrationLikelihood(observation, sky_operator, calibration_operator):
@@ -55,7 +91,7 @@ def ImagingCalibrationLikelihood(observation, sky_operator, calibration_operator
     my_asserteq(R.target, observation.vis.domain, calibration_operator.target)
     mask, vis, invcov = _get_mask(observation)
     modelvis = mask @ (calibration_operator*(R @ sky_operator))
-    return ift.GaussianEnergy(mean=vis, inverse_covariance=ift.makeOp(invcov)) @ modelvis
+    return _build_gauss_lh_nres(modelvis, vis, invcov)
 
 
 def CalibrationLikelihood(observation, calibration_operator, model_visibilities):
@@ -64,4 +100,4 @@ def CalibrationLikelihood(observation, calibration_operator, model_visibilities)
     my_assert_isinstance(calibration_operator.domain, ift.MultiDomain)
     my_asserteq(calibration_operator.target, model_visibilities.domain, observation.vis.domain)
     mask, vis, invcov = _get_mask(observation)
-    return ift.GaussianEnergy(vis, ift.makeOp(invcov)) @ ift.makeOp(mask(model_visibilities)) @ mask @ calibration_operator
+    return _build_gauss_lh_nres(ift.makeOp(mask(model_visibilities)) @ mask @ calibration_operator, vis, invcov)
