@@ -7,7 +7,7 @@ from ducc0.wgridder import dirty2ms, ms2dirty
 
 import nifty7 as ift
 
-from .global_config import epsilon, nthreads, wstacking
+from .global_config import epsilon, nthreads, wgridding
 from .observation import Observation
 from .util import my_assert, my_assert_isinstance, my_asserteq
 
@@ -82,7 +82,7 @@ class SingleResponse(ift.LinearOperator):
             'pixsize_x': self._domain[0].distances[0],
             'pixsize_y': self._domain[0].distances[1],
             'epsilon': epsilon(),
-            'do_wstacking': wstacking(),
+            'do_wstacking': wgridding(),
             'nthreads': nthreads()
         }
         self._vol = self._domain[0].scalar_dvol

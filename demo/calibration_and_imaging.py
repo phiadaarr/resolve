@@ -11,7 +11,7 @@ import resolve as rve
 
 def main():
     rve.set_nthreads(8)
-    rve.set_wstacking(False)
+    rve.set_wgridding(True)
     obs = rve.ms2observations('/data/AM754_A030124_flagged.ms', 'DATA', 0)
     obs = [oo.restrict_to_stokes_i() for oo in obs]
     t0, _ = rve.tmin_tmax(*obs)

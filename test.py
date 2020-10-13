@@ -16,7 +16,7 @@ nthreads = 1
 ift.fft.set_nthreads(nthreads)
 rve.set_nthreads(nthreads)
 rve.set_epsilon(1e-4)
-rve.set_wstacking(False)
+rve.set_wgridding(False)
 OBSERVATION = rve.ms2observations(f'{direc}CYG-ALL-2052-2MHZ.ms', 'DATA')[0]
 snr = OBSERVATION.max_snr()
 OBS = [OBSERVATION.restrict_to_stokes_i(), OBSERVATION.average_stokes_i()]

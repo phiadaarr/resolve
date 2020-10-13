@@ -17,7 +17,7 @@ def main():
     args = parser.parse_args()
 
     rve.set_nthreads(args.j)
-    rve.set_wstacking(False)
+    rve.set_wgridding(False)
     obs = rve.ms2observations(args.ms, 'DATA')[0].average_stokes_i()
 
     rve.set_epsilon(1/10/obs.max_snr())
