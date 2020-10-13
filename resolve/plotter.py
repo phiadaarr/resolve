@@ -19,6 +19,7 @@ UNIT = 6
 
 class Plotter:
     # TODO Residual plots
+    # TODO Plot latent fields
     def __init__(self, fileformat, directory):
         self._nifty, self._uvscatter, self._calib = [], [], []
         self._f = fileformat
@@ -70,6 +71,10 @@ class Plotter:
         makedirs(direc, exist_ok=True)
         fname = join(direc, f'{identifier}.{self._f}')
         return op, fname
+
+    @property
+    def directory(self):
+        return self._dir
 
 
 def _plot_nifty(state, op, kwargs, fname):
