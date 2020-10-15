@@ -37,17 +37,18 @@ def main():
     logweighting = ift.SimpleCorrelatedField(dom, 0, (2, 2), (2, 2), (1.2, 0.4), (0.5, 0.2), (-2, 0.5), 'invcov')
     interpolation = ift.LinearInterpolator(dom, effuv)
     weightop = ift.makeOp(obs.weight) @ (rve.AddEmptyDimension(interpolation.target) @ interpolation @ logweighting.exp())**(-2)
+    lh = rve.ImagingLikelihoodVariableCovariance(obs, sky, weightop)
 
     plotter = rve.Plotter('png', 'plots')
     plotter.add('logsky', logsky)
     plotter.add('power spectrum logsky', logsky.power_spectrum)
     plotter.add('bayesian weighting', logweighting.exp())
     plotter.add('power spectrum bayesian weighting', logweighting.power_spectrum)
+    plotter.add('normalized residuals', lh.normalized_residual)
 
     ic = ift.AbsDeltaEnergyController(0.5, 3, 100, name='Sampling')
     minimizer = ift.NewtonCG(ift.GradientNormController(name='newton', iteration_limit=5))
-
-    ham = ift.StandardHamiltonian(rve.ImagingLikelihoodVariableCovariance(obs, sky, weightop), ic)
+    ham = ift.StandardHamiltonian(lh, ic)
     pos = 0.1*ift.from_random(ham.domain)
     state = rve.MinimizationState(pos, [])
 

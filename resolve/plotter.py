@@ -17,9 +17,8 @@ UNIT = 6
 
 
 class Plotter:
-    # TODO Residual plots
     def __init__(self, fileformat, directory):
-        self._nifty, self._calib = [], []
+        self._nifty, self._calib, self._hist = [], [], []
         self._f = fileformat
         self._dir = directory
         makedirs(self._dir, exist_ok=True)
@@ -34,6 +33,10 @@ class Plotter:
         my_assert_isinstance(operator, ift.Operator)
         self._calib.append({'title': str(name), 'operator': operator})
 
+    def add_histogram(self, name, operator):
+        my_assert_isinstance(operator, ift.Operator)
+        self._hist.append({'title': str(name), 'operator': operator})
+
     def plot(self, identifier, state):
         my_assert_isinstance(state, (ift.MultiField, MinimizationState))
         for ii, obj in enumerate(self._nifty):
@@ -46,9 +49,14 @@ class Plotter:
             if fname is None:
                 continue
             _plot_calibration(state, op, fname)
+        for ii, obj in enumerate(self._hist):
+            op, fname = self._plot_init(obj, state, identifier)
+            if fname is None:
+                continue
+            _plot_histograms(state, fname, postop=op)
         mydir = join(self._dir, 'zzz_latent')
         makedirs(mydir, exist_ok=True)
-        _plot_latent_histograms(state, join(mydir, f'{identifier}.{self._f}'))
+        _plot_histograms(state, join(mydir, f'{identifier}.{self._f}'))
 
     def _plot_init(self, obj, state, identifier):
         op = obj['operator']
@@ -108,30 +116,63 @@ def _plot_calibration(state, op, fname):
     plt.close(fig)
 
 
-def _plot_latent_histograms(state, fname):
-    pos = state if isinstance(state, ift.MultiField) else state.mean
-    N = len(state.domain.keys())
+def _plot_histograms(state, fname, postop=None):
+    if isinstance(state, (ift.Field, ift.MultiField)):
+        pos = [state]
+    elif isinstance(state, MinimizationState) and len(state) == 0:
+        if len(state) == 0:
+            pos = [state.mean]
+        else:
+            pos = state
+    else:
+        raise TypeError
+    if postop is not None:
+        pos = [postop.force(ff) for ff in pos]
+    del state
+    dom = pos[0].domain
+
+    if isinstance(dom, ift.DomainTuple):
+        keys = ['']
+        N = 2 if np.iscomplexobj(pos[0].val) else 1
+    else:
+        N = 0
+        for kk in dom.keys():
+            if np.iscomplexobj(pos[0][kk].val):
+                N += 2
+            else:
+                N += 1
+        keys = dom.keys()
     n1 = int(np.ceil(np.sqrt(N)))
     n2 = int(np.ceil(N/n1))
-    fig, axs = plt.subplots(n1, n2, figsize=(UNIT/2*n1, UNIT/2*n2))
-    axs = list(axs.ravel())
-    for kk in pos.keys():
-        axx = axs.pop(0)
-        if isinstance(state, ift.MultiField):
-            arr = state[kk].val
-        elif len(state) == 0:
-            arr = state.mean[kk].val
+
+    if n1 == n2 == 1:
+        fig = plt.figure(figsize=(UNIT/2*n1, UNIT/2*n2))
+        axs = [plt.gca()]
+    else:
+        fig, axs = plt.subplots(n2, n1, figsize=(UNIT/2*n1, UNIT*3/4*n2))
+        axs = list(axs.ravel())
+    for kk in keys:
+        if isinstance(dom, ift.MultiDomain):
+            arr = np.array([ss[kk].val for ss in pos])
         else:
-            arr = np.array([ss[kk].val for ss in state])
-        if arr.size == 1:
-            axx.axvline(arr.ravel()[0])
+            arr = np.array([ss.val for ss in pos])
+
+        if np.iscomplexobj(arr):
+            arrs = {'real': arr.real, 'imag': arr.imag}
         else:
-            mi, ma, width = np.min(arr), np.max(arr), 0.3
-            axx.hist(arr.ravel(), alpha=0.5, density=True,
-                     bins=np.arange(mi, ma + width, width))
-        xs = np.linspace(-5, 5)
-        axx.plot(xs, np.exp(-xs**2/2)/np.sqrt(2*np.pi))
-        axx.set_title(f'{kk}')
+            arrs = {'': arr}
+        for ll, arr in arrs.items():
+            axx = axs.pop(0)
+            if arr.size == 1:
+                axx.axvline(arr.ravel()[0])
+            else:
+                mi, ma, width = np.min(arr), np.max(arr), 0.3
+                axx.hist(arr.ravel(), alpha=0.5, density=True,
+                         bins=np.arange(mi, ma + width, width))
+            xs = np.linspace(-5, 5)
+            axx.set_yscale('log')
+            axx.plot(xs, np.exp(-xs**2/2)/np.sqrt(2*np.pi))
+            axx.set_title(f'{kk} {ll}')
     plt.tight_layout()
     fig.savefig(fname)
     plt.close(fig)

@@ -87,6 +87,8 @@ def main():
     plotter = rve.Plotter('png', 'plots')
     plotter.add_calibration_solution('calibration_logamplitude', logampl)
     plotter.add_calibration_solution('calibration_phase', phase)
+    plotter.add_histogram('normalized_residuals_calib2', lh0.normalized_residual)
+    plotter.add_histogram('normalized_residuals_science', lh1.normalized_residual)
     ham = ift.StandardHamiltonian(lh0)
     state = rve.MinimizationState(0.1*ift.from_random(ham.domain), [])
     minimizer = ift.NewtonCG(ift.GradientNormController(name='newton', iteration_limit=10))
