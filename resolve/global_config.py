@@ -4,19 +4,19 @@
 
 import nifty7 as ift
 
-_wstacking = False
+_wgridding = False
 _epsilon = 1e-12
 _nthreads = 1
 
 
-def wstacking():
-    return _wstacking
+def wgridding():
+    return _wgridding
 
 
-def set_wstacking(val):
-    global _wstacking
-    _wstacking = bool(val)
-    print(f'Set wstacking to {wstacking()}')
+def set_wgridding(val):
+    global _wgridding
+    _wgridding = bool(val)
+    print(f'Set wgridding to {wgridding()}')
 
 
 def epsilon():

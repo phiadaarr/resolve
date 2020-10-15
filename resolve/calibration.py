@@ -28,8 +28,8 @@ def calibration_distribution(observation, phase_operator, logamplitude_operator,
 
 class CalibrationDistributor(ift.LinearOperator):
     def __init__(self, domain, target, ant_col, time_col, antenna_dct, time_dct):
-        # Domain: pols*antennas*freqs, time
-        # Target: vis.shape
+        # Domain: pols, antennas, time, freqs
+        # Target: pols, times, freqs
         my_asserteq(ant_col.ndim, 1)
         my_assert(np.issubdtype(ant_col.dtype, np.integer))
         my_assert(set(np.unique(ant_col)) <= set(antenna_dct.keys()))
@@ -44,29 +44,28 @@ class CalibrationDistributor(ift.LinearOperator):
         myants = np.empty_like(ant_col)
         for kk, vv in antenna_dct.items():
             myants[ant_col == kk] = vv
-        if isinstance(self._domain[1], ift.RGSpace):
+        tdom = self._domain[2]
+        if isinstance(tdom, ift.RGSpace):
             my_assert(time_dct is None)
             mytime = time_col
-            self._ntimes = self._domain[1].size
+            self._ntimes = tdom.size
         else:
             mytime = np.empty(time_col.size, int)
             for kk, vv in time_dct.items():
                 mytime[time_col == kk] = vv
             self._ntimes = len(time_dct)
-        self._li = MyLinearInterpolator(self._domain[1], self._nantennas, myants, mytime)
+        self._li = MyLinearInterpolator(tdom, self._nantennas, myants, mytime)
 
     def apply(self, x, mode):
         self._check_input(x, mode)
         res = None
         x = x.val
-        if mode == self.TIMES:
-            x = x.reshape(self._target.shape[0], self._nantennas, -1, self._target.shape[2])
-        for pol in range(self._target.shape[0]):
-            for freq in range(self._target.shape[2]):
-                if mode == self.TIMES:
-                    tmp = self._li(ift.makeField(self._li.domain, x[pol, :, :, freq])).val
-                else:
-                    tmp = self._li.adjoint(ift.makeField(self._li.target, x[pol, :, freq])).val
+        npol, _, nfreq = self._target.shape
+        for pol in range(npol):
+            for freq in range(nfreq):
+                op = self._li if mode == self.TIMES else self._li.adjoint
+                val = x[pol, :, :, freq] if mode == self.TIMES else x[pol, :, freq]
+                tmp = op(ift.makeField(op.domain, val)).val
                 if res is None:
                     shp = self._target.shape
                     if mode == self.ADJOINT_TIMES:
@@ -76,14 +75,11 @@ class CalibrationDistributor(ift.LinearOperator):
                     res[pol, :, freq] = tmp
                 else:
                     res[pol, :, :, freq] = tmp
-        if mode == self.ADJOINT_TIMES:
-            res = res.reshape(self._domain.shape)
         return ift.makeField(self._tgt(mode), res)
 
 
 class MyLinearInterpolator(ift.LinearOperator):
     def __init__(self, time_domain, nants, ant_col, time_col):
-        # TODO Unify with Bayesian weighting scheme operator
         my_assert_isinstance(time_domain, (ift.RGSpace, ift.UnstructuredDomain))
         my_asserteq(len(time_domain.shape), 1)
         floattime = isinstance(time_domain, ift.RGSpace)
