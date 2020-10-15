@@ -2,7 +2,6 @@
 # Copyright(C) 2020 Max-Planck-Society
 # Author: Philipp Arras
 
-from os import makedirs
 from os.path import join
 
 import matplotlib.pyplot as plt
@@ -11,9 +10,16 @@ import numpy as np
 import nifty7 as ift
 
 from .minimization import MinimizationState
+from .mpi import onlymaster
 from .util import my_assert_isinstance
 
 UNIT = 6
+
+
+@onlymaster
+def makedirs(*args, **kwargs):
+    from os import makedirs
+    makedirs(*args, **kwargs)
 
 
 class Plotter:
@@ -23,20 +29,24 @@ class Plotter:
         self._dir = directory
         makedirs(self._dir, exist_ok=True)
 
+    @onlymaster
     def add(self, name, operator, **kwargs):
         my_assert_isinstance(operator, ift.Operator)
         self._nifty.append({'operator': operator,
                             'title': str(name),
                             'kwargs': kwargs})
 
+    @onlymaster
     def add_calibration_solution(self, name, operator):
         my_assert_isinstance(operator, ift.Operator)
         self._calib.append({'title': str(name), 'operator': operator})
 
+    @onlymaster
     def add_histogram(self, name, operator):
         my_assert_isinstance(operator, ift.Operator)
         self._hist.append({'title': str(name), 'operator': operator})
 
+    @onlymaster
     def plot(self, identifier, state):
         my_assert_isinstance(state, (ift.MultiField, MinimizationState))
         for ii, obj in enumerate(self._nifty):
@@ -58,6 +68,7 @@ class Plotter:
         makedirs(mydir, exist_ok=True)
         _plot_histograms(state, join(mydir, f'{identifier}.{self._f}'))
 
+    @onlymaster
     def _plot_init(self, obj, state, identifier):
         op = obj['operator']
         if not set(op.domain.keys()) <= set(state.domain.keys()):
