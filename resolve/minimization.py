@@ -6,17 +6,18 @@ import pickle
 
 import nifty7 as ift
 
+from .mpi import comm, onlymaster
 from .util import (compare_attributes, my_assert, my_assert_isinstance,
                    my_asserteq)
 
 
 def simple_minimize(operator, position, n_samples, minimizer, constants=[], point_estimates=[]):
-    mini = Minimization(operator, position, n_samples, constants, point_estimates)
+    mini = Minimization(operator, position, n_samples, constants, point_estimates, comm)
     return mini.minimize(minimizer)
 
 
 class Minimization:
-    def __init__(self, operator, position, n_samples, constants=[], point_estimates=[]):
+    def __init__(self, operator, position, n_samples, constants=[], point_estimates=[], comm=None):
         n_samples = int(n_samples)
         self._position = position
         position = position.extract(operator.domain)
@@ -31,7 +32,7 @@ class Minimization:
                    'constants': constants,
                    'point_estimates': point_estimates,
                    'mirror_samples': True,
-                   'comm': None,  # TODO Add MPI support
+                   'comm': comm,
                    'nanisinf': True
             }
             self._e = ift.MetricGaussianKL.make(**dct)
@@ -82,6 +83,7 @@ class MinimizationState:
     def domain(self):
         return self._position.domain
 
+    @onlymaster
     def save(self, file_name):
         with open(file_name, 'wb') as f:
             pickle.dump([self._position, self._samples, self._mirror],

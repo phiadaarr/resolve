@@ -10,6 +10,7 @@ import nifty7 as ift
 from .antenna_positions import AntennaPositions
 from .constants import SPEEDOFLIGHT
 from .direction import Direction
+from .mpi import onlymaster
 from .polarization import Polarization
 from .util import (compare_attributes, my_assert, my_assert_isinstance,
                    my_asserteq)
@@ -64,6 +65,7 @@ class Observation:
         return Observation(antpos, vis, weight, flags, self._polarization,
                            freq, self._direction)
 
+    @onlymaster
     def save_to_hdf5(self, file_name):
         with h5py.File(file_name, 'w') as f:
             for ii, vv in enumerate(self._antpos.to_list()):
