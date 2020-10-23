@@ -92,8 +92,6 @@ def ms2observations(ms, data_column, spectral_window=None):
     inds = weight == 0
     weight[inds] = 1
     flags[inds] = False
-    # Convention: multiply v by -1
-    uvw[:, 1] *= -1
 
     # TODO Determine which observation is calibration observation
     # TODO Import name of source
