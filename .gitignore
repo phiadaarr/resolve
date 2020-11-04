@@ -1,4 +1,5 @@
 # custom
+*.npz
 *.hdf5
 *.ms
 .pytest_cache

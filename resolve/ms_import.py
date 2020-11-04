@@ -62,6 +62,7 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window=None, pola
         raise ValueError
 
     # Spectral windows
+    my_assert(spectral_window is None or (isinstance(spectral_window, int) and spectral_window >= 0))
     with table(join(ms, 'SPECTRAL_WINDOW'), **CFG) as t:
         freq = t.getcol('CHAN_FREQ')
         nspws = freq.shape[0]
@@ -108,15 +109,22 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window=None, pola
     # TODO Import name of source
     observations = []
     for ifield, direction in enumerate(dirs):
-        uvw, ant1, ant2, time, freq, vis, wgt, flags = read_ms_i(
+        uvw, ant1, ant2, time, freq_out, vis, wgt, flags = read_ms_i(
             ms, data_column, freq, ifield, spectral_window, pol_ind,
             pol_summation, with_calib_info)
+        if np.any(flags):
+            if not wgt.flags.writeable:
+                # This is necessary because otherwise we can store the weight
+                # array with less memory (created with np.broadcast_to)
+                wgt = wgt.copy()
+            wgt[flags] = 0.
+        del flags
+        vis[wgt == 0] = 0.
         vis = _ms2resolve_transpose(vis)
         wgt = _ms2resolve_transpose(wgt)
-        flags = _ms2resolve_transpose(flags)
         antpos = AntennaPositions(uvw, ant1, ant2, time)
-        observations.append(Observation(antpos, vis, wgt, flags,
-                                        polobj, freq, direction))
+        observations.append(Observation(antpos, vis, wgt, polobj, freq_out,
+                                        direction))
     return observations
 
 
@@ -139,6 +147,9 @@ def _determine_weighting(t):
 
 def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices, pol_summation, with_calib_info):
     from casacore.tables import table
+    freq = np.array(freq)
+    my_asserteq(freq.ndim, 1)
+    my_assert(len(freq) > 0)
     nchan = len(freq)
     assert pol_indices is None or isinstance(pol_indices, list)
     if pol_indices is None:
@@ -163,12 +174,15 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices, pol_
             if pol_summation:
                 tflags = np.any(tflags.astype(np.bool), axis=-1)
                 twgt = np.sum(twgt, axis=-1)
-            tflags[twgt == 0] = True
+            if twgt.ndim == 3:  # with WEIGHT_SPECTRUM
+                tflags[twgt == 0] = True
+
             # Select field and spectral window
             tfieldid = t.getcol("FIELD_ID", startrow=start, nrow=stop-start)
             tflags[tfieldid != field] = True
             tspw = t.getcol("FIELD_ID", startrow=start, nrow=stop-start)
             tflags[tspw != spectral_window] = True
+
             npol = tflags.shape[2]
             if not pol_summation:
                 tflags = np.all(tflags, axis=2)
@@ -176,9 +190,11 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices, pol_
             active_rows[start:stop] = np.invert(np.all(tflags, axis=-1))
             active_channels = np.logical_or(active_channels, np.invert(np.all(tflags, axis=0)))
             start = stop
+        nrealrows, nrealchan = np.sum(active_rows), np.sum(active_channels)
+        if nrealrows == 0 or nrealchan == 0:
+            raise RuntimeError('Empty data set')
 
         # Read in data
-        nrealrows, nrealchan = np.sum(active_rows), np.sum(active_channels)
         start, realstart = 0, 0
         shp = (nrealrows, nrealchan)
         wgtshp = (nrealrows, nrealchan) if fullwgt else (nrealrows,)
@@ -197,6 +213,7 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices, pol_
                 tvis = t.getcol(data_column, startrow=start, nrow=stop-start)[..., pol_indices]
                 assert tvis.dtype == np.complex64
                 if pol_summation:
+                    # FIXME Implement weighted sum here
                     tvis = np.sum(tvis, axis=-1)
                 if not allrows:
                     tvis = tvis[active_rows[start:stop]]
@@ -240,16 +257,11 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices, pol_
 
     # blow up wgt to the right dimensions if necessary
     if not fullwgt:
-        wgt = np.broadcast_to(wgt.reshape((-1, 1)), vis.shape)
-
-    # vis[wgt == 0] = 0.
-
+        wgt = np.broadcast_to(wgt[:, None], vis.shape)
+    my_asserteq(wgt.shape, vis.shape)
     return (np.ascontiguousarray(uvw),
             ant1, ant2, time,
             np.ascontiguousarray(freq),
             np.ascontiguousarray(vis),
-            np.ascontiguousarray(wgt) if fullwgt else wgt,
-# Convention: can use flag as index array: vis[flags] gives out good visibilities
-            1-flags.astype(np.uint8))
-
-
+            np.ascontiguousarray(wgt),# if fullwgt else wgt,
+            flags)

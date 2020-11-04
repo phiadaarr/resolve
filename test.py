@@ -31,7 +31,8 @@ sky = rve.vla_beam(dom, np.mean(OBSERVATION.freq)) @ (sky0 + inserter @ points)
 
 @pmp('ms', ('CYG-ALL-2052-2MHZ', 'CYG-D-6680-64CH-10S', 'AM754_A030124_flagged'))
 @pmp('with_calib_info', (False, True))
-def test_save_and_load_hdf5(ms, with_calib_info):
+@pmp('compress', (False, True))
+def test_save_and_load_observation(ms, with_calib_info, compress):
     spws = [None]
     if ms == 'AM754_A030124_flagged':
         spws = [0, 1]
@@ -42,10 +43,9 @@ def test_save_and_load_hdf5(ms, with_calib_info):
         for ob in obs:
             snr0 = ob.max_snr()
             print('Fraction useful:', ob.fraction_useful())
-            ob.save_to_hdf5('foo.hdf5')
-            ob1 = rve.Observation.load_from_hdf5('foo.hdf5')
+            ob.save_to_npz('foo.npz', compress)
+            ob1 = rve.Observation.load_from_npz('foo.npz')
             assert ob == ob1
-            ob1.compress()
             assert snr0 <= ob1.max_snr()
 
 
