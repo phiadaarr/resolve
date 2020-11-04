@@ -18,8 +18,17 @@ INVTABLE = {val: key for key, val in TABLE.items()}
 
 
 class Polarization:
+    """Stores polarization information of a data set and is used for
+    translating between indices (5, 6, 7, 8, ...) and strings
+    ("RR", "RL", "LR", "LL", ...).
+
+    Parameters
+    ----------
+    indices : tuple of polarization indices.
+        Takes integer values between 5 and including 12.
+    """
     def __init__(self, indices):
-        self._ind = list(indices)
+        self._ind = tuple(indices)
         my_assert(len(self._ind) <= 4)
         self._trivial = len(indices) == 0
 
@@ -52,7 +61,7 @@ class Polarization:
         return len(self._ind)
 
     def to_list(self):
-        return self._ind
+        return list(self._ind)
 
     @staticmethod
     def from_list(lst):
