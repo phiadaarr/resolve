@@ -29,7 +29,7 @@ points = ift.InverseGammaOperator(inserter.domain, alpha=0.5, q=0.2/dom.scalar_d
 sky = rve.vla_beam(dom, np.mean(OBSERVATION.freq)) @ (sky0 + inserter @ points)
 
 
-@pmp('ms', (f'CYG-ALL-2052-2MHZ', 'CYG-D-6680-64CH-10S', 'AM754_A030124_flagged'))
+@pmp('ms', ('CYG-ALL-2052-2MHZ', 'CYG-D-6680-64CH-10S', 'AM754_A030124_flagged'))
 def test_save_and_load_hdf5(ms):
     spws = [None]
     if ms == 'AM754_A030124_flagged':
