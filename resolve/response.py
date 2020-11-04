@@ -69,7 +69,8 @@ class FullResponse(ift.LinearOperator):
 
 class SingleResponse(ift.LinearOperator):
     def __init__(self, domain, uvw, freq, mask, single_precision):
-        # TODO Currently only the response uses single_precision if possible. Could be rolled out to the whole likelihood
+        # TODO Currently only the response uses single_precision if possible.
+        # Could be rolled out to the whole likelihood
         self._domain = ift.DomainTuple.make(domain)
         self._target = ift.makeDomain(ift.UnstructuredDomain(ss) for ss in (uvw.shape[0], freq.size))
         self._capability = self.TIMES | self.ADJOINT_TIMES
@@ -84,6 +85,7 @@ class SingleResponse(ift.LinearOperator):
             'epsilon': epsilon(),
             'do_wstacking': wgridding(),
             'nthreads': nthreads()
+            # FIXME Add negate_v as soon as it is available in ducc
         }
         self._vol = self._domain[0].scalar_dvol
         self._target_dtype = np.complex64 if single_precision else np.complex128

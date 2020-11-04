@@ -40,6 +40,9 @@ class Polarization:
         inds = (8, 5) if self.circular() else (9, 12)
         return Polarization(inds)
 
+    def restrict_by_name(self, lst):
+        return Polarization([INVTABLE[ss] for ss in lst])
+
     def circular(self):
         if self._trivial:
             raise RuntimeError

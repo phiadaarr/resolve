@@ -43,14 +43,6 @@ def compare_attributes(obj0, obj1, attribute_list):
     return True
 
 
-def complex2float_dtype(dtype):
-    if dtype == np.complex128:
-        return np.float64
-    if dtype == np.complex64:
-        return np.float32
-    raise RuntimeError
-
-
 class Reshaper(ift.LinearOperator):
     def __init__(self, domain, target):
         self._domain = ift.DomainTuple.make(domain)
