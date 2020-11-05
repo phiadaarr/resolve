@@ -1,4 +1,5 @@
 # custom
+*.state
 *.npz
 *.hdf5
 *.ms

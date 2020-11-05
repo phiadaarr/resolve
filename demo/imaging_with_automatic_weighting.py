@@ -18,7 +18,7 @@ def main():
 
     rve.set_nthreads(args.j)
     rve.set_wgridding(False)
-    obs = rve.ms2observations(args.ms, 'DATA')[0].average_stokes_i()
+    obs = rve.ms2observations(args.ms, 'DATA', False, 0, 'stokesiavg')[0]
 
     rve.set_epsilon(1/10/obs.max_snr())
     fov = np.array([3, 1.5])*rve.ARCMIN2RAD
