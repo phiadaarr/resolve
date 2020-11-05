@@ -14,13 +14,12 @@ if __name__ == '__main__':
     with_calib_info = True
     datasetname = sys.argv[1]
     outname = sys.argv[2]
-    nspec = rve.ms_n_spectral_windows(datasetname)
-
-    for compr in [True, False]:
-        for pol in ["LL", "stokesiavg", "stokesi", "all"]:
-            for spec in range(nspec):
-                obs = rve.ms2observations(datasetname, datacolumn, with_calib_info, spec, pol)
-                for ifield, oo in enumerate(obs):
-                    fname = f"{outname}compr{compr}pol{pol}spectralwindow{spec}field{ifield}.npz"
-                    print(f"Save {fname}")
-                    oo.save_to_npz(fname, compr)
+    compr = True
+    pol = ["LL", "stokesiavg", "stokesi", "all"][1]
+    spec = 0
+    # nspec = rve.ms_n_spectral_windows(datasetname)
+    obs = rve.ms2observations(datasetname, datacolumn, with_calib_info, spec, pol)
+    for ifield, oo in enumerate(obs):
+        fname = f"{outname}field{ifield}.npz"
+        print(f"Save {fname}")
+        oo.save_to_npz(fname, compr)
