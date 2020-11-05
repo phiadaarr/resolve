@@ -28,6 +28,7 @@ class AntennaPositions:
         self._ant1, self._ant2 = ant1, ant2
         self._t0 = None
 
+    @property
     def only_imaging(self):
         return self._ant1 is None
 

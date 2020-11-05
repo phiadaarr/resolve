@@ -24,7 +24,7 @@ class Observation:
         my_asserteq(weight.shape, vis.shape)
         my_asserteq(vis.shape, (len(polarization), nrows, len(freq)))
         my_asserteq(nrows, vis.shape[1])
-        # FIXME Deal with zero weights in weights learning
+        my_assert(np.all(weight >= 0.))
 
         self._antpos = antenna_positions
         self._vis = vis
@@ -35,6 +35,14 @@ class Observation:
 
     def apply_flags(self, arr):
         return arr[self._weight != 0.]
+
+    @property
+    def flags(self):
+        return self._weight == 0.
+
+    @property
+    def mask(self):
+        return self._weight > 0.
 
     def max_snr(self):
         return np.max(np.abs(self.apply_flags(self._vis*np.sqrt(self._weight))))

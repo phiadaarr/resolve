@@ -20,7 +20,7 @@ def StokesIResponse(observation, domain):
     npol = observation.npol
     my_assert(npol in [1, 2])
     sp = observation.vis.dtype == np.complex64
-    mask = observation.flags.val
+    mask = observation.mask
     sr0 = SingleResponse(domain, observation.uvw, observation.freq, mask[0], sp)
     if npol == 1 or (npol == 2 and np.all(mask[0] == mask[1])):
         contr = ift.ContractionOperator(observation.vis.domain, 0)

@@ -15,7 +15,7 @@ from .util import my_asserteq, my_assert
 CFG = {'readonly': True, 'ack': False}
 
 
-def ms2observations(ms, data_column, with_calib_info, spectral_window=None, polarizations="all"):
+def ms2observations(ms, data_column, with_calib_info, spectral_window, polarizations="all"):
     # FIXME Support to read in only selected channels
     """
 
@@ -36,9 +36,7 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window=None, pola
         Reads in all information necessary for calibration, if True. If only
         imaging shall be performed, this can be set to False.
     spectral_window : int
-        Index of spectral window which shall be imported. If only one spectral
-        window is present, defaults to important it. If several spectral
-        windows are present, this parameter is non-optional.
+        Index of spectral window which shall be imported.
     polarizations
         "all":     All polarizations are imported.
         "stokesi": Only LL/RR or XX/YY polarizations are imported and averaged
@@ -62,14 +60,9 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window=None, pola
         raise ValueError
 
     # Spectral windows
-    my_assert(spectral_window is None or (isinstance(spectral_window, int) and spectral_window >= 0))
+    my_assert(isinstance(spectral_window, int) and spectral_window >= 0)
     with table(join(ms, 'SPECTRAL_WINDOW'), **CFG) as t:
-        freq = t.getcol('CHAN_FREQ')
-        nspws = freq.shape[0]
-        if spectral_window is None and nspws > 1:
-            raise RuntimeError("Need to specify spectral window.")
-        spectral_window = 0 if nspws == 1 else int(spectral_window)
-        freq = freq[spectral_window]
+        freq = t.getcol('CHAN_FREQ')[spectral_window]
 
     # Polarization
     with table(join(ms, 'POLARIZATION'), **CFG) as t:
@@ -180,7 +173,7 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices, pol_
             # Select field and spectral window
             tfieldid = t.getcol("FIELD_ID", startrow=start, nrow=stop-start)
             tflags[tfieldid != field] = True
-            tspw = t.getcol("FIELD_ID", startrow=start, nrow=stop-start)
+            tspw = t.getcol("DATA_DESC_ID", startrow=start, nrow=stop-start)
             tflags[tspw != spectral_window] = True
 
             npol = tflags.shape[2]
@@ -240,7 +233,7 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices, pol_
 
             start, realstart = stop, realstop
         uvw = t.getcol("UVW")[active_rows]
-        if bool(with_calib_info):
+        if with_calib_info:
             ant1 = np.ascontiguousarray(t.getcol("ANTENNA1")[active_rows])
             ant2 = np.ascontiguousarray(t.getcol("ANTENNA2")[active_rows])
             time = np.ascontiguousarray(t.getcol("TIME")[active_rows])
@@ -252,7 +245,7 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices, pol_
     print('# Correlations: {}'.format(1 if pol_summation else vis.shape[2]))
     print('Full weights' if fullwgt else 'Row-only weights')
     nflagged = np.sum(flags) + (nrow-nrealrows)*nchan + (nchan-nrealchan)*nrow
-    print("{} % flagged".format(nflagged/(nrow*nchan)*100))
+    print("{} % flagged or not selected".format(nflagged/(nrow*nchan)*100))
     freq = freq[active_channels]
 
     # blow up wgt to the right dimensions if necessary

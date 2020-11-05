@@ -17,7 +17,7 @@ ift.fft.set_nthreads(nthreads)
 rve.set_nthreads(nthreads)
 rve.set_epsilon(1e-4)
 rve.set_wgridding(False)
-OBSERVATION = rve.ms2observations(f'{direc}CYG-ALL-2052-2MHZ.ms', 'DATA', True)[0]
+OBSERVATION = rve.ms2observations(f'{direc}CYG-ALL-2052-2MHZ.ms', 'DATA', True, 0)[0]
 snr = OBSERVATION.max_snr()
 OBS = [OBSERVATION.restrict_to_stokes_i(), OBSERVATION.average_stokes_i()]
 assert snr >= OBS[0].max_snr()  # Leave data out, so snr cannot increase
@@ -33,11 +33,9 @@ sky = rve.vla_beam(dom, np.mean(OBSERVATION.freq)) @ (sky0 + inserter @ points)
 @pmp('with_calib_info', (False, True))
 @pmp('compress', (False, True))
 def test_save_and_load_observation(ms, with_calib_info, compress):
-    spws = [None]
+    spws = [0]
     if ms == 'AM754_A030124_flagged':
-        spws = [0, 1]
-        with pytest.raises(RuntimeError):
-            rve.ms2observations(f'{direc}{ms}.ms', 'DATA', with_calib_info)
+        spws.append(1)
     for spw in spws:
         obs = rve.ms2observations(f'{direc}{ms}.ms', 'DATA', with_calib_info, spectral_window=spw)
         for ob in obs:
@@ -64,13 +62,14 @@ def test_imaging_likelihood(obs):
 
 @pmp('obs', OBS)
 def test_varcov_likelihood(obs):
-    invcovop = ift.InverseGammaOperator(obs.vis.domain, 1, 1/obs.weight).reciprocal().ducktape('invcov')
+    var = rve.divide_where_possible(1, obs.weight)
+    invcovop = ift.InverseGammaOperator(obs.vis.domain, 1, var).reciprocal().ducktape('invcov')
     lh = rve.ImagingLikelihoodVariableCovariance(obs, sky, invcovop)
     try_operator(lh)
 
 
 @pmp('obs', OBS)
-@pmp('noisemodel', range(4))
+@pmp('noisemodel', range(2))
 def test_imaging_likelihoods(obs, noisemodel):
     efflen = obs.effective_uvwlen()
     npix = 2500
@@ -79,10 +78,12 @@ def test_imaging_likelihoods(obs, noisemodel):
     pol_freq_copy = ift.ContractionOperator(obs.vis.domain, (0, 2)).adjoint
     cf = ift.SimpleCorrelatedField(dom, 0, (2, 2), (2, 2), (1.2, 0.4), (0.5, 0.2), (-2, 0.5), 'invcov').exp()
     correction = pol_freq_copy @ baseline_distributor @ cf
-    if noisemodel == 2:  # Multiplicative noise model TODO Try without **(-2)
+    if noisemodel == 0:  # Multiplicative noise model
+        var = rve.divide_where_possible(1, obs.weight)
         invcovop = ift.makeOp(obs.weight) @ correction**(-2)
-    else:  # Additive noise model
-        invcovop = (ift.Adder(1/obs.weight) @ correction**2).reciprocal()
+    elif noisemodel == 1:  # Additive noise model
+        var = rve.divide_where_possible(1, obs.weight)
+        invcovop = (ift.Adder(var) @ correction**2).reciprocal()
     lh = rve.ImagingLikelihoodVariableCovariance(obs, sky, invcovop)
     try_operator(lh)
 
@@ -203,6 +204,6 @@ def test_response_distributor():
 
 @pmp('obs', OBS)
 def test_single_response(obs):
-    mask = obs.flags.val
+    mask = obs.mask
     op = rve.response.SingleResponse(dom, obs.uvw, obs.freq, mask[0], False)
     ift.extra.check_linear_operator(op, np.float64, np.complex128, only_r_linear=True)
