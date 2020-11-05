@@ -43,14 +43,6 @@ def compare_attributes(obj0, obj1, attribute_list):
     return True
 
 
-def complex2float_dtype(dtype):
-    if dtype == np.complex128:
-        return np.float64
-    if dtype == np.complex64:
-        return np.float32
-    raise RuntimeError
-
-
 class Reshaper(ift.LinearOperator):
     def __init__(self, domain, target):
         self._domain = ift.DomainTuple.make(domain)
@@ -60,3 +52,17 @@ class Reshaper(ift.LinearOperator):
     def apply(self, x, mode):
         self._check_input(x, mode)
         return ift.makeField(self._tgt(mode), x.val.reshape(self._tgt(mode).shape))
+
+
+def divide_where_possible(a, b):
+    # Otherwise one
+    if isinstance(a, ift.Field):
+        dom = a.domain
+        a = a.val
+    elif isinstance(b, ift.Field):
+        dom = b.domain
+        b = b.val
+    else:
+        raise TypeError
+    arr = np.divide(a, b, out=np.ones(dom.shape), where=b != 0)
+    return ift.makeField(dom, arr)

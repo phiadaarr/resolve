@@ -1,4 +1,6 @@
 # custom
+*.state
+*.npz
 *.hdf5
 *.ms
 .pytest_cache

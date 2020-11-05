@@ -10,15 +10,17 @@ from .observation import Observation
 from .response import StokesIResponse
 from .util import my_assert_isinstance, my_asserteq
 
-# TODO VariableCovariance version for all likelihoods
+# FIXME VariableCovariance version for all likelihoods
 
 
 def _get_mask(observation):
+    # Only needed for variable covariance gaussian energy
     my_assert_isinstance(observation, Observation)
     vis = observation.vis
-    if np.all(observation.flags.val):
+    flags = observation.flags
+    if not np.any(flags):
         return ift.ScalingOperator(vis.domain, 1.), vis, observation.weight
-    mask = ift.MaskOperator(ift.makeField(vis.domain, ~observation.flags.val.astype(bool)))
+    mask = ift.MaskOperator(ift.makeField(vis.domain, flags))
     return mask, mask(vis), mask(observation.weight)
 
 
@@ -63,8 +65,7 @@ def ImagingLikelihood(observation, sky_operator):
     my_assert_isinstance(sky_operator, ift.Operator)
     R = StokesIResponse(observation, sky_operator.target)
     my_asserteq(R.target, observation.vis.domain)
-    mask, vis, invcov = _get_mask(observation)
-    return _build_gauss_lh_nres(mask @ R @ sky_operator, vis, invcov)
+    return _build_gauss_lh_nres(R @ sky_operator, observation.vis, observation.weight)
 
 
 def ImagingLikelihoodVariableCovariance(observation, sky_operator, inverse_covariance_operator):
@@ -89,9 +90,8 @@ def ImagingCalibrationLikelihood(observation, sky_operator, calibration_operator
     my_assert_isinstance(calibration_operator.domain, ift.MultiDomain)
     R = StokesIResponse(observation, sky_operator.target)
     my_asserteq(R.target, observation.vis.domain, calibration_operator.target)
-    mask, vis, invcov = _get_mask(observation)
-    modelvis = mask @ (calibration_operator*(R @ sky_operator))
-    return _build_gauss_lh_nres(modelvis, vis, invcov)
+    modelvis = calibration_operator*(R @ sky_operator)
+    return _build_gauss_lh_nres(modelvis, observation.vis, observation.weight)
 
 
 def CalibrationLikelihood(observation, calibration_operator, model_visibilities):
@@ -99,5 +99,5 @@ def CalibrationLikelihood(observation, calibration_operator, model_visibilities)
         print('Warning: Use calibration with only one polarization present.')
     my_assert_isinstance(calibration_operator.domain, ift.MultiDomain)
     my_asserteq(calibration_operator.target, model_visibilities.domain, observation.vis.domain)
-    mask, vis, invcov = _get_mask(observation)
-    return _build_gauss_lh_nres(ift.makeOp(mask(model_visibilities)) @ mask @ calibration_operator, vis, invcov)
+    return _build_gauss_lh_nres(ift.makeOp(model_visibilities) @ calibration_operator,
+                                observation.vis, observation.weight)

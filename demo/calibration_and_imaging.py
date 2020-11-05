@@ -14,8 +14,7 @@ import resolve as rve
 def main():
     rve.set_nthreads(8)
     rve.set_wgridding(True)
-    obs = rve.ms2observations('/data/AM754_A030124_flagged.ms', 'DATA', 0)
-    obs = [oo.restrict_to_stokes_i() for oo in obs]
+    obs = rve.ms2observations('/data/AM754_A030124_flagged.ms', 'DATA', True, 0, "stokesi")
     t0, _ = rve.tmin_tmax(*obs)
     obs = [oo.move_time(-t0) for oo in obs]
     ocalib1, ocalib2, oscience = obs

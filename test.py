@@ -17,35 +17,29 @@ ift.fft.set_nthreads(nthreads)
 rve.set_nthreads(nthreads)
 rve.set_epsilon(1e-4)
 rve.set_wgridding(False)
-OBSERVATION = rve.ms2observations(f'{direc}CYG-ALL-2052-2MHZ.ms', 'DATA')[0]
-snr = OBSERVATION.max_snr()
-OBS = [OBSERVATION.restrict_to_stokes_i(), OBSERVATION.average_stokes_i()]
-assert snr >= OBS[0].max_snr()  # Leave data out, so snr cannot increase
+OBS = []
+for polmode in ["all", "stokesi", ["LL"], "stokesiavg"]:
+    OBS.append(rve.ms2observations(f'{direc}CYG-ALL-2052-2MHZ.ms', 'DATA', True, 0, polarizations=polmode)[0])
+assert OBS[1].max_snr() >= OBS[2].max_snr()  # Average data so SNR increases
 npix, fov = 256, 1*rve.DEG2RAD
 dom = ift.RGSpace((npix, npix), (fov/npix, fov/npix))
 sky0 = ift.SimpleCorrelatedField(dom, 21, (1, 0.1), (5, 1), (1.2, 0.4), (0.2, 0.2), (-2, 0.5)).exp()
 inserter = rve.PointInserter(sky0.target, np.array([[0, 0]]))
 points = ift.InverseGammaOperator(inserter.domain, alpha=0.5, q=0.2/dom.scalar_dvol).ducktape('points')
-sky = rve.vla_beam(dom, np.mean(OBSERVATION.freq)) @ (sky0 + inserter @ points)
+sky = rve.vla_beam(dom, np.mean(OBS[0].freq)) @ (sky0 + inserter @ points)
 
 
-@pmp('ms', (f'CYG-ALL-2052-2MHZ', 'CYG-D-6680-64CH-10S', 'AM754_A030124_flagged'))
-def test_save_and_load_hdf5(ms):
-    spws = [None]
-    if ms == 'AM754_A030124_flagged':
-        spws = [0, 1]
-        with pytest.raises(RuntimeError):
-            rve.ms2observations(f'{direc}{ms}.ms', 'DATA', None)
-    for spw in spws:
-        obs = rve.ms2observations(f'{direc}{ms}.ms', 'DATA', spw)
+@pmp('ms', ('CYG-ALL-2052-2MHZ', 'CYG-D-6680-64CH-10S', 'AM754_A030124_flagged', '1052735056'))
+@pmp('with_calib_info', (False, True))
+@pmp('compress', (False, True))
+def test_save_and_load_observation(ms, with_calib_info, compress):
+    ms = f'{direc}{ms}.ms'
+    for spw in range(rve.ms_n_spectral_windows(ms)):
+        obs = rve.ms2observations(ms, 'DATA', with_calib_info, spectral_window=spw)
         for ob in obs:
-            snr0 = ob.max_snr()
-            print('Fraction useful:', ob.fraction_useful())
-            ob.save_to_hdf5('foo.hdf5')
-            ob1 = rve.Observation.load_from_hdf5('foo.hdf5')
+            ob.save_to_npz('foo.npz', compress)
+            ob1 = rve.Observation.load_from_npz('foo.npz')
             assert ob == ob1
-            ob1.compress()
-            assert snr0 <= ob1.max_snr()
 
 
 def try_operator(op):
@@ -55,22 +49,29 @@ def try_operator(op):
     lin.gradient
 
 
+def try_lh(obs, lh_class, *args):
+    if obs.polarization.has_crosshanded():
+        with pytest.raises(RuntimeError):
+            lh_class(*args)
+        return
+    try_operator(lh_class(*args))
+
+
 @pmp('obs', OBS)
 def test_imaging_likelihood(obs):
-    lh = rve.ImagingLikelihood(obs, sky)
-    try_operator(lh)
+    try_lh(obs, rve.ImagingLikelihood, obs, sky)
 
 
 @pmp('obs', OBS)
-def test_varcov_likelihood(obs):
-    invcovop = ift.InverseGammaOperator(obs.vis.domain, 1, 1/obs.weight).reciprocal().ducktape('invcov')
-    lh = rve.ImagingLikelihoodVariableCovariance(obs, sky, invcovop)
-    try_operator(lh)
+def test_varcov_imaging_likelihood(obs):
+    var = rve.divide_where_possible(1, obs.weight)
+    invcovop = ift.InverseGammaOperator(obs.vis.domain, 1, var).reciprocal().ducktape('invcov')
+    try_lh(obs, rve.ImagingLikelihoodVariableCovariance, obs, sky, invcovop)
 
 
 @pmp('obs', OBS)
-@pmp('noisemodel', range(4))
-def test_imaging_likelihoods(obs, noisemodel):
+@pmp('noisemodel', range(2))
+def test_weighting_methods(obs, noisemodel):
     efflen = obs.effective_uvwlen()
     npix = 2500
     dom = ift.RGSpace(npix, 2*max(efflen)/npix)
@@ -78,18 +79,18 @@ def test_imaging_likelihoods(obs, noisemodel):
     pol_freq_copy = ift.ContractionOperator(obs.vis.domain, (0, 2)).adjoint
     cf = ift.SimpleCorrelatedField(dom, 0, (2, 2), (2, 2), (1.2, 0.4), (0.5, 0.2), (-2, 0.5), 'invcov').exp()
     correction = pol_freq_copy @ baseline_distributor @ cf
-    if noisemodel == 2:  # Multiplicative noise model TODO Try without **(-2)
+    if noisemodel == 0:  # Multiplicative noise model
+        var = rve.divide_where_possible(1, obs.weight)
         invcovop = ift.makeOp(obs.weight) @ correction**(-2)
-    else:  # Additive noise model
-        invcovop = (ift.Adder(1/obs.weight) @ correction**2).reciprocal()
-    lh = rve.ImagingLikelihoodVariableCovariance(obs, sky, invcovop)
-    try_operator(lh)
+    elif noisemodel == 1:  # Additive noise model
+        var = rve.divide_where_possible(1, obs.weight)
+        invcovop = (ift.Adder(var) @ correction**2).reciprocal()
+    try_lh(obs, rve.ImagingLikelihoodVariableCovariance, obs, sky, invcovop)
 
 
 @pmp('time_mode', [True, False])
 def test_calibration_likelihood(time_mode):
-    obs = rve.ms2observations(f'{direc}AM754_A030124_flagged.ms', 'DATA', 0)
-    obs = [oo.restrict_to_stokes_i() for oo in obs]
+    obs = rve.ms2observations(f'{direc}AM754_A030124_flagged.ms', 'DATA', True, spectral_window=0, polarizations="stokesi")
     t0, _ = rve.tmin_tmax(*obs)
     obs = [oo.move_time(-t0) for oo in obs]
     uants = rve.unique_antennas(*obs)
@@ -178,7 +179,7 @@ def test_calibration_distributor(obs):
     antenna_dct = {aa: ii for ii, aa in enumerate(uants)}
     op = rve.calibration.CalibrationDistributor(dom, tgt, obs.antenna_positions.ant1, obs.antenna_positions.time, antenna_dct, time_dct)
     ift.extra.check_linear_operator(op)
-    # TODO Separate test for rve.calibration.MyLinearInterpolator()
+    # FIXME Separate test for rve.calibration.MyLinearInterpolator()
 
 
 def test_point_inserter():
@@ -202,6 +203,6 @@ def test_response_distributor():
 
 @pmp('obs', OBS)
 def test_single_response(obs):
-    mask = obs.flags.val
+    mask = obs.mask
     op = rve.response.SingleResponse(dom, obs.uvw, obs.freq, mask[0], False)
     ift.extra.check_linear_operator(op, np.float64, np.complex128, only_r_linear=True)

@@ -58,7 +58,7 @@ class MinimizationState:
         self._mirror = bool(mirror_samples)
 
     def __getitem__(self, key):
-        # TODO Add MPI support
+        # FIXME Add MPI support
         if not isinstance(key, int):
             raise TypeError
         if key >= len(self) or key < 0:
