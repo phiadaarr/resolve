@@ -90,7 +90,7 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window, polarizat
     with table(join(ms, 'FIELD'), **CFG) as t:
         equinox = t.coldesc('REFERENCE_DIR')['desc']['keywords']['MEASINFO']['Ref']
         equinox = str(equinox)[1:]
-        # TODO Put proper support for equinox here
+        # FIXME Put proper support for equinox here
         if equinox == "1950_VLA":
             equinox = 1950
         dirs = []
@@ -99,8 +99,8 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window, polarizat
             dirs.append(Direction(pc[0], equinox))
         dirs = tuple(dirs)
 
-    # TODO Determine which observation is calibration observation
-    # TODO Import name of source
+    # FIXME Determine which observation is calibration observation
+    # FIXME Import name of source
     observations = []
     for ifield, direction in enumerate(dirs):
         uvw, ant1, ant2, time, freq_out, vis, wgt, flags = read_ms_i(

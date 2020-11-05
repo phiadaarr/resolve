@@ -11,7 +11,7 @@ class AntennaPositions:
     """Summarizes all information on antennas and baselines. If calibration is
     performed this class stores also antenna indices and time information.
     For imaging only this is not necessary."""
-    # TODO Split this class into two. One for only imaging, one also for calibration
+    # FIXME Split this class into two. One for only imaging, one also for calibration
     def __init__(self, uvw, ant1=None, ant2=None, time=None):
         if ant1 is None:
             my_asserteq(ant2, time, None)

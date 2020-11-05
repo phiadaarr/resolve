@@ -184,7 +184,7 @@ def test_calibration_distributor(obs):
     antenna_dct = {aa: ii for ii, aa in enumerate(uants)}
     op = rve.calibration.CalibrationDistributor(dom, tgt, obs.antenna_positions.ant1, obs.antenna_positions.time, antenna_dct, time_dct)
     ift.extra.check_linear_operator(op)
-    # TODO Separate test for rve.calibration.MyLinearInterpolator()
+    # FIXME Separate test for rve.calibration.MyLinearInterpolator()
 
 
 def test_point_inserter():

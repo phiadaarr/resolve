@@ -10,7 +10,7 @@ from .observation import Observation
 from .response import StokesIResponse
 from .util import my_assert_isinstance, my_asserteq
 
-# TODO VariableCovariance version for all likelihoods
+# FIXME VariableCovariance version for all likelihoods
 
 
 def _get_mask(observation):

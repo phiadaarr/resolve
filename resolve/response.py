@@ -69,7 +69,7 @@ class FullResponse(ift.LinearOperator):
 
 class SingleResponse(ift.LinearOperator):
     def __init__(self, domain, uvw, freq, mask, single_precision):
-        # TODO Currently only the response uses single_precision if possible.
+        # FIXME Currently only the response uses single_precision if possible.
         # Could be rolled out to the whole likelihood
         self._domain = ift.DomainTuple.make(domain)
         self._target = ift.makeDomain(ift.UnstructuredDomain(ss) for ss in (uvw.shape[0], freq.size))
