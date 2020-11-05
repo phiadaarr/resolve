@@ -96,6 +96,7 @@ class SingleResponse(ift.LinearOperator):
         if mode == self.TIMES:
             args1 = {'dirty': x}
             f = dirty2vis
+            # FIXME Use vis_out keyword of wgridder
         else:
             args1 = {
                 'vis': x,

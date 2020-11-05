@@ -22,9 +22,6 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window, polarizat
     If WEIGHT_SPECTRUM is available this column is used for weighting.
     Otherwise fall back to WEIGHT.
 
-    If "stokesi" is chosen then visibilities where one of the two polarizations
-    is flagged are flagged.
-
     Parameters
     ----------
     ms : string
@@ -39,7 +36,8 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window, polarizat
         Index of spectral window which shall be imported.
     polarizations
         "all":     All polarizations are imported.
-        "stokesi": Only LL/RR or XX/YY polarizations are imported and averaged
+        "stokesi": Only LL/RR or XX/YY polarizations are imported.
+        "stokesiavg": Only LL/RR or XX/YY polarizations are imported and averaged
                    on the fly.
         List of strings: Strings can be "XX", "YY", "XY", "YX", "LL", "LR",
                    "RL", "RR". The respective polarizations are loaded.
@@ -58,7 +56,7 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window, polarizat
         raise RuntimeError
     if isinstance(polarizations, str):
         polarizations = [polarizations]
-    if ("stokesi" in polarizations or "all" in polarizations) and len(polarizations) > 1:
+    if ("stokesiavg" in polarizations or "stokesi" in polarizations or "all" in polarizations) and len(polarizations) > 1:
         raise ValueError
 
     # Spectral windows
@@ -75,18 +73,18 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window, polarizat
         pol = list(pol[0])  # Not clear what the first dimension is used for
         polobj = Polarization(pol)
         if polarizations[0] == "stokesi":
+            polarizations = ["LL", "RR"] if polobj.circular() else ["XX", "YY"]
+        if polarizations[0] == "stokesiavg":
             pol_ind = polobj.stokes_i_indices()
             polobj = Polarization.trivial()
             pol_summation = True
-        elif polarizations[0] != "all":
-            polobj = polobj.restrict_by_name(polarizations)
-            pol_ind = [polobj.to_str_list().index(ii) for ii in polarizations]
-            pol_summation = False
         elif polarizations[0] == "all":
             pol_ind = None
             pol_summation = False
         else:
-            raise RuntimeError
+            polobj = polobj.restrict_by_name(polarizations)
+            pol_ind = [polobj.to_str_list().index(ii) for ii in polarizations]
+            pol_summation = False
 
     # Field
     with table(join(ms, 'FIELD'), **CFG) as t:

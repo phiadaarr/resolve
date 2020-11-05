@@ -52,6 +52,11 @@ class Polarization:
             return False
         raise RuntimeError
 
+    def has_crosshanded(self):
+        if len(set(self._ind) & set([6, 7, 10, 11])) > 0:
+            return True
+        return False
+
     def stokes_i_indices(self):
         if self._trivial:
             raise RuntimeError

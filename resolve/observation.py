@@ -88,29 +88,6 @@ class Observation:
     def __getitem__(self, slc):
         return Observation(self._antpos[slc], self._vis[:, slc], self._weight[:, slc], self._polarization, self._freq, self._direction)
 
-    def average_stokes_i(self):
-        # Compute weighted mean of visibilities
-        indL, indR = self._polarization.stokes_i_indices()
-        visL, visR = self._vis[indL], self._vis[indR]
-        weightL, weightR = self._weight[indL], self._weight[indR]
-        weight = weightL+weightR
-        vis = (weightL*visL+weightR*visR)/weight
-        vis, weight = vis[None], weight[None]
-        f = np.ascontiguousarray
-        vis, weight = f(vis), f(weight)
-        return Observation(self._antpos, vis, weight, Polarization.trivial(),
-                           self._freq, self._direction)
-
-    def restrict_to_stokes_i(self):
-        inds = self._polarization.stokes_i_indices()
-        vis = self._vis[inds]
-        weight = self._weight[inds]
-        pol = self._polarization.restrict_to_stokes_i()
-        f = np.ascontiguousarray
-        vis, weight = f(vis), f(weight)
-        return Observation(self._antpos, vis, weight, pol, self._freq,
-                           self._direction)
-
     def delete_antenna_information(self):
         raise NotImplementedError
 
