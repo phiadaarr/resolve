@@ -3,7 +3,7 @@
 # Author: Philipp Arras
 
 import numpy as np
-from ducc0.wgridder import dirty2ms, ms2dirty
+from ducc0.wgridder import dirty2vis, vis2dirty
 
 import nifty7 as ift
 
@@ -78,14 +78,12 @@ class SingleResponse(ift.LinearOperator):
             'uvw': uvw,
             'freq': freq,
             'mask': mask.astype(np.uint8),
-            'nu': 0,
-            'nv': 0,
             'pixsize_x': self._domain[0].distances[0],
             'pixsize_y': self._domain[0].distances[1],
             'epsilon': epsilon(),
-            'do_wstacking': wgridding(),
-            'nthreads': nthreads()
-            # FIXME Add negate_v as soon as it is available in ducc
+            'do_wgridding': wgridding(),
+            'nthreads': nthreads(),
+            'flip_v': True
         }
         self._vol = self._domain[0].scalar_dvol
         self._target_dtype = np.complex64 if single_precision else np.complex128
@@ -97,14 +95,14 @@ class SingleResponse(ift.LinearOperator):
         x = x.val.astype(self._domain_dtype if mode == self.TIMES else self._target_dtype)
         if mode == self.TIMES:
             args1 = {'dirty': x}
-            f = dirty2ms
+            f = dirty2vis
         else:
             args1 = {
-                'ms': x,
+                'vis': x,
                 'npix_x': self._domain[0].shape[0],
                 'npix_y': self._domain.shape[1]
             }
-            f = ms2dirty
+            f = vis2dirty
         res = ift.makeField(self._tgt(mode), f(**self._args, **args1)*self._vol)
         my_asserteq(res.dtype, self._target_dtype if mode == self.TIMES else self._domain_dtype)
         return res
