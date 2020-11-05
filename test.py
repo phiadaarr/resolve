@@ -29,22 +29,17 @@ points = ift.InverseGammaOperator(inserter.domain, alpha=0.5, q=0.2/dom.scalar_d
 sky = rve.vla_beam(dom, np.mean(OBS[0].freq)) @ (sky0 + inserter @ points)
 
 
-@pmp('ms', ('CYG-ALL-2052-2MHZ', 'CYG-D-6680-64CH-10S', 'AM754_A030124_flagged'))
+@pmp('ms', ('CYG-ALL-2052-2MHZ', 'CYG-D-6680-64CH-10S', 'AM754_A030124_flagged', '1052735056'))
 @pmp('with_calib_info', (False, True))
 @pmp('compress', (False, True))
 def test_save_and_load_observation(ms, with_calib_info, compress):
-    spws = [0]
-    if ms == 'AM754_A030124_flagged':
-        spws.append(1)
-    for spw in spws:
-        obs = rve.ms2observations(f'{direc}{ms}.ms', 'DATA', with_calib_info, spectral_window=spw)
+    ms = f'{direc}{ms}.ms'
+    for spw in range(rve.ms_n_spectral_windows(ms)):
+        obs = rve.ms2observations(ms, 'DATA', with_calib_info, spectral_window=spw)
         for ob in obs:
-            snr0 = ob.max_snr()
-            print('Fraction useful:', ob.fraction_useful())
             ob.save_to_npz('foo.npz', compress)
             ob1 = rve.Observation.load_from_npz('foo.npz')
             assert ob == ob1
-            assert snr0 <= ob1.max_snr()
 
 
 def try_operator(op):
