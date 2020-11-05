@@ -8,15 +8,8 @@ Resolve is in beta stage: You are more than welcome to test it and help to make 
 In the likely case that you encounter bugs, please contact me via [email](mailto:parras@mpg-garching.mpg.de).
 
 ## Installation
-- Install nifty7, e.g. via:
-```
-pip3 install --user git+https://gitlab.mpcdf.mpg.de/ift/nifty.git@NIFTy_7
-```
+- Install nifty7, ducc0, matplotlib, scipy (see [Dockerfile](https://gitlab.mpcdf.mpg.de/ift/resolve/-/blob/master/Dockerfile))
 - For reading [measurement sets](https://casa.nrao.edu/Memos/229.html), install [python-casacore](https://github.com/casacore/python-casacore).
-- For reading data in HDF5 format, install [h5py](http://www.h5py.org/), e.g. via:
-```
-pip3 install --user h5py
-```
 
 ## Related publications
 
