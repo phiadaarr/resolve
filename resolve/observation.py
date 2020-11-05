@@ -61,7 +61,8 @@ class Observation:
             if vv is None:
                 vv = np.array([])
             dct[f'antpos{ii}'] = vv
-        np.savez(file_name, **dct)
+        f = np.savez_compressed if compress else np.savez
+        f(file_name, **dct)
 
     @staticmethod
     def load_from_npz(file_name):

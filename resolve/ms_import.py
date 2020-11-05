@@ -52,6 +52,8 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window, polarizat
     """
     from casacore.tables import table
 
+    if ms[-1] == "/":
+        ms = ms[:-1]
     if not isdir(ms) or splitext(ms)[1] != '.ms':
         raise RuntimeError
     if isinstance(polarizations, str):
@@ -61,6 +63,7 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window, polarizat
 
     # Spectral windows
     my_assert(isinstance(spectral_window, int) and spectral_window >= 0)
+    my_assert(spectral_window < ms_n_spectral_windows(ms))
     with table(join(ms, 'SPECTRAL_WINDOW'), **CFG) as t:
         freq = t.getcol('CHAN_FREQ')[spectral_window]
 
@@ -73,11 +76,11 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window, polarizat
         polobj = Polarization(pol)
         if polarizations[0] == "stokesi":
             pol_ind = polobj.stokes_i_indices()
-            polobj = polobj.restrict_to_stokes_i()
+            polobj = Polarization.trivial()
             pol_summation = True
         elif polarizations[0] != "all":
-            pol_ind = [pol.index(ii) for ii in polarizations]
             polobj = polobj.restrict_by_name(polarizations)
+            pol_ind = [polobj.to_list().index(ii) for ii in polarizations]
             pol_summation = False
         elif polarizations[0] == "all":
             pol_ind = None
@@ -163,7 +166,7 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices, pol_
             stop = min(nrow, start+step)
             tflags = t.getcol('FLAG', startrow=start, nrow=stop-start)[..., pol_indices]
             twgt = t.getcol(weightcol, startrow=start, nrow=stop-start)[..., pol_indices]
-            # ncorr = tflags.shape[2]
+            npol = tflags.shape[2]
             if pol_summation:
                 tflags = np.any(tflags.astype(np.bool), axis=-1)
                 twgt = np.sum(twgt, axis=-1)
@@ -176,7 +179,6 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices, pol_
             tspw = t.getcol("DATA_DESC_ID", startrow=start, nrow=stop-start)
             tflags[tspw != spectral_window] = True
 
-            npol = tflags.shape[2]
             if not pol_summation:
                 tflags = np.all(tflags, axis=2)
             assert tflags.ndim == 2
@@ -189,12 +191,13 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices, pol_
 
         # Read in data
         start, realstart = 0, 0
-        shp = (nrealrows, nrealchan)
-        wgtshp = (nrealrows, nrealchan) if fullwgt else (nrealrows,)
-        if not pol_summation:
-            npol = npol if pol_indices == slice(None) else len(pol_indices)
-            shp = shp + (npol,)
-            wgtshp = wgtshp + (npol,)
+        if pol_summation:
+            npol = 1
+        else:
+            if pol_indices != slice(None):
+                npol = len(pol_indices)
+        shp = (nrealrows, nrealchan, npol)
+        wgtshp = (nrealrows, nrealchan, npol) if fullwgt else (nrealrows, npol)
         vis = np.empty(shp, dtype=np.complex64)
         flags = np.empty(shp, dtype=np.bool)
         wgt = np.empty(wgtshp, dtype=np.float32)
@@ -203,29 +206,34 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices, pol_
             realstop = realstart+np.sum(active_rows[start:stop])
             if realstop > realstart:
                 allrows = stop-start == realstop-realstart
-                tvis = t.getcol(data_column, startrow=start, nrow=stop-start)[..., pol_indices]
-                assert tvis.dtype == np.complex64
-                if pol_summation:
-                    # FIXME Implement weighted sum here
-                    tvis = np.sum(tvis, axis=-1)
-                if not allrows:
-                    tvis = tvis[active_rows[start:stop]]
-                tvis = tvis[:, active_channels]
-                tflags = t.getcol("FLAG", startrow=start, nrow=stop-start)[..., pol_indices]
-                if pol_summation:
-                    tflags = np.any(tflags.astype(np.bool), axis=-1)
-                if not allrows:
-                    tflags = tflags[active_rows[start:stop]]
-                tflags = tflags[:, active_channels]
+
                 twgt = t.getcol(weightcol, startrow=start, nrow=stop-start)[..., pol_indices]
                 assert twgt.dtype == np.float32
-                if pol_summation:
-                    twgt = np.sum(twgt, axis=-1)
                 if not allrows:
                     twgt = twgt[active_rows[start:stop]]
                 if fullwgt:
                     twgt = twgt[:, active_channels]
+
+                tvis = t.getcol(data_column, startrow=start, nrow=stop-start)[..., pol_indices]
+                assert tvis.dtype == np.complex64
+                if not allrows:
+                    tvis = tvis[active_rows[start:stop]]
+                tvis = tvis[:, active_channels]
+
+                tflags = t.getcol("FLAG", startrow=start, nrow=stop-start)[..., pol_indices]
+                if not allrows:
+                    tflags = tflags[active_rows[start:stop]]
+                tflags = tflags[:, active_channels]
 #                tflags[twgt==0] = True
+                if pol_summation:
+                    assert twgt.shape[2] == 2
+                    # Noise-weighted average
+                    twgt[tflags] = 0.
+                    tvis = np.sum(twgt*tvis, axis=-1)[..., None]
+                    twgt = np.sum(twgt, axis=-1)[..., None]
+                    tvis /= twgt
+                    # Can deal also with one of two visibilities flagged
+                    tflags = np.all(tflags.astype(np.bool), axis=-1)[..., None]
 
                 vis[realstart:realstop] = tvis
                 wgt[realstart:realstop] = twgt
@@ -258,3 +266,10 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices, pol_
             np.ascontiguousarray(vis),
             np.ascontiguousarray(wgt),# if fullwgt else wgt,
             flags)
+
+
+def ms_n_spectral_windows(ms):
+    from casacore.tables import table
+    with table(join(ms, 'SPECTRAL_WINDOW'), **CFG) as t:
+        freq = t.getcol('CHAN_FREQ')
+    return freq.shape[0]
