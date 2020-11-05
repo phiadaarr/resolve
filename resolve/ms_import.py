@@ -196,8 +196,12 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices, pol_
         else:
             if pol_indices != slice(None):
                 npol = len(pol_indices)
+            else:
+                npol = npol
         shp = (nrealrows, nrealchan, npol)
-        wgtshp = (nrealrows, nrealchan, npol) if fullwgt else (nrealrows, npol)
+        # If pol_summation we need the big shape because the flag information
+        # is integrated into the weight array.
+        wgtshp = shp if fullwgt or pol_summation else (nrealrows, npol)
         vis = np.empty(shp, dtype=np.complex64)
         flags = np.empty(shp, dtype=np.bool)
         wgt = np.empty(wgtshp, dtype=np.float32)
@@ -226,15 +230,17 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices, pol_
                 tflags = tflags[:, active_channels]
 #                tflags[twgt==0] = True
                 if pol_summation:
+                    if not fullwgt:
+                        twgt = twgt[:, None]
+                    assert tflags.dtype == np.bool
                     assert twgt.shape[2] == 2
                     # Noise-weighted average
-                    twgt[tflags] = 0.
+                    twgt = twgt*(~tflags)
                     tvis = np.sum(twgt*tvis, axis=-1)[..., None]
                     twgt = np.sum(twgt, axis=-1)[..., None]
                     tvis /= twgt
                     # Can deal also with one of two visibilities flagged
                     tflags = np.all(tflags.astype(np.bool), axis=-1)[..., None]
-
                 vis[realstart:realstop] = tvis
                 wgt[realstart:realstop] = twgt
                 flags[realstart:realstop] = tflags
@@ -257,7 +263,7 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices, pol_
     freq = freq[active_channels]
 
     # blow up wgt to the right dimensions if necessary
-    if not fullwgt:
+    if not fullwgt and not pol_summation:
         wgt = np.broadcast_to(wgt[:, None], vis.shape)
     my_asserteq(wgt.shape, vis.shape)
     return (np.ascontiguousarray(uvw),
