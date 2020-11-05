@@ -66,6 +66,9 @@ class Polarization:
     def to_list(self):
         return list(self._ind)
 
+    def to_str_list(self):
+        return [TABLE[ii] for ii in self._ind]
+
     @staticmethod
     def from_list(lst):
         return Polarization(lst)

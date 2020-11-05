@@ -80,7 +80,7 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window, polarizat
             pol_summation = True
         elif polarizations[0] != "all":
             polobj = polobj.restrict_by_name(polarizations)
-            pol_ind = [polobj.to_list().index(ii) for ii in polarizations]
+            pol_ind = [polobj.to_str_list().index(ii) for ii in polarizations]
             pol_summation = False
         elif polarizations[0] == "all":
             pol_ind = None
