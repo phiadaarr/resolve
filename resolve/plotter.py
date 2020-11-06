@@ -63,10 +63,10 @@ class Plotter:
             op, fname = self._plot_init(obj, state, identifier)
             if fname is None:
                 continue
-            _plot_histograms(state, fname, postop=op)
+            _plot_histograms(state, fname, 20, 0.5, postop=op)
         mydir = join(self._dir, 'zzz_latent')
         makedirs(mydir, exist_ok=True)
-        _plot_histograms(state, join(mydir, f'{identifier}.{self._f}'))
+        _plot_histograms(state, join(mydir, f'{identifier}.{self._f}'), 5, 0.5)
 
     @onlymaster
     def _plot_init(self, obj, state, identifier):
@@ -135,7 +135,7 @@ def _generalstate2list(state):
     raise TypeError
 
 
-def _plot_histograms(state, fname, postop=None):
+def _plot_histograms(state, fname, lim, width, postop=None):
     lst = _generalstate2list(state)
     if postop is not None:
         lst0 = postop.force(lst[0])
@@ -172,16 +172,17 @@ def _plot_histograms(state, fname, postop=None):
             lstC = {'': lstA}
         for ll, lstD in lstC.items():
             axx = axs.pop(0)
+            lstD = lstD.ravel()
             if lstD.size == 1:
-                axx.axvline(lstD.ravel()[0])
+                axx.axvline(lstD[0])
             else:
-                mi, ma, width = np.min(lstD), np.max(lstD), 0.5
-                axx.hist(lstD.ravel(), alpha=0.5, density=True,
-                         bins=np.arange(mi, ma + width, width))
+                axx.hist(lstD.clip(-lim, lim-width), alpha=0.5, density=True,
+                         bins=np.arange(-lim, lim + width, width))
             xs = np.linspace(-5, 5)
             axx.set_yscale('log')
             axx.plot(xs, np.exp(-xs**2/2)/np.sqrt(2*np.pi))
-            axx.set_title(f'{kk} {ll}')
+            redchisq = np.sum((np.abs(lstD) if np.iscomplexobj(lstD) else lstD)**2)/lstD.size
+            axx.set_title(f'{kk} {ll} {redchisq:.1f}')
     plt.tight_layout()
     fig.savefig(fname)
     plt.close(fig)
