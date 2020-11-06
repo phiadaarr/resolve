@@ -1,5 +1,6 @@
 # custom
 *stage*
+*.mp4
 *.state
 *.npz
 *.hdf5

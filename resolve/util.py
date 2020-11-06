@@ -15,7 +15,7 @@ def my_assert(*conds):
 def my_asserteq(*args):
     for aa in args[1:]:
         if args[0] != aa:
-            raise RuntimeError(args[0], aa)
+            raise RuntimeError(f"{args[0]} != {aa}")
 
 
 def my_assert_isinstance(*args):
