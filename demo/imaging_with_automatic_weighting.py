@@ -44,7 +44,7 @@ def main():
     plotter.add('power spectrum logsky', logsky.power_spectrum)
     plotter.add('bayesian weighting', logweighting.exp())
     plotter.add('power spectrum bayesian weighting', logweighting.power_spectrum)
-    plotter.add('normalized residuals', lh.normalized_residual)
+    plotter.add_histogram('normalized residuals', lh.normalized_residual)
 
     ic = ift.AbsDeltaEnergyController(0.5, 3, 100, name='Sampling')
     minimizer = ift.NewtonCG(ift.GradientNormController(name='newton', iteration_limit=5))
