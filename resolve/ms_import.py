@@ -9,8 +9,7 @@ from .antenna_positions import AntennaPositions
 from .direction import Direction
 from .observation import Observation
 from .polarization import Polarization
-from .util import my_asserteq, my_assert
-
+from .util import my_assert, my_asserteq
 
 CFG = {'readonly': True, 'ack': False}
 

@@ -3,8 +3,8 @@
 # Author: Philipp Arras
 
 import sys
-import resolve as rve
 
+import resolve as rve
 
 if __name__ == '__main__':
     if len(sys.argv) != 3:

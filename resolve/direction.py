@@ -2,7 +2,7 @@
 # Copyright(C) 2020 Max-Planck-Society
 # Author: Philipp Arras
 
-from .util import my_asserteq, compare_attributes
+from .util import compare_attributes, my_asserteq
 
 
 class Direction:

@@ -3,6 +3,7 @@
 # Author: Philipp Arras
 
 import nifty7 as ift
+
 from .util import my_assert_isinstance, my_asserteq
 
 

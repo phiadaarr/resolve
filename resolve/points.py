@@ -5,7 +5,8 @@
 import numpy as np
 
 import nifty7 as ift
-from .util import my_asserteq, my_assert_isinstance
+
+from .util import my_assert_isinstance, my_asserteq
 
 
 class PointInserter(ift.LinearOperator):
