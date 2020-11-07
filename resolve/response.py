@@ -3,7 +3,7 @@
 # Author: Philipp Arras
 
 import numpy as np
-from ducc0.wgridder import dirty2vis, vis2dirty
+from ducc0.wgridder.experimental import dirty2vis, vis2dirty
 
 import nifty7 as ift
 
