@@ -84,6 +84,55 @@ class Plotter:
         return self._dir
 
 
+class MfPlotter(Plotter):
+    def __init__(self, fileformat, directory):
+        super(MfPlotter, self).__init__(fileformat, directory)
+        self._spectra = []
+        self._mf = []
+
+    @onlymaster
+    def add_spectra(self, name, operator, directions):
+        """
+        Parameters
+        ----------
+        directions: array, shape (n, 2)
+            In units of the space.
+        """
+        my_assert_isinstance(operator, ift.Operator)
+        # FIXME Write interface checks
+        sdom = operator.target[1]
+        directions = np.round(np.array(directions)/np.array(sdom.distances)).astype(int)
+        self._spectra.append({'title': str(name), 'operator': operator, 'directions': directions})
+
+    @onlymaster
+    def add_mf(self, name, operator, directions=None, movie_length=2):
+        """
+        Parameters
+        ----------
+        directions: array, shape (n, 2)
+            In units of the space.
+        """
+        my_assert_isinstance(operator, ift.Operator)
+        # FIXME Write interface checks
+        self._mf.append({'title': str(name), 'operator': operator, 'directions': directions, 'movie_length': movie_length})
+
+    @onlymaster
+    def plot(self, identifier, state):
+        super(MfPlotter, self).plot(identifier, state)
+
+        for ii, obj in enumerate(self._spectra):
+            op, fname = self._plot_init(obj, state, identifier)
+            if fname is None:
+                continue
+            _plot_spectra(state, op, fname, obj['directions'])
+
+        for ii, obj in enumerate(self._mf):
+            op, fname = self._plot_init(obj, state, identifier)
+            if fname is None:
+                continue
+            _plot_mf(state, op, fname, obj['directions'], obj['movie_length'])
+
+
 def _plot_nifty(state, op, kwargs, fname):
     if isinstance(state, MinimizationState) and len(state) > 0:
         tgt = op.target
@@ -188,3 +237,44 @@ def _plot_histograms(state, fname, lim, width, postop=None):
     plt.tight_layout()
     fig.savefig(fname)
     plt.close(fig)
+
+
+def _plot_spectra(state, op, name, directions):
+    fld = op.force(state.mean)
+
+    fdom, dom = fld.domain
+    freqs = np.array(fdom.coordinates)
+
+    val = fld.val.reshape(fld.shape[0], -1).T
+    plt.figure()
+    for ind in directions:
+        plt.plot(freqs*1e-6, val[ind])
+    plt.xlabel('MHz')
+    plt.tight_layout()
+    plt.savefig(f'{name}_spectra.png')
+    plt.close()
+
+
+def _plot_mf(state, op, name, directions, movie_length):
+    # FIXME Write proper plotting routine which includes also directions and uncertainties
+    fld = op.force(state.mean)
+
+    fdom, dom = fld.domain
+    freqs = np.array(fdom.coordinates)
+    nfreq = fld.shape[0]
+    my_asserteq(nfreq, len(freqs))
+    mi, ma = np.min(fld.val), np.max(fld.val)
+
+    name = splitext(name)[0]
+    for ii in range(nfreq):
+        ift.single_plot(ift.makeField(dom, fld.val[ii]),
+                        title=f'{freqs[ii]*1e-6:.0f} MHz',
+                        vmin=mi, vmax=ma,
+                        cmap='inferno',
+                        name=f'{name}_{ii:04.0f}.png')
+
+    if movie_length > 0:
+        framerate = nfreq/float(movie_length)
+        os.system(f"ffmpeg -framerate {framerate} -i {name}_%04d.png -c:v libx264 -pix_fmt yuv420p -crf 23 -y {name}.mp4")
+        for ii in range(nfreq):
+            os.remove(f'{name}_{ii:04.0f}.png')

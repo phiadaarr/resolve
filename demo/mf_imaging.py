@@ -11,7 +11,7 @@ import nifty7 as ift
 import resolve as rve
 
 
-def mf_logsky(domain, freq, prefix):
+def mf_logsky(domain, freq, prefix, plotter):
     # FIXME cumsum over first dimensions may be performance-wise suboptimal
     assert np.all(np.diff(freq) > 0)  # need ordered frequencies
 
@@ -29,12 +29,14 @@ def mf_logsky(domain, freq, prefix):
                                    prefix=f'{prefix}b0')
     # FIXME Is there a bug in the b0 handling?
     b0 = ift.ScalingOperator(domain, 0.).ducktape(f'{prefix}b0')
+    plotter.add("a0", a0)
+    plotter.add("b0", b0)
 
     # IDEA Try to use individual power spectra
     # FIXME Support fixed variance for zero mode
     cfm = ift.CorrelatedFieldMaker.make(0., (1, 0.00001), f'{prefix}freqxi', total_N=2*(nfreq-1))
     # FIXME Support fixed fluctuations
-    cfm.add_fluctuations(domain, (1, 0.00001), (5, 1), (1.2, 0.4), (0.2, 0.2), (-2, 0.5))
+    cfm.add_fluctuations(domain, (1, 0.00001), (1.2, 0.4), (0.2, 0.2), (-2, 0.5))
     freqxi = cfm.finalize(0)
 
     # FIXME Make sure that it is standard normal distributed in uncorrelated directions
@@ -91,6 +93,8 @@ def mf_logsky(domain, freq, prefix):
 
     rve.my_asserteq(logsky.target[1], ift.DomainTuple.make(domain)[0])
     rve.my_asserteq(logsky.target[0].size, nfreq)
+
+    plotter.add_mf("logsky", logsky)
     return logsky
 
 
@@ -121,32 +125,29 @@ def main():
     npix = np.array([250, 250])
     dom = ift.RGSpace(npix, fov/npix)
 
-    logsky = mf_logsky(dom, obs.freq, 'sky')
+    plotter = rve.MfPlotter('png', 'plots')
+
+    logsky = mf_logsky(dom, obs.freq, 'sky', plotter)
+
+    # # Plot prior samples
+    # for ii in range(3):
+    #     state = rve.MinimizationState(ift.from_random(logsky.domain), [])
+    #     plotter.plot(f"prior{ii}", state)
+
     sky = logsky.exp()
 
-    lh = rve.MfImagingLikelihood(obs, sky)
-
-    # print('Execution time for sky model')
-    # ift.exec_time(sky)
-    # print('Execution time for complete likelihood')
-    # ift.exec_time(lh, True)
-
-    # for ii in range(3):
-    #     rve.mf_plot(f'debug{ii}', logsky(ift.from_random(sky.domain)), 2)
-
     # FIXME Figure out how to do automatic weighting for mf
+    lh = rve.MfImagingLikelihood(obs, sky)
+    plotter.add_histogram('normalized residuals', lh.normalized_residual)
 
     ham = ift.StandardHamiltonian(lh)
     pos = 0.1*ift.from_random(ham.domain)
     state = rve.MinimizationState(pos, [])
-    minimizer = ift.NewtonCG(ift.GradientNormController(name='newton', iteration_limit=5))
+    minimizer = ift.NewtonCG(ift.GradientNormController(name='newton', iteration_limit=10))
 
-    plotter = rve.Plotter('png', 'plots')
-    plotter.add_histogram('normalized residuals', lh.normalized_residual)
-
-    for ii in range(5):
+    for ii in range(20):
         state = rve.simple_minimize(ham, state.mean, 0, minimizer)
-        rve.mf_plot(f'debug{ii}', logsky(state.mean), 2)
+        plotter.plot(f"iter{ii}", state)
 
 
 if __name__ == '__main__':
