@@ -95,6 +95,7 @@ def mf_logsky(domain, freq, prefix, plotter):
     rve.my_asserteq(logsky.target[0].size, nfreq)
 
     plotter.add_mf("logsky", logsky)
+    # FIXME Add all power spectra to plotter
     plotter.add_spectra("spectra", logsky, [[0.0002, 0.00035], [0.0004, 0.0001]])
     return logsky
 
@@ -102,6 +103,7 @@ def mf_logsky(domain, freq, prefix, plotter):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-j', type=int, default=1)
+    parser.add_argument('--automatic-weighting', action='store_true')
     args = parser.parse_args()
     rve.set_nthreads(args.j)
     rve.set_wgridding(False)
@@ -126,7 +128,10 @@ def main():
     npix = np.array([250, 250])
     dom = ift.RGSpace(npix, fov/npix)
 
-    plotter = rve.MfPlotter('png', 'plots')
+    if args.automatic_weighting:
+        plotter = rve.MfPlotter('png', 'plots_auto')
+    else:
+        plotter = rve.MfPlotter('png', 'plots')
 
     logsky = mf_logsky(dom, obs.freq, 'sky', plotter)
 
@@ -138,8 +143,27 @@ def main():
 
     sky = logsky.exp()
 
-    # FIXME Figure out how to do automatic weighting for mf
-    lh = rve.MfImagingLikelihood(obs, sky)
+    if args.automatic_weighting:
+        # FIXME Figure out how to do automatic weighting for mf
+        npix = 2500
+        effuv = np.linalg.norm(obs.effective_uvw(), axis=1)
+        dom = ift.RGSpace(npix, 2*np.max(effuv)/npix)
+
+        cfm = ift.CorrelatedFieldMaker.make(0, (2, 2), 'invcov', total_N=obs.nfreq)
+        cfm.add_fluctuations(dom, (2, 2), (1.2, 0.4), (0.5, 0.2), (-2, 0.5))
+        logweighting = cfm.finalize(0)
+
+        interpolation = rve.MfWeightingInterpolation(effuv, logweighting.target)
+        # FIXME Move into tests
+        ift.extra.check_linear_operator(interpolation)
+        weightop = ift.makeOp(obs.weight) @ (interpolation @ logweighting.exp())**(-2)
+        lh = rve.MfImagingLikelihoodVariableCovariance(obs, sky, weightop)
+
+        # FIXME
+        # plotter.add('bayesian weighting', logweighting.exp())
+        # plotter.add('power spectrum bayesian weighting', logweighting.power_spectrum)
+    else:
+        lh = rve.MfImagingLikelihood(obs, sky)
     plotter.add_histogram('normalized residuals', lh.normalized_residual)
 
     ham = ift.StandardHamiltonian(lh)

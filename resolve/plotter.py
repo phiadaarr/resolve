@@ -241,6 +241,7 @@ def _plot_histograms(state, fname, lim, width, postop=None):
 
 def _plot_spectra(state, op, name, directions):
     fld = op.force(state.mean)
+    mi, ma = np.min(fld.val), np.max(fld.val)
 
     fdom, dom = fld.domain
     freqs = np.array(fdom.coordinates)*1e-6
@@ -248,9 +249,10 @@ def _plot_spectra(state, op, name, directions):
     plt.figure()
     for indx, indy in directions:
         plt.plot(freqs, fld.val[:, indx, indy])
+    plt.ylim([mi, ma])
     plt.xlabel('MHz')
     plt.tight_layout()
-    plt.savefig(f'{name}_spectra.png')
+    plt.savefig(name)
     plt.close()
 
 

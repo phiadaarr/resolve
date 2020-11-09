@@ -77,15 +77,26 @@ def MfImagingLikelihood(observation, sky_operator):
     return _build_gauss_lh_nres(R @ sky_operator, observation.vis, observation.weight)
 
 
+def MfImagingLikelihoodVariableCovariance(observation, sky_operator, inverse_covariance_operator):
+    my_assert_isinstance(observation, Observation)
+    my_assert_isinstance(sky_operator, ift.Operator)
+    R = MfResponse(observation, sky_operator.target)
+    return _varcov(observation, R @ sky_operator, inverse_covariance_operator)
+
+
 def ImagingLikelihoodVariableCovariance(observation, sky_operator, inverse_covariance_operator):
     my_assert_isinstance(observation, Observation)
     my_assert_isinstance(sky_operator, inverse_covariance_operator, ift.Operator)
     my_assert_isinstance(inverse_covariance_operator.domain, sky_operator.domain, ift.MultiDomain)
     my_assert_isinstance(inverse_covariance_operator.target, sky_operator.target, ift.DomainTuple)
     R = StokesIResponse(observation, sky_operator.target)
-    my_asserteq(R.target.shape, observation.vis.shape)
+    return _varcov(observation, R @ sky_operator, inverse_covariance_operator)
+
+
+def _varcov(observation, Rs, inverse_covariance_operator):
+    my_asserteq(Rs.target.shape, observation.vis.shape)
     mask, vis, _ = _get_mask(observation)
-    residual = ift.Adder(vis, neg=True) @ mask @ R @ sky_operator
+    residual = ift.Adder(vis, neg=True) @ mask @ Rs
     inverse_covariance_operator = mask @ inverse_covariance_operator
     dtype = observation.vis.dtype
     return _build_varcov_gauss_lh_nres(residual, inverse_covariance_operator, dtype)
