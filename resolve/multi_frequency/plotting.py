@@ -13,7 +13,7 @@ from ..util import my_asserteq
 
 def mf_plot(name, fld, movie_length=0):
     fdom, dom = fld.domain
-    freqs = np.array(fdom.binbounds)[:-1]
+    freqs = np.array(fdom.coordinates)
     nfreq = fld.shape[0]
     my_asserteq(nfreq, len(freqs))
     mi, ma = np.min(fld.val), np.max(fld.val)

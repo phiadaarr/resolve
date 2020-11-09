@@ -72,9 +72,6 @@ def MfImagingLikelihood(observation, sky_operator):
     freq0 = np.array(observation.freq)
     freq1 = np.array(sky_operator.target[0].binbounds)
 
-    if np.any(freq0 != freq1):
-        # FIXME Support fewer imaging bands
-        raise NotImplementedError
 
     exit()
 

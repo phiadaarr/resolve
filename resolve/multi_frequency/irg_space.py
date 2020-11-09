@@ -25,22 +25,22 @@ class IRGSpace(ift.StructuredDomain):
 
     Parameters
     ----------
-    binbounds : np.ndarray
+    coordinates : np.ndarray
         Must be sorted and strictly ascending.
     """
 
-    _needed_for_hash = ["_binbounds"]
+    _needed_for_hash = ["_coordinates"]
 
-    def __init__(self, binbounds):
-        bb = np.array(binbounds)
+    def __init__(self, coordinates):
+        bb = np.array(coordinates)
         if bb.ndim != 1:
             raise TypeError
         if np.any(np.diff(bb) <= 0.):
-            raise ValueError("Binbounds must be sorted and strictly ascending")
-        self._binbounds = tuple(bb)
+            raise ValueError("Coordinates must be sorted and strictly ascending")
+        self._coordinates = tuple(bb)
 
     def __repr__(self):
-        return (f"IRGSpace(shape={self.shape}, binbounds=...)")
+        return (f"IRGSpace(shape={self.shape}, coordinates=...)")
 
     @property
     def harmonic(self):
@@ -49,7 +49,7 @@ class IRGSpace(ift.StructuredDomain):
 
     @property
     def shape(self):
-        return (len(self._binbounds) - 1,)
+        return len(self._coordinates),
 
     @property
     def size(self):
@@ -61,14 +61,11 @@ class IRGSpace(ift.StructuredDomain):
 
     @property
     def dvol(self):
-        # FIXME Is this volume treatment really correct?
-        return np.diff(np.array(self._binbounds))[:-1]
+        """This has one pixel less than :meth:`shape`. Not sure if this is
+        okay.
+        """
+        return np.diff(np.array(self._coordinates))
 
     @property
-    def binbounds(self):
-        return self._binbounds
-
-    # @property
-    # def pixel_centers(self):
-    #     bb = np.array(self._binbounds)
-    #     return bb[:-1] + np.diff(bb)/2.
+    def coordinates(self):
+        return self._coordinates

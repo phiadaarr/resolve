@@ -15,12 +15,9 @@ def mf_logsky(domain, freq, prefix):
     # FIXME cumsum over first dimensions may be performance-wise suboptimal
     assert np.all(np.diff(freq) > 0)  # need ordered frequencies
 
-    assert len(set(np.diff(freq))) == 1
-    f0 = freq[0]
-    df = freq[1] - freq[0]
-    freq_bounds = f0 - df/2. + df*np.arange(len(freq)+1)
+    # freq = freq[::5]  # Fewer imaging bands, FIXME write interface
     nfreq = len(freq)
-    freqdom = rve.IRGSpace(freq_bounds)
+    freqdom = rve.IRGSpace(freq)
     assert freqdom.size == nfreq
 
     # FIXME Figure out why the values are so freaking big/small
@@ -124,7 +121,6 @@ def main():
     npix = np.array([250, 250])
     dom = ift.RGSpace(npix, fov/npix)
 
-    # FIXME Add option to have fewer imaging bands than channels
     logsky = mf_logsky(dom, obs.freq, 'sky')
     sky = logsky.exp()
 
