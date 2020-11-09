@@ -22,6 +22,7 @@ def StokesIResponse(observation, domain):
     sp = observation.vis.dtype == np.complex64
     mask = observation.mask
     sr0 = SingleResponse(domain, observation.uvw, observation.freq, mask[0], sp)
+    # FIXME Get rid of npol==2 support here
     if npol == 1 or (npol == 2 and np.all(mask[0] == mask[1])):
         contr = ift.ContractionOperator(observation.vis.domain, 0)
         return contr.adjoint @ sr0
@@ -29,6 +30,62 @@ def StokesIResponse(observation, domain):
         sr1 = SingleResponse(domain, observation.uvw, observation.freq, mask[1], sp)
         return ResponseDistributor(sr0, sr1)
     raise RuntimeError
+
+
+class MfResponse(ift.LinearOperator):
+    def __init__(self, observation, domain):
+        my_assert_isinstance(observation, Observation)
+        # FIXME Add polarization support
+        my_asserteq(observation.npol, 1)
+        self._domain = ift.DomainTuple.make(domain)
+        self._target = observation.vis.domain
+        self._capability = self.TIMES | self.ADJOINT_TIMES
+
+        data_freq = observation.freq
+        my_assert(np.all(np.diff(data_freq) > 0))
+        sky_freq = np.array(domain[0].coordinates)
+        band_indices = [np.argmin(np.abs(ff-sky_freq)) for ff in data_freq]
+        # Make sure that no index is wasted
+        my_asserteq(len(set(band_indices)), domain[0].size)
+        self._r = []
+        sp = observation.vis.dtype == np.complex64
+        for band_index in np.unique(band_indices):
+            sel = band_indices == band_index
+            assert observation.mask.shape[0] == 1
+            r = SingleResponse(domain[1], observation.uvw, observation.freq[sel],
+                               observation.mask[0, :, sel].T, sp)
+            self._r.append((band_index, sel, r))
+        # Double check that all channels are written to
+        check = np.zeros(len(data_freq))
+        for _, sel, _ in self._r:
+            check[sel] += 1
+        my_assert(np.all(check == 1))
+
+    def apply(self, x, mode):
+        self._check_input(x, mode)
+        res = None
+        x = x.val
+        if mode == self.TIMES:
+            for band_index, sel, rr in self._r:
+                foo = rr(ift.makeField(rr.domain, x[band_index]))
+                if res is None:
+                    res = np.empty(self._tgt(mode).shape, foo.dtype)
+                res[0][..., sel] = foo.val
+        else:
+            empty = np.zeros(self._domain.shape[0], bool)
+            res = np.empty(self._tgt(mode).shape)
+            for band_index, sel, rr in self._r:
+                assert x.shape[0] == 1
+                # FIXME Do we need ascontiguousarray here?
+                res[band_index] = rr.adjoint(ift.makeField(rr.target, x[0][..., sel])).val
+                empty[band_index] = False
+            for band_index in np.where(empty)[0]:
+                # Support empty imaging bands even though this might be a waste
+                # of time
+                res[band_index] = 0
+                empty[band_index] = False
+            my_assert(not np.any(empty))
+        return ift.makeField(self._tgt(mode), res)
 
 
 class ResponseDistributor(ift.LinearOperator):
@@ -92,6 +149,7 @@ class SingleResponse(ift.LinearOperator):
 
     def apply(self, x, mode):
         self._check_input(x, mode)
+        # FIXME mtr Is the sky in single precision mode single or double?
         # my_asserteq(x.dtype, self._domain_dtype if mode == self.TIMES else self._target_dtype)
         x = x.val.astype(self._domain_dtype if mode == self.TIMES else self._target_dtype)
         if mode == self.TIMES:
@@ -102,6 +160,8 @@ class SingleResponse(ift.LinearOperator):
             f = dirty2vis
             # FIXME Use vis_out keyword of wgridder
         else:
+            # FIXME assert correct strides for visibilities
+            my_assert(x.flags['C_CONTIGUOUS'])
             args1 = {
                 'vis': x,
                 'npix_x': self._domain[0].shape[0],

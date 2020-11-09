@@ -7,8 +7,8 @@ import numpy as np
 import nifty7 as ift
 
 from .observation import Observation
-from .response import StokesIResponse
-from .util import my_assert_isinstance, my_asserteq
+from .response import StokesIResponse, MfResponse
+from .util import my_assert_isinstance, my_asserteq, my_assert
 
 # FIXME VariableCovariance version for all likelihoods
 
@@ -69,11 +69,12 @@ def ImagingLikelihood(observation, sky_operator):
 
 
 def MfImagingLikelihood(observation, sky_operator):
-    freq0 = np.array(observation.freq)
-    freq1 = np.array(sky_operator.target[0].binbounds)
-
-
-    exit()
+    my_assert_isinstance(observation, Observation)
+    my_assert_isinstance(sky_operator, ift.Operator)
+    R = MfResponse(observation, sky_operator.target)
+    # FIXME Move to tests
+    # ift.extra.check_linear_operator(R, rtol=1e-5, target_dtype=np.complex128, only_r_linear=True)
+    return _build_gauss_lh_nres(R @ sky_operator, observation.vis, observation.weight)
 
 
 def ImagingLikelihoodVariableCovariance(observation, sky_operator, inverse_covariance_operator):

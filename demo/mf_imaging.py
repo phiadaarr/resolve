@@ -126,15 +126,27 @@ def main():
 
     lh = rve.MfImagingLikelihood(obs, sky)
 
+    # print('Execution time for sky model')
+    # ift.exec_time(sky)
+    # print('Execution time for complete likelihood')
+    # ift.exec_time(lh, True)
 
-    print('Execution time for complete sky model')
-    ift.exec_time(sky)
+    # for ii in range(3):
+    #     rve.mf_plot(f'debug{ii}', logsky(ift.from_random(sky.domain)), 2)
 
-    for ii in range(3):
-        rve.mf_plot(f'debug{ii}', logsky(ift.from_random(sky.domain)), 2)
-
-    # FIXME Write mf likelihood
     # FIXME Figure out how to do automatic weighting for mf
+
+    ham = ift.StandardHamiltonian(lh)
+    pos = 0.1*ift.from_random(ham.domain)
+    state = rve.MinimizationState(pos, [])
+    minimizer = ift.NewtonCG(ift.GradientNormController(name='newton', iteration_limit=5))
+
+    plotter = rve.Plotter('png', 'plots')
+    plotter.add_histogram('normalized residuals', lh.normalized_residual)
+
+    for ii in range(5):
+        state = rve.simple_minimize(ham, state.mean, 0, minimizer)
+        rve.mf_plot(f'debug{ii}', logsky(state.mean), 2)
 
 
 if __name__ == '__main__':
