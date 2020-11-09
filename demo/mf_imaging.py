@@ -128,11 +128,7 @@ def main():
     npix = np.array([250, 250])
     dom = ift.RGSpace(npix, fov/npix)
 
-    if args.automatic_weighting:
-        plotter = rve.MfPlotter('png', 'plots_auto')
-    else:
-        plotter = rve.MfPlotter('png', 'plots')
-
+    plotter = rve.MfPlotter('png', 'plots_auto' if args.automatic_weighting else 'plots')
     logsky = mf_logsky(dom, obs.freq, 'sky', plotter)
 
     # Plot prior samples
@@ -157,19 +153,32 @@ def main():
         # FIXME Move into tests
         ift.extra.check_linear_operator(interpolation)
         weightop = ift.makeOp(obs.weight) @ (interpolation @ logweighting.exp())**(-2)
-        lh = rve.MfImagingLikelihoodVariableCovariance(obs, sky, weightop)
+        lh_wgt = rve.MfImagingLikelihoodVariableCovariance(obs, sky, weightop)
 
         # FIXME
         # plotter.add('bayesian weighting', logweighting.exp())
         # plotter.add('power spectrum bayesian weighting', logweighting.power_spectrum)
-    else:
-        lh = rve.MfImagingLikelihood(obs, sky)
+    lh = rve.MfImagingLikelihood(obs, sky)
     plotter.add_histogram('normalized residuals', lh.normalized_residual)
 
+    minimizer = ift.NewtonCG(ift.GradientNormController(name='newton', iteration_limit=5))
+
     ham = ift.StandardHamiltonian(lh)
-    pos = 0.1*ift.from_random(ham.domain)
-    state = rve.MinimizationState(pos, [])
-    minimizer = ift.NewtonCG(ift.GradientNormController(name='newton', iteration_limit=10))
+    state = rve.MinimizationState(0.1*ift.from_random(ham.domain), [])
+
+    if args.automatic_weighting:
+        for ii in range(5):
+            state = rve.simple_minimize(ham, state.mean, 0, minimizer)
+            plotter.plot(f"pre_sky_{ii}", state)
+
+        lh = lh_wgt
+        ham = ift.StandardHamiltonian(lh)
+        pos = ift.MultiField.union([0.1*ift.from_random(ham.domain), state.mean])
+        state = rve.MinimizationState(pos, [])
+
+        for ii in range(5):
+            state = rve.simple_minimize(ham, state.mean, 0, minimizer, constants=sky.domain.keys())
+            plotter.plot(f"pre_wgt_{ii}", state)
 
     for ii in range(20):
         state = rve.simple_minimize(ham, state.mean, 0, minimizer)
