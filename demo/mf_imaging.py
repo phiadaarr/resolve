@@ -90,12 +90,6 @@ def mf_logsky(domain, freq, prefix):
     # FIXME Write also test which tests first bin from explicit formula
     np.testing.assert_equal(out.val[0], a0.force(pos).val)
 
-    # pos = ift.from_random(logsky.domain)
-    # from time import time
-    # t0 = time()
-    # logsky(pos)
-    # print(f'{time()-t0}')
-
     # ift.extra.check_operator(logsky, ift.from_random(logsky.domain), ntries=10)
 
     rve.my_asserteq(logsky.target[1], ift.DomainTuple.make(domain)[0])
@@ -126,16 +120,19 @@ def main():
     rve.set_epsilon(1/10/obs.max_snr())
 
     fov = np.array([3, 3])*rve.ARCMIN2RAD
-    npix = np.array([256, 256])
+    # Do not use powers of two here, otherwise super slow
+    npix = np.array([250, 250])
     dom = ift.RGSpace(npix, fov/npix)
 
     # FIXME Add option to have fewer imaging bands than channels
     logsky = mf_logsky(dom, obs.freq, 'sky')
     sky = logsky.exp()
 
+    print('Execution time for complete sky model')
+    ift.exec_time(sky)
+
     for ii in range(3):
         rve.mf_plot(f'debug{ii}', logsky(ift.from_random(sky.domain)), 2)
-        # rve.mf_plot(f'debug{ii}', logsky(ift.from_random(sky.domain)), 2)
 
     # FIXME Write mf likelihood
     # FIXME Figure out how to do automatic weighting for mf
