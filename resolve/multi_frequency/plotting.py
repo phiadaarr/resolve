@@ -29,6 +29,9 @@ def mf_plot(name, fld, movie_length=0):
     plt.savefig(f'{name}_spectra.png')
     plt.close()
 
+    if movie_length is None:
+        return
+
     for ii in range(nfreq):
         ift.single_plot(ift.makeField(dom, fld.val[ii]),
                         title=f'{freqs[ii]*1e-6:.0f} MHz',

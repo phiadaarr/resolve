@@ -125,7 +125,8 @@ def main():
     sky = logsky.exp()
 
     for ii in range(3):
-        rve.mf_plot(f'debug{ii}', logsky(ift.from_random(sky.domain)), 2)
+        rve.mf_plot(f'debug{ii}', logsky(ift.from_random(sky.domain)), None)
+        # rve.mf_plot(f'debug{ii}', logsky(ift.from_random(sky.domain)), 2)
 
     # FIXME Write mf likelihood
     # FIXME Figure out how to do automatic weighting for mf
