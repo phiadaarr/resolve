@@ -128,7 +128,7 @@ def main():
     npix = np.array([250, 250])
     dom = ift.RGSpace(npix, fov/npix)
 
-    plotter = rve.MfPlotter('png', 'plots_auto' if args.automatic_weighting else 'plots')
+    plotter = rve.MfPlotter('png', 'plots')
     logsky = mf_logsky(dom, obs.freq, 'sky', plotter)
 
     # Plot prior samples
@@ -160,6 +160,7 @@ def main():
         # plotter.add('power spectrum bayesian weighting', logweighting.power_spectrum)
     lh = rve.MfImagingLikelihood(obs, sky)
     plotter.add_histogram('normalized residuals', lh.normalized_residual)
+    plotter.add_histogram('normalized residuals autowgts', lh_wgt.normalized_residual)
 
     minimizer = ift.NewtonCG(ift.GradientNormController(name='newton', iteration_limit=5))
 
