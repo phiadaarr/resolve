@@ -40,7 +40,7 @@ class IRGSpace(ift.StructuredDomain):
         self._binbounds = tuple(bb)
 
     def __repr__(self):
-        return (f"IRGSpace(shape={self.shape}, binbounds={self._binbounds})")
+        return (f"IRGSpace(shape={self.shape}, binbounds=...)")
 
     @property
     def harmonic(self):

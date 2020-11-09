@@ -11,8 +11,8 @@ import nifty7 as ift
 import resolve as rve
 
 
-def mf_logsky(domain, freq, flexibility, asperity, prefix):
-    # FIXME cumsum over first dimensions is performance-wise suboptimal
+def mf_logsky(domain, freq, prefix):
+    # FIXME cumsum over first dimensions may be performance-wise suboptimal
     assert np.all(np.diff(freq) > 0)  # need ordered frequencies
 
     assert len(set(np.diff(freq))) == 1
@@ -22,6 +22,9 @@ def mf_logsky(domain, freq, flexibility, asperity, prefix):
     nfreq = len(freq)
     freqdom = rve.IRGSpace(freq_bounds)
     assert freqdom.size == nfreq
+
+    # FIXME Figure out why the values are so freaking big/small
+    flexibility, asperity = (1e-12, 1e-14), (1e14, 1e14)
 
     # FIXME Take a0 and b0 into account
     a0 = ift.SimpleCorrelatedField(domain, 21, (1, 0.1), (5, 1), (1.2, 0.4), (0.2, 0.2), (-2, 0.5),
@@ -120,8 +123,7 @@ def main():
     dom = ift.RGSpace(npix, fov/npix)
 
     # FIXME Add option to have fewer imaging bands than channels
-    # FIXME Figure out why the values are so freaking big/small
-    logsky = mf_logsky(dom, obs.freq, (1e-12, 1e-13), (1e14, 1e14), 'sky')
+    logsky = mf_logsky(dom, obs.freq, 'sky')
     sky = logsky.exp()
 
     for ii in range(3):
