@@ -3,7 +3,7 @@ from .constants import *
 from .global_config import *
 from .likelihood import (CalibrationLikelihood, ImagingCalibrationLikelihood,
                          ImagingLikelihood,
-                         ImagingLikelihoodVariableCovariance)
+                         ImagingLikelihoodVariableCovariance, MfImagingLikelihood)
 from .minimization import Minimization, MinimizationState, simple_minimize
 from .mpi import onlymaster
 from .ms_import import ms2observations, ms_n_spectral_windows

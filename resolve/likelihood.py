@@ -68,6 +68,17 @@ def ImagingLikelihood(observation, sky_operator):
     return _build_gauss_lh_nres(R @ sky_operator, observation.vis, observation.weight)
 
 
+def MfImagingLikelihood(observation, sky_operator):
+    freq0 = np.array(observation.freq)
+    freq1 = np.array(sky_operator.target[0].binbounds)
+
+    if np.any(freq0 != freq1):
+        # FIXME Support fewer imaging bands
+        raise NotImplementedError
+
+    exit()
+
+
 def ImagingLikelihoodVariableCovariance(observation, sky_operator, inverse_covariance_operator):
     my_assert_isinstance(observation, Observation)
     my_assert_isinstance(sky_operator, inverse_covariance_operator, ift.Operator)

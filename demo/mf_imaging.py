@@ -128,6 +128,9 @@ def main():
     logsky = mf_logsky(dom, obs.freq, 'sky')
     sky = logsky.exp()
 
+    lh = rve.MfImagingLikelihood(obs, sky)
+
+
     print('Execution time for complete sky model')
     ift.exec_time(sky)
 
