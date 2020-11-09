@@ -24,13 +24,14 @@ def mf_logsky(domain, freq, prefix):
     assert freqdom.size == nfreq
 
     # FIXME Figure out why the values are so freaking big/small
-    flexibility, asperity = (1e-12, 1e-14), (1e14, 1e14)
+    flexibility, asperity = (1e-11, 1e-14), (1e14, 1e14)
 
-    # FIXME Take a0 and b0 into account
     a0 = ift.SimpleCorrelatedField(domain, 21, (1, 0.1), (5, 1), (1.2, 0.4), (0.2, 0.2), (-2, 0.5),
                                    prefix=f'{prefix}a0')
-    b0 = ift.SimpleCorrelatedField(domain, 0, (1, 0.1), (5, 1), (1.2, 0.4), (0.2, 0.2), (-2, 0.5),
+    b0 = ift.SimpleCorrelatedField(domain, 0, (1e-7, 1e-7), (1e-7, 1e-7), (1.2, 0.4), (0.2, 0.2), (-2, 0.5),
                                    prefix=f'{prefix}b0')
+    # FIXME Is there a bug in the b0 handling?
+    b0 = ift.ScalingOperator(domain, 0.).ducktape(f'{prefix}b0')
 
     # IDEA Try to use individual power spectra
     # FIXME Support fixed variance for zero mode
@@ -53,7 +54,7 @@ def mf_logsky(domain, freq, prefix):
     # FIXME Make test working
     # ift.extra.check_linear_operator(intop)
     expander = ift.ContractionOperator(intop.domain, (0, 1)).adjoint
-    vol = freqdom.dvol[:-1]  # FIXME Volume
+    vol = freqdom.dvol
 
     flex = ift.LognormalTransform(*flexibility, prefix + 'flexibility', 0)
     dom = intop.domain[0]
@@ -81,7 +82,13 @@ def mf_logsky(domain, freq, prefix):
         asp = freqxi*sig_flex*(ift.Adder(shift) @ sig_asp).ptw("sqrt")
 
     # FIXME shift, vasp, vflex have far more pixels than needed
-    logsky = intop @ asp
+
+    logsky = rve.IntWProcessInitialConditions(a0, b0, intop @ asp)
+    pos = ift.from_random(logsky.domain)
+    out = logsky(pos)
+    # FIXME Move to tests
+    # FIXME Write also test which tests first bin from explicit formula
+    np.testing.assert_equal(out.val[0], a0.force(pos).val)
 
     # pos = ift.from_random(logsky.domain)
     # from time import time
@@ -127,7 +134,7 @@ def main():
     sky = logsky.exp()
 
     for ii in range(3):
-        rve.mf_plot(f'debug{ii}', logsky(ift.from_random(sky.domain)), None)
+        rve.mf_plot(f'debug{ii}', logsky(ift.from_random(sky.domain)), 2)
         # rve.mf_plot(f'debug{ii}', logsky(ift.from_random(sky.domain)), 2)
 
     # FIXME Write mf likelihood

@@ -61,7 +61,8 @@ class IRGSpace(ift.StructuredDomain):
 
     @property
     def dvol(self):
-        return np.diff(np.array(self._binbounds))
+        # FIXME Is this volume treatment really correct?
+        return np.diff(np.array(self._binbounds))[:-1]
 
     @property
     def binbounds(self):

@@ -8,7 +8,7 @@ from .minimization import Minimization, MinimizationState, simple_minimize
 from .mpi import onlymaster
 from .ms_import import ms2observations, ms_n_spectral_windows
 from .multi_frequency.irg_space import IRGSpace
-from .multi_frequency.operators import WienerIntegrations
+from .multi_frequency.operators import WienerIntegrations, IntWProcessInitialConditions
 from .multi_frequency.plotting import mf_plot
 from .observation import Observation, tmin_tmax, unique_antennas, unique_times
 from .plotter import Plotter
