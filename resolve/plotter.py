@@ -243,12 +243,11 @@ def _plot_spectra(state, op, name, directions):
     fld = op.force(state.mean)
 
     fdom, dom = fld.domain
-    freqs = np.array(fdom.coordinates)
+    freqs = np.array(fdom.coordinates)*1e-6
 
-    val = fld.val.reshape(fld.shape[0], -1).T
     plt.figure()
-    for ind in directions:
-        plt.plot(freqs*1e-6, val[ind])
+    for indx, indy in directions:
+        plt.plot(freqs, fld.val[:, indx, indy])
     plt.xlabel('MHz')
     plt.tight_layout()
     plt.savefig(f'{name}_spectra.png')

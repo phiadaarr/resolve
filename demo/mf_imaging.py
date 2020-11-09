@@ -95,6 +95,7 @@ def mf_logsky(domain, freq, prefix, plotter):
     rve.my_asserteq(logsky.target[0].size, nfreq)
 
     plotter.add_mf("logsky", logsky)
+    plotter.add_spectra("spectra", logsky, [[0.0002, 0.00035], [0.0004, 0.0001]])
     return logsky
 
 
@@ -129,10 +130,11 @@ def main():
 
     logsky = mf_logsky(dom, obs.freq, 'sky', plotter)
 
-    # # Plot prior samples
-    # for ii in range(3):
-    #     state = rve.MinimizationState(ift.from_random(logsky.domain), [])
-    #     plotter.plot(f"prior{ii}", state)
+    # Plot prior samples
+    if False:
+        for ii in range(3):
+            state = rve.MinimizationState(ift.from_random(logsky.domain), [])
+            plotter.plot(f"prior{ii}", state)
 
     sky = logsky.exp()
 
