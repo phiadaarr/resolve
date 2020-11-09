@@ -7,8 +7,8 @@ import numpy as np
 import nifty7 as ift
 
 from .observation import Observation
-from .response import StokesIResponse, MfResponse
-from .util import my_assert_isinstance, my_asserteq, my_assert
+from .response import MfResponse, StokesIResponse
+from .util import my_assert, my_assert_isinstance, my_asserteq
 
 # FIXME VariableCovariance version for all likelihoods
 

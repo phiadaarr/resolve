@@ -3,9 +3,10 @@
 # Authors: Philipp Frank, Philipp Arras, Philipp Haim
 
 import numpy as np
-from ..util import my_asserteq, my_assert_isinstance
 
 import nifty7 as ift
+
+from ..util import my_assert_isinstance, my_asserteq
 
 
 class WienerIntegrations(ift.LinearOperator):
@@ -73,4 +74,3 @@ class _FancyBroadcast(ift.LinearOperator):
         else:
             res = np.sum(x.val, axis=0)
         return ift.makeField(self._tgt(mode), res)
-

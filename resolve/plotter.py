@@ -2,7 +2,8 @@
 # Copyright(C) 2020 Max-Planck-Society
 # Author: Philipp Arras
 
-from os.path import join
+import os
+from os.path import join, splitext
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,7 +12,7 @@ import nifty7 as ift
 
 from .minimization import MinimizationState
 from .mpi import onlymaster
-from .util import my_assert_isinstance
+from .util import my_assert_isinstance, my_asserteq
 
 UNIT = 6
 
