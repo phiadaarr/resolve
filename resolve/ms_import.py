@@ -177,6 +177,7 @@ def read_ms_i(
         my_asserteq(len(pol_indices), 2)
 
     with table(name, readonly=True, ack=False) as t:
+        # FIXME Get rid of fullwgt
         fullwgt, weightcol = _determine_weighting(t)
         nrow = t.nrows()
         active_rows = np.ones(nrow, dtype=np.bool)
