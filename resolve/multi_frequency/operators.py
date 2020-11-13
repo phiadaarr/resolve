@@ -78,8 +78,9 @@ class _FancyBroadcast(ift.LinearOperator):
 
 class MfWeightingInterpolation(ift.LinearOperator):
     def __init__(self, eff_uvw, domain):
+        domain = ift.DomainTuple.make(domain)
         my_asserteq(domain.shape[0], eff_uvw.shape[1])  # freqaxis
-        self._domain = ift.DomainTuple.make(domain)
+        self._domain = domain
         nrow, nfreq = eff_uvw.shape
         tgt = [ift.UnstructuredDomain(aa) for aa in [1, nrow, nfreq]]
         self._target = ift.DomainTuple.make(tgt)

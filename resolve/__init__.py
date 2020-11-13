@@ -16,7 +16,7 @@ from .observation import Observation, tmin_tmax, unique_antennas, unique_times
 from .plotter import MfPlotter, Plotter
 from .points import PointInserter
 from .primary_beam import vla_beam
-from .response import StokesIResponse
+from .response import StokesIResponse, MfResponse
 from .simple_operators import AddEmptyDimension
 from .util import (Reshaper, divide_where_possible, my_assert,
                    my_assert_isinstance, my_asserteq)

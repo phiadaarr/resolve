@@ -72,8 +72,6 @@ def MfImagingLikelihood(observation, sky_operator):
     my_assert_isinstance(observation, Observation)
     my_assert_isinstance(sky_operator, ift.Operator)
     R = MfResponse(observation, sky_operator.target)
-    # FIXME Move to tests
-    # ift.extra.check_linear_operator(R, rtol=1e-5, target_dtype=np.complex128, only_r_linear=True)
     return _build_gauss_lh_nres(R @ sky_operator, observation.vis, observation.weight)
 
 

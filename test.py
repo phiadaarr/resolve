@@ -3,6 +3,7 @@
 # Author: Philipp Arras
 
 import numpy as np
+from os.path import join
 import pytest
 
 import nifty7 as ift
@@ -244,3 +245,13 @@ def test_mfweighting():
     dom = ift.UnstructuredDomain(nchan), ift.RGSpace(npix, 2*np.max(effuv)/npix)
     op = rve.MfWeightingInterpolation(effuv, dom)
     ift.extra.check_linear_operator(op)
+
+
+def test_mf_response():
+    ms = join(direc, 'CYG-D-6680-64CH-10S.ms')
+    obs = rve.ms2observations(ms, 'DATA', False, 0, "stokesiavg")[0]
+    skydom = rve.IRGSpace(obs.freq), dom
+    R = rve.MfResponse(obs, skydom)
+    ift.extra.check_linear_operator(R, rtol=1e-5, atol=1e-5,
+                                    target_dtype=np.complex128,
+                                    only_r_linear=True)
