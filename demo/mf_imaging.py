@@ -10,6 +10,8 @@ import numpy as np
 import nifty7 as ift
 import resolve as rve
 
+# FIXME Add damping to Wiener integration
+
 
 def mf_logsky(domain, freq, prefix, plotter):
     # FIXME cumsum over first dimensions may be performance-wise suboptimal
