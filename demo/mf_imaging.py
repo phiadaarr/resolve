@@ -10,8 +10,8 @@ import numpy as np
 import nifty7 as ift
 import resolve as rve
 
-# FIXME Later: Add damping to Wiener integration
-# FIXME Later: cumsum over first dimensions may be performance-wise suboptimal
+# FIXME Add damping to Wiener integration
+# FIXME cumsum over first dimensions may be performance-wise suboptimal
 
 
 def mf_logsky(domain, freq, prefix, plotter):
@@ -81,13 +81,6 @@ def mf_logsky(domain, freq, prefix, plotter):
     # FIXME shift, vasp, vflex have far more pixels than needed
 
     logsky = rve.IntWProcessInitialConditions(a0, b0, intop @ asp)
-    pos = ift.from_random(logsky.domain)
-    out = logsky(pos)
-    # FIXME Move to tests
-    # FIXME Write also test which tests first bin from explicit formula
-    np.testing.assert_equal(out.val[0], a0.force(pos).val)
-
-    # ift.extra.check_operator(logsky, ift.from_random(logsky.domain), ntries=10)
 
     rve.my_asserteq(logsky.target[1], ift.DomainTuple.make(domain)[0])
     rve.my_asserteq(logsky.target[0].size, nfreq)

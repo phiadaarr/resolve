@@ -29,6 +29,8 @@ inserter = rve.PointInserter(sky0.target, np.array([[0, 0]]))
 points = ift.InverseGammaOperator(inserter.domain, alpha=0.5, q=0.2/dom.scalar_dvol).ducktape('points')
 sky = rve.vla_beam(dom, np.mean(OBS[0].freq)) @ (sky0 + inserter @ points)
 
+freqdomain = rve.IRGSpace(np.linspace(1000, 1050, num=10))
+
 
 @pmp('ms', ('CYG-ALL-2052-2MHZ', 'CYG-D-6680-64CH-10S', 'AM754_A030124_flagged', '1052735056'))
 @pmp('with_calib_info', (False, True))
@@ -206,6 +208,18 @@ def test_point_inserter():
     assert np.all(res == 0)
 
 
+def test_integrator_values():
+    # FIXME Write also test which tests first bin from explicit formula
+    domain = ift.RGSpace((12, 12))
+    a0 = ift.ScalingOperator(domain, 0.).ducktape('a0')
+    b0 = ift.ScalingOperator(domain, 0.).ducktape('b0')
+    intop = rve.WienerIntegrations(freqdomain, domain).ducktape('int')
+    logsky = rve.IntWProcessInitialConditions(a0, b0, intop)
+    pos = ift.from_random(logsky.domain)
+    out = logsky(pos)
+    np.testing.assert_equal(out.val[0], a0.force(pos).val)
+
+
 def test_response_distributor():
     dom = ift.UnstructuredDomain(2), ift.UnstructuredDomain(4)
     op0 = ift.makeOp(ift.makeField(dom, np.arange(8).reshape(2, -1)))
@@ -259,5 +273,5 @@ def test_mf_response():
 
 def test_intop():
     dom = ift.RGSpace((12, 12))
-    op = rve.WienerIntegrations(rve.IRGSpace(np.linspace(1000, 1050, num=10)), dom)
+    op = rve.WienerIntegrations(freqdomain, dom)
     ift.extra.check_linear_operator(op)
