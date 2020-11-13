@@ -235,3 +235,12 @@ def test_randomonmaster():
     fvalid()
     with pytest.raises(RuntimeError):
         finvalid()
+
+
+def test_mfweighting():
+    nrow = 100
+    nchan = 4
+    effuv = ift.random.current_rng().random((nrow, nchan))
+    dom = ift.UnstructuredDomain(nchan), ift.RGSpace(npix, 2*np.max(effuv)/npix)
+    op = rve.MfWeightingInterpolation(effuv, dom)
+    ift.extra.check_linear_operator(op)

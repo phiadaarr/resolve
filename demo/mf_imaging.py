@@ -152,8 +152,6 @@ def main():
         logweighting = cfm.finalize(0)
 
         interpolation = rve.MfWeightingInterpolation(effuv, logweighting.target)
-        # FIXME Move into tests
-        ift.extra.check_linear_operator(interpolation)
         weightop = ift.makeOp(obs.weight) @ (interpolation @ logweighting.exp())**(-2)
         lh_wgt = rve.MfImagingLikelihoodVariableCovariance(obs, sky, weightop)
 
