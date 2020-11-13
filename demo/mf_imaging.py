@@ -10,11 +10,11 @@ import numpy as np
 import nifty7 as ift
 import resolve as rve
 
-# FIXME Add damping to Wiener integration
+# FIXME Later: Add damping to Wiener integration
+# FIXME Later: cumsum over first dimensions may be performance-wise suboptimal
 
 
 def mf_logsky(domain, freq, prefix, plotter):
-    # FIXME cumsum over first dimensions may be performance-wise suboptimal
     assert np.all(np.diff(freq) > 0)  # need ordered frequencies
 
     # freq = freq[::5]  # Fewer imaging bands, FIXME write interface
@@ -50,10 +50,6 @@ def mf_logsky(domain, freq, prefix, plotter):
 
     intop = rve.WienerIntegrations(freqdom, domain)
     freqxi = rve.Reshaper(freqxi.target, intop.domain) @ freqxi
-
-    # FIXME Move to tests
-    # FIXME Make test working
-    # ift.extra.check_linear_operator(intop)
     expander = ift.ContractionOperator(intop.domain, (0, 1)).adjoint
     vol = freqdom.dvol
 

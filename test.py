@@ -255,3 +255,9 @@ def test_mf_response():
     ift.extra.check_linear_operator(R, rtol=1e-5, atol=1e-5,
                                     target_dtype=np.complex128,
                                     only_r_linear=True)
+
+
+def test_intop():
+    dom = ift.RGSpace((12, 12))
+    op = rve.WienerIntegrations(rve.IRGSpace(np.linspace(1000, 1050, num=10)), dom)
+    ift.extra.check_linear_operator(op)
