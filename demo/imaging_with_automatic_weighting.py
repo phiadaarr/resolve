@@ -8,11 +8,13 @@ import numpy as np
 
 import nifty7 as ift
 import resolve as rve
+from os.path import isfile
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-j", type=int, default=1)
+    parser.add_argument("--use-cached", action="store_true")
     parser.add_argument("ms")
     args = parser.parse_args()
 
@@ -56,50 +58,83 @@ def main():
     # MAP points with original weights
     lh = rve.ImagingLikelihood(obs, points)
     ham = ift.StandardHamiltonian(lh)
-    pos = 0.1 * ift.from_random(ham.domain)
+    state = rve.MinimizationState(0.1 * ift.from_random(ham.domain), [])
     mini = ift.NewtonCG(ift.GradientNormController(name="newton", iteration_limit=4))
-    pos = rve.simple_minimize(ham, pos, 0, mini).mean
-    plotter.plot("stage0", rve.MinimizationState(pos, []))
+    if args.use_cached and isfile("stage0"):
+        state = rve.MinimizationState.load("stage0")
+    else:
+        state = rve.simple_minimize(ham, state.mean, 0, mini)
+        plotter.plot("stage0", state)
+        state.save("stage0")
 
     # MAP diffuse with original weights
     lh = rve.ImagingLikelihood(obs, sky)
+    plotter.add_histogram(
+        "normalized residuals (original weights)", lh.normalized_residual
+    )
     ham = ift.StandardHamiltonian(lh)
-    pos = ift.MultiField.union([0.1 * ift.from_random(diffuse.domain), pos])
+    state = rve.MinimizationState(
+        ift.MultiField.union([0.1 * ift.from_random(diffuse.domain), state.mean]), []
+    )
     mini = ift.NewtonCG(ift.GradientNormController(name="newton", iteration_limit=20))
-    pos = rve.simple_minimize(ham, pos, 0, mini).mean
-    plotter.plot("stage1", rve.MinimizationState(pos, []))
+    if args.use_cached and isfile("stage1"):
+        state = rve.MinimizationState.load("stage1")
+    else:
+        state = rve.simple_minimize(ham, state.mean, 0, mini)
+        plotter.plot("stage1", state)
+        state.save("stage1")
 
     # MGVI weights
     lh = rve.ImagingLikelihoodVariableCovariance(obs, sky, weightop)
-    plotter.add_histogram("normalized residuals", lh.normalized_residual)
+    plotter.add_histogram(
+        "normalized residuals (learned weights)", lh.normalized_residual
+    )
     ic = ift.AbsDeltaEnergyController(0.1, 3, 100, name="Sampling")
     ham = ift.StandardHamiltonian(lh, ic)
     cst = sky.domain.keys()
-    pos = ift.MultiField.union([0.1 * ift.from_random(weightop.domain), pos])
+    state = rve.MinimizationState(
+        ift.MultiField.union([0.1 * ift.from_random(weightop.domain), state.mean]), []
+    )
     mini = ift.VL_BFGS(ift.GradientNormController(name="bfgs", iteration_limit=20))
-    for ii in range(10):
-        pos = rve.simple_minimize(ham, pos, 0, mini, cst, cst).mean
-        plotter.plot(f"stage2_{ii}", rve.MinimizationState(pos, []))
+    if args.use_cached and isfile("stage2"):
+        state = rve.MinimizationState.load("stage2")
+    else:
+        for ii in range(10):
+            state = rve.simple_minimize(ham, state.mean, 0, mini, cst, cst)
+            plotter.plot(f"stage2_{ii}", state)
+        state.save("stage2")
 
     # Reset sky
-    pos = ift.MultiField.union([pos, 0.1 * ift.from_random(sky.domain)])
+    state = rve.MinimizationState(
+        ift.MultiField.union([state.mean, 0.1 * ift.from_random(sky.domain)]), []
+    )
 
     # MGVI sky
     ic = ift.AbsDeltaEnergyController(0.1, 3, 200, name="Sampling")
     ham = ift.StandardHamiltonian(lh, ic)
-    state = rve.MinimizationState(pos, [])
     cst = list(points.domain.keys()) + list(weightop.domain.keys())
-    for ii in range(3):
-        state = rve.simple_minimize(ham, state.mean, 15, mini, cst, cst)
-        plotter.plot(f"stage3_{ii}", state)
+    mini = ift.NewtonCG(ift.GradientNormController(name="newton", iteration_limit=15))
+    for ii in range(4):
+        fname = f"stage3_{ii}"
+        if args.use_cached and isfile(fname):
+            state = rve.MinimizationState.load(fname)
+        else:
+            state = rve.simple_minimize(ham, state.mean, 5, mini, cst, cst)
+            plotter.plot(f"stage3_{ii}", state)
+            state.save(fname)
 
     # Sky + weighting simultaneously
     ic = ift.AbsDeltaEnergyController(0.1, 3, 200, name="Sampling")
     ham = ift.StandardHamiltonian(lh, ic)
-    mini = ift.NewtonCG(ift.GradientNormController(name="newton", iteration_limit=50))
+    mini = ift.NewtonCG(ift.GradientNormController(name="newton", iteration_limit=15))
     for ii in range(30):
-        state = rve.simple_minimize(ham, state.mean, 15, mini)
-        plotter.plot(f"stage4_{ii}", state)
+        fname = f"stage4_{ii}"
+        if args.use_cached and isfile(fname):
+            state = rve.MinimizationState.load(fname)
+        else:
+            state = rve.simple_minimize(ham, state.mean, 5, mini)
+            plotter.plot(f"stage4_{ii}", state)
+            state.save(fname)
 
 
 if __name__ == "__main__":
