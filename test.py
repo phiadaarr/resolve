@@ -206,3 +206,20 @@ def test_single_response(obs):
     mask = obs.mask
     op = rve.response.SingleResponse(dom, obs.uvw, obs.freq, mask[0], False)
     ift.extra.check_linear_operator(op, np.float64, np.complex128, only_r_linear=True)
+
+
+@rve.onlymaster
+def fvalid():
+    return 1.
+
+
+@rve.onlymaster
+def finvalid():
+    ift.from_random(ift.UnstructuredDomain(1))
+    return 1.
+
+
+def test_randomonmaster():
+    fvalid()
+    with pytest.raises(RuntimeError):
+        finvalid()
