@@ -186,6 +186,7 @@ def read_ms_i(
         # Determine which subset of rows/channels we need to input
         start = 0
         while start < nrow:
+            print("First pass:", f"{(start/nrow*100):.1f}%")
             stop = min(nrow, start + step)
             tflags = t.getcol("FLAG", startrow=start, nrow=stop - start)[
                 ..., pol_indices
@@ -239,6 +240,7 @@ def read_ms_i(
         # Read in data
         start, realstart = 0, 0
         while start < nrow:
+            print("Second pass:", f"{(start/nrow*100):.1f}%")
             stop = min(nrow, start + step)
             realstop = realstart + np.sum(active_rows[start:stop])
             if realstop > realstart:
@@ -291,19 +293,11 @@ def read_ms_i(
         else:
             ant1 = ant2 = time = None
 
-    print(
-        "# Rows: {} ({} fully flagged or not selected)".format(
-            nrow, nrow - vis.shape[0]
-        )
-    )
-    print("# Channels: {} ({} fully flagged)".format(nchan, nchan - vis.shape[1]))
+    print( "# Rows: {} ({} fully flagged or not selected)".format( nrow, nrow - vis.shape[0]))
+    print("# Channels: {} ({} fully flagged of not selected)".format(nchan, nchan - vis.shape[1]))
     print("# Correlations: {}".format(1 if pol_summation else vis.shape[2]))
     print("Full weights" if fullwgt else "Row-only weights")
-    print(
-        "{} % flagged or not selected".format(
-            (1.0 - np.sum(wgt != 0) / (nrow * nchan * npol)) * 100
-        )
-    )
+    print( "{} % flagged or not selected".format( (1.0 - np.sum(wgt != 0) / (nrow * nchan * npol)) * 100))
     freq = freq[active_channels]
 
     # blow up wgt to the right dimensions if necessary
