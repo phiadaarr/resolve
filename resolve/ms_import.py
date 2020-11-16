@@ -221,7 +221,6 @@ def read_ms_i(
             )
             start = stop
         nrealrows, nrealchan = np.sum(active_rows), np.sum(active_channels)
-        print(nrealchan)
         if nrealrows == 0 or nrealchan == 0:
             raise RuntimeError("Empty data set")
 
