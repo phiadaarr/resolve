@@ -101,7 +101,7 @@ def main():
 
     obs = rve.ms2observations('/data/CYG-D-6680-64CH-10S.ms', 'DATA', False, 0, 'stokesiavg')[0]
 
-    # obs = rve.Observation.load_from_npz('/data/g330field0.npz')
+    # obs = rve.Observation.load('/data/g330field0.npz')
 
     print('Frequencies:')
     print(obs.freq)

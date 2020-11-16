@@ -40,8 +40,8 @@ def test_save_and_load_observation(ms, with_calib_info, compress):
     for spw in range(rve.ms_n_spectral_windows(ms)):
         obs = rve.ms2observations(ms, 'DATA', with_calib_info, spectral_window=spw)
         for ob in obs:
-            ob.save_to_npz('foo.npz', compress)
-            ob1 = rve.Observation.load_from_npz('foo.npz')
+            ob.save('foo.npz', compress)
+            ob1 = rve.Observation.load('foo.npz')
             assert ob == ob1
 
 

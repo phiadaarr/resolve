@@ -22,4 +22,4 @@ if __name__ == '__main__':
     for ifield, oo in enumerate(obs):
         fname = f"{outname}field{ifield}.npz"
         print(f"Save {fname}")
-        oo.save_to_npz(fname, compr)
+        oo.save(fname, compr)

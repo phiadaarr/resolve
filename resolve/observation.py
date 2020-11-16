@@ -51,7 +51,7 @@ class Observation:
         return self.apply_flags(self._weight).size/self._weight.size
 
     @onlymaster
-    def save_to_npz(self, file_name, compress):
+    def save(self, file_name, compress):
         dct = dict(vis=self._vis,
                    weight=self._weight,
                    freq=self._freq,
@@ -65,7 +65,7 @@ class Observation:
         f(file_name, **dct)
 
     @staticmethod
-    def load_from_npz(file_name):
+    def load(file_name):
         dct = dict(np.load(file_name))
         antpos = []
         for ii in range(4):
