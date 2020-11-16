@@ -15,9 +15,13 @@ CFG = {"readonly": True, "ack": False}
 
 
 def ms2observations(
-    ms, data_column, with_calib_info, spectral_window, polarizations="all"
+    ms,
+    data_column,
+    with_calib_info,
+    spectral_window,
+    polarizations="all",
+    channel_slice=slice(None),
 ):
-    # FIXME Support to read in only selected channels
     """
 
     If WEIGHT_SPECTRUM is available this column is used for weighting.
@@ -42,6 +46,9 @@ def ms2observations(
                    on the fly.
         List of strings: Strings can be "XX", "YY", "XY", "YX", "LL", "LR",
                    "RL", "RR". The respective polarizations are loaded.
+    channel_slice : slice
+        Slice of selected channels. Default: select all channels
+        FIXME Select channels by indices
 
     Note
     ----
@@ -65,6 +72,7 @@ def ms2observations(
         raise ValueError
 
     # Spectral windows
+    my_assert_isinstance(channel_slice, slice)
     my_assert_isinstance(spectral_window, int)
     my_assert(spectral_window >= 0)
     my_assert(spectral_window < ms_n_spectral_windows(ms))
@@ -118,6 +126,7 @@ def ms2observations(
             pol_ind,
             pol_summation,
             with_calib_info,
+            channel_slice,
         )
         vis[wgt == 0] = 0.0
         vis = _ms2resolve_transpose(vis)
@@ -153,6 +162,7 @@ def read_ms_i(
     pol_indices,
     pol_summation,
     with_calib_info,
+    channel_slice,
 ):
     from casacore.tables import table
 
@@ -183,6 +193,10 @@ def read_ms_i(
             twgt = t.getcol(weightcol, startrow=start, nrow=stop - start)[
                 ..., pol_indices
             ]
+            if channel_slice != slice(None):
+                tchslcflags = np.ones_like(tflags)
+                tchslcflags[:, channel_slice] = False
+                tflags = np.logical_or(tflags, tchslcflags)
             if not fullwgt:
                 twgt = np.repeat(twgt[:, None], nchan, axis=1)
             my_asserteq(twgt.ndim, 3)
@@ -207,6 +221,7 @@ def read_ms_i(
             )
             start = stop
         nrealrows, nrealchan = np.sum(active_rows), np.sum(active_channels)
+        print(nrealchan)
         if nrealrows == 0 or nrealchan == 0:
             raise RuntimeError("Empty data set")
 
@@ -264,7 +279,7 @@ def read_ms_i(
                     tvis = np.sum(twgt * tvis, axis=-1)[..., None]
                     twgt = np.sum(twgt, axis=-1)[..., None]
                     tvis /= twgt
-                del(tflags)
+                del tflags
                 vis[realstart:realstop] = tvis
                 wgt[realstart:realstop] = twgt
 
@@ -285,7 +300,11 @@ def read_ms_i(
     print("# Channels: {} ({} fully flagged)".format(nchan, nchan - vis.shape[1]))
     print("# Correlations: {}".format(1 if pol_summation else vis.shape[2]))
     print("Full weights" if fullwgt else "Row-only weights")
-    print("{} % flagged or not selected".format((1.-np.sum(wgt != 0)/(nrow*nchan))*100))
+    print(
+        "{} % flagged or not selected".format(
+            (1.0 - np.sum(wgt != 0) / (nrow * nchan * npol)) * 100
+        )
+    )
     freq = freq[active_channels]
 
     # blow up wgt to the right dimensions if necessary
