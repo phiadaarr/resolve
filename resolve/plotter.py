@@ -89,6 +89,7 @@ class MfPlotter(Plotter):
         super(MfPlotter, self).__init__(fileformat, directory)
         self._spectra = []
         self._mf = []
+        self._multi1d = []
 
     @onlymaster
     def add_spectra(self, name, operator, directions):
@@ -105,7 +106,7 @@ class MfPlotter(Plotter):
         self._spectra.append({'title': str(name), 'operator': operator, 'directions': directions})
 
     @onlymaster
-    def add_mf(self, name, operator, directions=None, movie_length=2):
+    def add_multiple2d(self, name, operator, directions=None, movie_length=2):
         """
         Parameters
         ----------
@@ -115,6 +116,13 @@ class MfPlotter(Plotter):
         my_assert_isinstance(operator, ift.Operator)
         # FIXME Write interface checks
         self._mf.append({'title': str(name), 'operator': operator, 'directions': directions, 'movie_length': movie_length})
+
+    @onlymaster
+    def add_multiple1d(self, name, operator, **kwargs):
+        my_assert_isinstance(operator, ift.Operator)
+        my_asserteq(len(operator.target.shape), 2)
+        self._multi1d.append({'operator': operator, 'title': str(name),
+                              'kwargs': kwargs})
 
     @onlymaster
     def plot(self, identifier, state):
@@ -132,6 +140,12 @@ class MfPlotter(Plotter):
                 continue
             _plot_mf(state, op, fname, obj['directions'], obj['movie_length'])
 
+        for ii, obj in enumerate(self._multi1d):
+            op, fname = self._plot_init(obj, state, identifier)
+            if fname is None:
+                continue
+            _plot_multi_oned(state, op, obj['kwargs'], fname)
+
 
 def _plot_nifty(state, op, kwargs, fname):
     if isinstance(state, MinimizationState) and len(state) > 0:
@@ -148,6 +162,17 @@ def _plot_nifty(state, op, kwargs, fname):
             p.add(sc.mean, **kwargs)
             p.add(sc.var.sqrt()/sc.mean)
             p.output(nx=2, ny=1, xsize=2*UNIT, ysize=UNIT, name=fname)
+    else:
+        pos = state if isinstance(state, ift.MultiField) else state.mean
+        ift.single_plot(op.force(pos), **kwargs, name=fname)
+
+
+def _plot_multi_oned(state, op, kwargs, fname):
+    if isinstance(state, MinimizationState) and len(state) > 0:
+        raise NotImplementedError
+        p = ift.Plot()
+        p.add([op.force(ss) for ss in state], **kwargs)
+        p.output(xsize=UNIT, ysize=UNIT, name=fname)
     else:
         pos = state if isinstance(state, ift.MultiField) else state.mean
         ift.single_plot(op.force(pos), **kwargs, name=fname)

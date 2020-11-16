@@ -85,7 +85,7 @@ def mf_logsky(domain, freq, prefix, plotter):
     rve.my_asserteq(logsky.target[1], ift.DomainTuple.make(domain)[0])
     rve.my_asserteq(logsky.target[0].size, nfreq)
 
-    plotter.add_mf("logsky", logsky)
+    plotter.add_multiple2d("logsky", logsky)
     # FIXME Add all power spectra to plotter
     plotter.add_spectra("spectra", logsky, [[0.0002, 0.00035], [0.0004, 0.0001]])
     return logsky
@@ -146,7 +146,7 @@ def main():
 
         # FIXME
         # plotter.add('bayesian weighting', logweighting.exp())
-        # plotter.add('power spectrum bayesian weighting', logweighting.power_spectrum)
+        plotter.add_multiple1d('power spectrum bayesian weighting', cfm.power_spectrum)
     lh = rve.MfImagingLikelihood(obs, sky)
     plotter.add_histogram('normalized residuals', lh.normalized_residual)
     plotter.add_histogram('normalized residuals autowgts', lh_wgt.normalized_residual)
