@@ -85,7 +85,8 @@ class Plotter:
 
 def _plot_nifty(state, op, kwargs, fname):
     if isinstance(state, MinimizationState) and len(state) > 0:
-        if len(op.target) == 1 and isinstance(op.target[0], ift.RGSpace) and len(op.shape) == 1:
+        tgt = op.target
+        if len(tgt) == 1 and isinstance(tgt[0], (ift.RGSpace, ift.PowerSpace)) and len(tgt.shape) == 1:
             p = ift.Plot()
             p.add([op.force(ss) for ss in state], **kwargs)
             p.output(xsize=UNIT, ysize=UNIT, name=fname)

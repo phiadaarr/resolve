@@ -3,6 +3,8 @@
 # Author: Philipp Arras
 
 import functools
+from .util import my_asserteq
+import nifty7 as ift
 
 try:
     from mpi4py import MPI
@@ -24,5 +26,9 @@ def onlymaster(func):
     def wrapper(*args, **kwargs):
         if not master:
             return
-        return func(*args, **kwargs)
+        state0 = ift.random.getState()
+        f = func(*args, **kwargs)
+        state1 = ift.random.getState()
+        my_asserteq(state0, state1)
+        return f
     return wrapper

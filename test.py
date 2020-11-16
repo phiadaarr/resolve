@@ -42,6 +42,18 @@ def test_save_and_load_observation(ms, with_calib_info, compress):
             assert ob == ob1
 
 
+@pmp("slc", [slice(3), slice(14, 15), slice(None, None, None), slice(None, None, 5)])
+def test_sliced_readin(slc):
+    ms = f"{direc}CYG-D-6680-64CH-10S.ms"
+    obs0 = rve.ms2observations(ms, "DATA", False, 0)[0]
+    obs = rve.ms2observations(ms, "DATA", False, 0, channel_slice=slc)[0]
+    ch0 = obs0.weight.val[..., slc]
+    ch = obs.weight.val
+    assert ch0.ndim == 3
+    assert ch0.shape == ch.shape
+    np.testing.assert_equal(ch0, ch)
+
+
 def try_operator(op):
     pos = ift.from_random(op.domain)
     op(pos)
@@ -206,3 +218,20 @@ def test_single_response(obs):
     mask = obs.mask
     op = rve.response.SingleResponse(dom, obs.uvw, obs.freq, mask[0], False)
     ift.extra.check_linear_operator(op, np.float64, np.complex128, only_r_linear=True)
+
+
+@rve.onlymaster
+def fvalid():
+    return 1.
+
+
+@rve.onlymaster
+def finvalid():
+    ift.from_random(ift.UnstructuredDomain(1))
+    return 1.
+
+
+def test_randomonmaster():
+    fvalid()
+    with pytest.raises(RuntimeError):
+        finvalid()

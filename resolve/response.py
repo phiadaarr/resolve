@@ -83,11 +83,12 @@ class SingleResponse(ift.LinearOperator):
             'epsilon': epsilon(),
             'do_wgridding': wgridding(),
             'nthreads': nthreads(),
-            'flip_v': True
+            'flip_v': True,
         }
         self._vol = self._domain[0].scalar_dvol
         self._target_dtype = np.complex64 if single_precision else np.complex128
         self._domain_dtype = np.float32 if single_precision else np.float64
+        self._verbt, self._verbadj = True, True
 
     def apply(self, x, mode):
         self._check_input(x, mode)
@@ -95,6 +96,9 @@ class SingleResponse(ift.LinearOperator):
         x = x.val.astype(self._domain_dtype if mode == self.TIMES else self._target_dtype)
         if mode == self.TIMES:
             args1 = {'dirty': x}
+            if self._verbt:
+                args1['verbosity'] = True
+                self._verbt = False
             f = dirty2vis
             # FIXME Use vis_out keyword of wgridder
         else:
@@ -103,6 +107,9 @@ class SingleResponse(ift.LinearOperator):
                 'npix_x': self._domain[0].shape[0],
                 'npix_y': self._domain.shape[1]
             }
+            if self._verbadj:
+                args1['verbosity'] = True
+                self._verbadj = False
             f = vis2dirty
         res = ift.makeField(self._tgt(mode), f(**self._args, **args1)*self._vol)
         my_asserteq(res.dtype, self._target_dtype if mode == self.TIMES else self._domain_dtype)
