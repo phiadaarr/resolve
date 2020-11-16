@@ -9,7 +9,7 @@ from .antenna_positions import AntennaPositions
 from .direction import Direction
 from .observation import Observation
 from .polarization import Polarization
-from .util import my_assert, my_asserteq
+from .util import my_assert, my_asserteq, my_assert_isinstance
 
 CFG = {"readonly": True, "ack": False}
 
@@ -65,7 +65,8 @@ def ms2observations(
         raise ValueError
 
     # Spectral windows
-    my_assert(isinstance(spectral_window, int) and spectral_window >= 0)
+    my_assert_isinstance(spectral_window, int)
+    my_assert(spectral_window >= 0)
     my_assert(spectral_window < ms_n_spectral_windows(ms))
     with table(join(ms, "SPECTRAL_WINDOW"), **CFG) as t:
         freq = t.getcol("CHAN_FREQ")[spectral_window]
@@ -108,7 +109,7 @@ def ms2observations(
     # FIXME Import name of source
     observations = []
     for ifield, direction in enumerate(dirs):
-        uvw, ant1, ant2, time, freq_out, vis, wgt, flags = read_ms_i(
+        uvw, ant1, ant2, time, freq_out, vis, wgt = read_ms_i(
             ms,
             data_column,
             freq,
@@ -118,13 +119,6 @@ def ms2observations(
             pol_summation,
             with_calib_info,
         )
-        if np.any(flags):
-            if not wgt.flags.writeable:
-                # This is necessary because otherwise we can store the weight
-                # array with less memory (created with np.broadcast_to)
-                wgt = wgt.copy()
-            wgt[flags] = 0.0
-        del flags
         vis[wgt == 0] = 0.0
         vis = _ms2resolve_transpose(vis)
         wgt = _ms2resolve_transpose(wgt)
@@ -189,12 +183,14 @@ def read_ms_i(
             twgt = t.getcol(weightcol, startrow=start, nrow=stop - start)[
                 ..., pol_indices
             ]
+            if not fullwgt:
+                twgt = np.repeat(twgt[:, None], nchan, axis=1)
+            my_asserteq(twgt.ndim, 3)
             npol = tflags.shape[2]
             if pol_summation:
-                tflags = np.any(tflags.astype(np.bool), axis=-1)
-                twgt = np.sum(twgt, axis=-1)
-            if twgt.ndim == 3:  # with WEIGHT_SPECTRUM
-                tflags[twgt == 0] = True
+                tflags = np.any(tflags.astype(np.bool), axis=2)[..., None]
+                twgt = np.sum(twgt, axis=2)[..., None]
+            tflags[twgt == 0] = True
 
             # Select field and spectral window
             tfieldid = t.getcol("FIELD_ID", startrow=start, nrow=stop - start)
@@ -202,10 +198,10 @@ def read_ms_i(
             tspw = t.getcol("DATA_DESC_ID", startrow=start, nrow=stop - start)
             tflags[tspw != spectral_window] = True
 
-            if not pol_summation:
-                tflags = np.all(tflags, axis=2)
-            assert tflags.ndim == 2
-            active_rows[start:stop] = np.invert(np.all(tflags, axis=-1))
+            # Inactive if all polarizations are flagged
+            assert tflags.ndim == 3
+            tflags = np.all(tflags, axis=2)
+            active_rows[start:stop] = np.invert(np.all(tflags, axis=1))
             active_channels = np.logical_or(
                 active_channels, np.invert(np.all(tflags, axis=0))
             )
@@ -214,8 +210,7 @@ def read_ms_i(
         if nrealrows == 0 or nrealchan == 0:
             raise RuntimeError("Empty data set")
 
-        # Read in data
-        start, realstart = 0, 0
+        # Create output arrays
         if pol_summation:
             npol = 1
         else:
@@ -224,12 +219,11 @@ def read_ms_i(
             else:
                 npol = npol
         shp = (nrealrows, nrealchan, npol)
-        # If pol_summation we need the big shape because the flag information
-        # is integrated into the weight array.
-        wgtshp = shp if fullwgt or pol_summation else (nrealrows, npol)
         vis = np.empty(shp, dtype=np.complex64)
-        flags = np.empty(shp, dtype=np.bool)
-        wgt = np.empty(wgtshp, dtype=np.float32)
+        wgt = np.empty(shp, dtype=np.float32)
+
+        # Read in data
+        start, realstart = 0, 0
         while start < nrow:
             stop = min(nrow, start + step)
             realstop = realstart + np.sum(active_rows[start:stop])
@@ -240,10 +234,11 @@ def read_ms_i(
                     ..., pol_indices
                 ]
                 assert twgt.dtype == np.float32
+                if not fullwgt:
+                    twgt = np.repeat(twgt[:, None], nchan, axis=1)
                 if not allrows:
                     twgt = twgt[active_rows[start:stop]]
-                if fullwgt:
-                    twgt = twgt[:, active_channels]
+                twgt = twgt[:, active_channels]
 
                 tvis = t.getcol(data_column, startrow=start, nrow=stop - start)[
                     ..., pol_indices
@@ -259,22 +254,19 @@ def read_ms_i(
                 if not allrows:
                     tflags = tflags[active_rows[start:stop]]
                 tflags = tflags[:, active_channels]
-                #                tflags[twgt==0] = True
+
+                assert twgt.ndim == tflags.ndim == 3
+                assert tflags.dtype == np.bool
+                twgt = twgt * (~tflags)
                 if pol_summation:
-                    if not fullwgt:
-                        twgt = twgt[:, None]
-                    assert tflags.dtype == np.bool
                     assert twgt.shape[2] == 2
                     # Noise-weighted average
-                    twgt = twgt * (~tflags)
                     tvis = np.sum(twgt * tvis, axis=-1)[..., None]
                     twgt = np.sum(twgt, axis=-1)[..., None]
                     tvis /= twgt
-                    # Can deal also with one of two visibilities flagged
-                    tflags = np.all(tflags.astype(np.bool), axis=-1)[..., None]
+                del(tflags)
                 vis[realstart:realstop] = tvis
                 wgt[realstart:realstop] = twgt
-                flags[realstart:realstop] = tflags
 
             start, realstart = stop, realstop
         uvw = t.getcol("UVW")[active_rows]
@@ -293,13 +285,10 @@ def read_ms_i(
     print("# Channels: {} ({} fully flagged)".format(nchan, nchan - vis.shape[1]))
     print("# Correlations: {}".format(1 if pol_summation else vis.shape[2]))
     print("Full weights" if fullwgt else "Row-only weights")
-    nflagged = np.sum(flags) + (nrow - nrealrows) * nchan + (nchan - nrealchan) * nrow
-    print("{} % flagged or not selected".format(nflagged / (nrow * nchan) * 100))
+    print("{} % flagged or not selected".format((1.-np.sum(wgt != 0)/(nrow*nchan))*100))
     freq = freq[active_channels]
 
     # blow up wgt to the right dimensions if necessary
-    if not fullwgt and not pol_summation:
-        wgt = np.broadcast_to(wgt[:, None], vis.shape)
     my_asserteq(wgt.shape, vis.shape)
     return (
         np.ascontiguousarray(uvw),
@@ -308,8 +297,7 @@ def read_ms_i(
         time,
         np.ascontiguousarray(freq),
         np.ascontiguousarray(vis),
-        np.ascontiguousarray(wgt),  # if fullwgt else wgt,
-        flags,
+        np.ascontiguousarray(wgt),
     )
 
 
