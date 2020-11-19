@@ -1,0 +1,5 @@
+#+TITLE: The future
+#+AUTHOR: Philipp Arras
+
+* To be investigated
+** Baseline-dependent averaging [[https://arxiv.org/pdf/1802.09321.pdf][arXiv]]
