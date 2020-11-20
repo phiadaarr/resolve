@@ -26,6 +26,9 @@ class Observation:
         my_asserteq(nrows, vis.shape[1])
         my_assert(np.all(weight >= 0.))
 
+        vis.flags.writeable = False
+        weight.flags.writeable = False
+
         self._antpos = antenna_positions
         self._vis = vis
         self._weight = weight
