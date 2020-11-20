@@ -77,8 +77,9 @@ class MfResponse(ift.LinearOperator):
             res = np.empty(self._tgt(mode).shape)
             for band_index, sel, rr in self._r:
                 assert x.shape[0] == 1
-                # FIXME Do we need ascontiguousarray here?
-                res[band_index] = rr.adjoint(ift.makeField(rr.target, x[0][..., sel])).val
+                # FIXME Is ascontiguousarray really a good idea here?
+                inp = np.ascontiguousarray(x[0][..., sel])
+                res[band_index] = rr.adjoint(ift.makeField(rr.target, inp)).val
                 empty[band_index] = False
             for band_index in np.where(empty)[0]:
                 # Support empty imaging bands even though this might be a waste

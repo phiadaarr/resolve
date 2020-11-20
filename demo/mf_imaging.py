@@ -16,8 +16,6 @@ import resolve as rve
 
 def mf_logsky(domain, freq, prefix, plotter):
     assert np.all(np.diff(freq) > 0)  # need ordered frequencies
-
-    # freq = freq[::5]  # Fewer imaging bands, FIXME write interface
     nfreq = len(freq)
     freqdom = rve.IRGSpace(freq)
     assert freqdom.size == nfreq
@@ -143,13 +141,13 @@ def main():
         interpolation = rve.MfWeightingInterpolation(effuv, logweighting.target)
         weightop = ift.makeOp(obs.weight) @ (interpolation @ logweighting.exp())**(-2)
         lh_wgt = rve.MfImagingLikelihoodVariableCovariance(obs, sky, weightop)
+        plotter.add_histogram('normalized residuals autowgts', lh_wgt.normalized_residual)
 
         # FIXME
         # plotter.add('bayesian weighting', logweighting.exp())
         plotter.add_multiple1d('power spectrum bayesian weighting', cfm.power_spectrum)
     lh = rve.MfImagingLikelihood(obs, sky)
     plotter.add_histogram('normalized residuals', lh.normalized_residual)
-    plotter.add_histogram('normalized residuals autowgts', lh_wgt.normalized_residual)
 
     minimizer = ift.NewtonCG(ift.GradientNormController(name='newton', iteration_limit=5))
 
