@@ -1,0 +1,14 @@
+* How to convert a measurement set to a npz file with Docker
+
+Assume that the measurement set folder is located at
+`/data/<ms-folder>`. Then the following commands create the npz-files
+`/data/<outputname>field<i>.npz` from it.
+
+#+BEGIN_SRC sh
+docker build -f misc/Dockerfile -t <tag> .
+docker run -v /data:/mnt <tag> mnt/<ms-folder> mnt/<outputname>
+#+END_SRC
+
+Note that the first command needs to be run from the project root of
+resolve. It installs the current checked out version of resolve into
+the Docker container.

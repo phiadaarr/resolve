@@ -13,7 +13,7 @@ setup(
     packages=find_packages(include=["resolve", "resolve.*"]),
     zip_safe=True,
     dependency_links=[],
-    install_requires=["nifty7", "ducc0"],
+    # install_requires=["nifty7", "ducc0"],
     license="GPLv3",
     classifiers=[
         "Development Status :: 3 - Alpha", "Topic :: Utilities",

@@ -130,7 +130,7 @@ def main():
     ic = ift.AbsDeltaEnergyController(0.1, 3, 700, name="Sampling")
     ham = ift.StandardHamiltonian(lh, ic)
     for ii in range(30):
-        if ii < 10:
+        if ii < 5:
             mini = ift.VL_BFGS(ift.GradientNormController(name="newton", iteration_limit=15))
         else:
             mini = ift.NewtonCG(ift.GradientNormController(name="newton", iteration_limit=15))

@@ -60,7 +60,7 @@ def ms2observations(
 
     if ms[-1] == "/":
         ms = ms[:-1]
-    if not isdir(ms) or splitext(ms)[1] != ".ms":
+    if not isdir(ms) or splitext(ms)[1].lower() != ".ms":
         raise RuntimeError
     if isinstance(polarizations, str):
         polarizations = [polarizations]
@@ -177,6 +177,7 @@ def read_ms_i(
         my_asserteq(len(pol_indices), 2)
 
     with table(name, readonly=True, ack=False) as t:
+        # FIXME Get rid of fullwgt
         fullwgt, weightcol = _determine_weighting(t)
         nrow = t.nrows()
         active_rows = np.ones(nrow, dtype=np.bool)
