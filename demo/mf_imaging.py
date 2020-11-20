@@ -115,8 +115,13 @@ def main():
     fov = np.array([3, 3])*rve.ARCMIN2RAD
     # Do not use powers of two here, otherwise super slow
     npix = np.array([250, 250])
-    dom = ift.RGSpace(npix, fov/npix)
 
+    if False:
+        R = rve.response.MfResponse(obs, rve.IRGSpace(obs.freq), ift.RGSpace(npix, fov/npix))
+        j = R.adjoint(obs.vis*obs.weight)
+        rve.plotter._plot_mf(rve.MinimizationState(j, []), ift.ScalingOperator(j.domain, 1), "out", None, 3)
+
+    dom = ift.RGSpace(npix, fov/npix)
     plotter = rve.MfPlotter('png', 'plots')
     logsky = mf_logsky(dom, obs.freq, 'sky', plotter)
 
