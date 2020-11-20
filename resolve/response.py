@@ -49,11 +49,12 @@ class MfResponse(ift.LinearOperator):
         my_asserteq(len(set(band_indices)), domain[0].size)
         self._r = []
         sp = observation.vis.dtype == np.complex64
+        mask = observation.mask
         for band_index in np.unique(band_indices):
             sel = band_indices == band_index
-            assert observation.mask.shape[0] == 1
+            assert mask.shape[0] == 1
             r = SingleResponse(domain[1], observation.uvw, observation.freq[sel],
-                               observation.mask[0, :, sel].T, sp)
+                               mask[0, :, sel].T, sp)
             self._r.append((band_index, sel, r))
         # Double check that all channels are written to
         check = np.zeros(len(data_freq))
