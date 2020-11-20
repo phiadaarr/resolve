@@ -8,7 +8,7 @@ import numpy as np
 
 import nifty7 as ift
 import resolve as rve
-from os.path import isfile
+from os.path import isfile, splitext
 
 
 def main():
@@ -20,7 +20,10 @@ def main():
 
     rve.set_nthreads(args.j)
     rve.set_wgridding(False)
-    obs = rve.ms2observations(args.ms, "DATA", False, 0, "stokesiavg")[0]
+    if splitext(args.ms) == ".npz":
+        obs = rve.Observation.load(args.ms)
+    else:
+        obs = rve.ms2observations(args.ms, "DATA", False, 0, "stokesiavg")[0]
 
     rve.set_epsilon(1 / 10 / obs.max_snr())
     fov = np.array([3, 1.5]) * rve.ARCMIN2RAD
