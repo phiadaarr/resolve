@@ -123,7 +123,8 @@ def main():
 
     dom = ift.RGSpace(npix, fov/npix)
     plotter = rve.MfPlotter('png', 'plots')
-    logsky = mf_logsky(dom, obs.freq, 'sky', plotter)
+    jump = 15
+    logsky = mf_logsky(dom, obs.freq[jump//2::jump], 'sky', plotter)
 
     # Plot prior samples
     if False:
