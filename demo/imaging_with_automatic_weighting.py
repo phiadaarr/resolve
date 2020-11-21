@@ -20,7 +20,7 @@ def main():
 
     rve.set_nthreads(args.j)
     rve.set_wgridding(False)
-    if splitext(args.ms) == ".npz":
+    if splitext(args.ms)[1] == ".npz":
         obs = rve.Observation.load(args.ms)
     else:
         obs = rve.ms2observations(args.ms, "DATA", False, 0, "stokesiavg")[0]
