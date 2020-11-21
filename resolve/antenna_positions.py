@@ -11,6 +11,7 @@ class AntennaPositions:
     """Summarizes all information on antennas and baselines. If calibration is
     performed this class stores also antenna indices and time information.
     For imaging only this is not necessary."""
+
     # FIXME Split this class into two. One for only imaging, one also for calibration
     def __init__(self, uvw, ant1=None, ant2=None, time=None):
         if ant1 is None:
@@ -52,13 +53,12 @@ class AntennaPositions:
     def move_time(self, t0):
         if self.only_imaging:
             raise RuntimeError
-        return AntennaPositions(self._uvw, self._ant1, self._ant2,
-                                self._time+t0)
+        return AntennaPositions(self._uvw, self._ant1, self._ant2, self._time + t0)
 
     def __eq__(self, other):
         if not isinstance(other, AntennaPositions):
             return False
-        return compare_attributes(self, other, ('_uvw', '_time', '_ant1', '_ant2'))
+        return compare_attributes(self, other, ("_uvw", "_time", "_ant1", "_ant2"))
 
     def __len__(self):
         return self._uvw.shape[0]
@@ -66,8 +66,9 @@ class AntennaPositions:
     def __getitem__(self, slc):
         if self.only_imaging:
             return AntennaPositions(self._uvw[slc])
-        return AntennaPositions(self._uvw[slc], self._ant1[slc],
-                                self._ant2[slc], self._time[slc])
+        return AntennaPositions(
+            self._uvw[slc], self._ant1[slc], self._ant2[slc], self._time[slc]
+        )
 
     @property
     def uvw(self):

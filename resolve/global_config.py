@@ -16,7 +16,7 @@ def wgridding():
 def set_wgridding(val):
     global _wgridding
     _wgridding = bool(val)
-    print(f'Set wgridding to {wgridding()}')
+    print(f"Set wgridding to {wgridding()}")
 
 
 def epsilon():
@@ -26,7 +26,7 @@ def epsilon():
 def set_epsilon(val):
     global _epsilon
     _epsilon = float(val)
-    print(f'Set epsilon to {epsilon()}')
+    print(f"Set epsilon to {epsilon()}")
 
 
 def nthreads():
@@ -37,4 +37,4 @@ def set_nthreads(val):
     global _nthreads
     _nthreads = int(val)
     ift.fft.set_nthreads(int(val))
-    print(f'Set nthreads to {nthreads()}')
+    print(f"Set nthreads to {nthreads()}")

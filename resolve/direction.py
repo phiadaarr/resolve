@@ -20,7 +20,7 @@ class Direction:
         return self._e
 
     def __repr__(self):
-        return f'Direction({self._pc}, equinox {self._e})'
+        return f"Direction({self._pc}, equinox {self._e})"
 
     def to_list(self):
         return [*self._pc, self._e]
@@ -32,4 +32,4 @@ class Direction:
     def __eq__(self, other):
         if not isinstance(other, Direction):
             return False
-        return compare_attributes(self, other, ('_pc', '_e'))
+        return compare_attributes(self, other, ("_pc", "_e"))

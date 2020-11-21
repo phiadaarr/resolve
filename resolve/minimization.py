@@ -7,17 +7,20 @@ import pickle
 import nifty7 as ift
 
 from .mpi import comm, onlymaster
-from .util import (compare_attributes, my_assert, my_assert_isinstance,
-                   my_asserteq)
+from .util import compare_attributes, my_assert, my_assert_isinstance, my_asserteq
 
 
-def simple_minimize(operator, position, n_samples, minimizer, constants=[], point_estimates=[]):
+def simple_minimize(
+    operator, position, n_samples, minimizer, constants=[], point_estimates=[]
+):
     mini = Minimization(operator, position, n_samples, constants, point_estimates, comm)
     return mini.minimize(minimizer)
 
 
 class Minimization:
-    def __init__(self, operator, position, n_samples, constants=[], point_estimates=[], comm=None):
+    def __init__(
+        self, operator, position, n_samples, constants=[], point_estimates=[], comm=None
+    ):
         n_samples = int(n_samples)
         self._position = position
         position = position.extract(operator.domain)
@@ -37,7 +40,7 @@ class Minimization:
                 "nanisinf": True,
             }
             self._e = ift.MetricGaussianKL.make(**dct)
-            self._n, self._m = dct['n_samples'], dct['mirror_samples']
+            self._n, self._m = dct["n_samples"], dct["mirror_samples"]
 
     def minimize(self, minimizer):
         self._e, _ = minimizer(self._e)
@@ -45,7 +48,7 @@ class Minimization:
         if self._n == 0:
             return MinimizationState(position, [])
         samples = list(self._e.samples)
-        my_asserteq(len(samples), 2*self._n if self._m else self._n)
+        my_asserteq(len(samples), 2 * self._n if self._m else self._n)
         return MinimizationState(position, samples, self._m)
 
 
@@ -64,17 +67,17 @@ class MinimizationState:
             raise TypeError
         if key >= len(self) or key < 0:
             raise KeyError
-        if self._mirror and key >= len(self)//2:
+        if self._mirror and key >= len(self) // 2:
             return self._position.unite(-self._samples[key])
         return self._position.unite(self._samples[key])
 
     def __len__(self):
-        return (2 if self._mirror else 1)*len(self._samples)
+        return (2 if self._mirror else 1) * len(self._samples)
 
     def __eq__(self, other):
         if not isinstance(other, MinimizationState):
             return False
-        return compare_attributes(self, other, ('_samples', '_position', '_mirror'))
+        return compare_attributes(self, other, ("_samples", "_position", "_mirror"))
 
     @property
     def mean(self):
@@ -86,13 +89,16 @@ class MinimizationState:
 
     @onlymaster
     def save(self, file_name):
-        with open(file_name, 'wb') as f:
-            pickle.dump([self._position, self._samples, self._mirror],
-                        f, pickle.HIGHEST_PROTOCOL)
+        with open(file_name, "wb") as f:
+            pickle.dump(
+                [self._position, self._samples, self._mirror],
+                f,
+                pickle.HIGHEST_PROTOCOL,
+            )
 
     @staticmethod
     def load(file_name):
-        with open(file_name, 'rb') as f:
+        with open(file_name, "rb") as f:
             position, samples, mirror = pickle.load(f)
         my_assert_isinstance(position, (ift.MultiField, ift.Field))
         my_assert_isinstance(mirror, bool)

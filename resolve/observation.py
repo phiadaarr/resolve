@@ -11,8 +11,7 @@ from .constants import SPEEDOFLIGHT
 from .direction import Direction
 from .mpi import onlymaster
 from .polarization import Polarization
-from .util import (compare_attributes, my_assert, my_assert_isinstance,
-                   my_asserteq)
+from .util import compare_attributes, my_assert, my_assert_isinstance, my_asserteq
 
 
 class Observation:
@@ -24,7 +23,7 @@ class Observation:
         my_asserteq(weight.shape, vis.shape)
         my_asserteq(vis.shape, (len(polarization), nrows, len(freq)))
         my_asserteq(nrows, vis.shape[1])
-        my_assert(np.all(weight >= 0.))
+        my_assert(np.all(weight >= 0.0))
 
         vis.flags.writeable = False
         weight.flags.writeable = False
@@ -37,33 +36,35 @@ class Observation:
         self._direction = direction
 
     def apply_flags(self, arr):
-        return arr[self._weight != 0.]
+        return arr[self._weight != 0.0]
 
     @property
     def flags(self):
-        return self._weight == 0.
+        return self._weight == 0.0
 
     @property
     def mask(self):
-        return self._weight > 0.
+        return self._weight > 0.0
 
     def max_snr(self):
-        return np.max(np.abs(self.apply_flags(self._vis*np.sqrt(self._weight))))
+        return np.max(np.abs(self.apply_flags(self._vis * np.sqrt(self._weight))))
 
     def fraction_useful(self):
-        return self.apply_flags(self._weight).size/self._weight.size
+        return self.apply_flags(self._weight).size / self._weight.size
 
     @onlymaster
     def save(self, file_name, compress):
-        dct = dict(vis=self._vis,
-                   weight=self._weight,
-                   freq=self._freq,
-                   polarization=self._polarization.to_list(),
-                   direction=self._direction.to_list())
+        dct = dict(
+            vis=self._vis,
+            weight=self._weight,
+            freq=self._freq,
+            polarization=self._polarization.to_list(),
+            direction=self._direction.to_list(),
+        )
         for ii, vv in enumerate(self._antpos.to_list()):
             if vv is None:
                 vv = np.array([])
-            dct[f'antpos{ii}'] = vv
+            dct[f"antpos{ii}"] = vv
         f = np.savez_compressed if compress else np.savez
         f(file_name, **dct)
 
@@ -72,32 +73,58 @@ class Observation:
         dct = dict(np.load(file_name))
         antpos = []
         for ii in range(4):
-            val = dct[f'antpos{ii}']
+            val = dct[f"antpos{ii}"]
             if val.size == 0:
                 val = None
             antpos.append(val)
-        pol = Polarization.from_list(dct['polarization'])
-        direction = Direction.from_list(dct['direction'])
-        return Observation(AntennaPositions.from_list(antpos), dct['vis'],
-                           dct['weight'], pol, dct['freq'], direction)
+        pol = Polarization.from_list(dct["polarization"])
+        direction = Direction.from_list(dct["direction"])
+        return Observation(
+            AntennaPositions.from_list(antpos),
+            dct["vis"],
+            dct["weight"],
+            pol,
+            dct["freq"],
+            direction,
+        )
 
     def __eq__(self, other):
         if not isinstance(other, Observation):
             return False
-        if self._vis.dtype != other._vis.dtype or self._weight.dtype != other._weight.dtype:
+        if (
+            self._vis.dtype != other._vis.dtype
+            or self._weight.dtype != other._weight.dtype
+        ):
             return False
-        return compare_attributes(self, other, ('_direction', '_polarization', '_freq', '_antpos', '_vis', '_weight'))
+        return compare_attributes(
+            self,
+            other,
+            ("_direction", "_polarization", "_freq", "_antpos", "_vis", "_weight"),
+        )
 
     def __getitem__(self, slc):
-        return Observation(self._antpos[slc], self._vis[:, slc], self._weight[:, slc], self._polarization, self._freq, self._direction)
+        return Observation(
+            self._antpos[slc],
+            self._vis[:, slc],
+            self._weight[:, slc],
+            self._polarization,
+            self._freq,
+            self._direction,
+        )
 
     def delete_antenna_information(self):
         raise NotImplementedError
 
     def move_time(self, t0):
         antpos = self._antpos.move_time(t0)
-        return Observation(antpos, self._vis, self._weight, self._polarization,
-                           self._freq, self._direction)
+        return Observation(
+            antpos,
+            self._vis,
+            self._weight,
+            self._polarization,
+            self._freq,
+            self._direction,
+        )
 
     @property
     def uvw(self):
@@ -108,18 +135,18 @@ class Observation:
         return self._antpos
 
     def effective_uvw(self):
-        out = np.einsum("ij,k->ijk", self.uvw, self._freq/SPEEDOFLIGHT)
+        out = np.einsum("ij,k->ijk", self.uvw, self._freq / SPEEDOFLIGHT)
         my_asserteq(out.shape, (self.nrow, 3, self.nfreq))
         return out
 
     def effective_uv(self):
-        out = np.einsum("ij,k->ijk", self.uvw[:, 0:2], self._freq/SPEEDOFLIGHT)
+        out = np.einsum("ij,k->ijk", self.uvw[:, 0:2], self._freq / SPEEDOFLIGHT)
         my_asserteq(out.shape, (self.nrow, 2, self.nfreq))
         return out
 
     def effective_uvwlen(self):
         uvlen = np.linalg.norm(self.uvw, axis=1)
-        return np.outer(uvlen, self._freq/SPEEDOFLIGHT)
+        return np.outer(uvlen, self._freq / SPEEDOFLIGHT)
 
     @property
     def vis(self):

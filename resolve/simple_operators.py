@@ -14,7 +14,9 @@ class AddEmptyDimension(ift.LinearOperator):
         my_asserteq(len(self._domain.shape), 1)
         my_assert_isinstance(self._domain[0], ift.UnstructuredDomain)
         tmp = ift.UnstructuredDomain(1)
-        self._target = ift.makeDomain((tmp, ift.UnstructuredDomain((self._domain.shape[0])), tmp))
+        self._target = ift.makeDomain(
+            (tmp, ift.UnstructuredDomain((self._domain.shape[0])), tmp)
+        )
         self._capability = self._all_ops
 
     def apply(self, x, mode):

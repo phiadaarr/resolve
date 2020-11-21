@@ -44,7 +44,7 @@ class MfResponse(ift.LinearOperator):
         data_freq = observation.freq
         my_assert(np.all(np.diff(data_freq) > 0))
         sky_freq = np.array(domain[0].coordinates)
-        band_indices = [np.argmin(np.abs(ff-sky_freq)) for ff in data_freq]
+        band_indices = [np.argmin(np.abs(ff - sky_freq)) for ff in data_freq]
         # Make sure that no index is wasted
         my_asserteq(len(set(band_indices)), domain[0].size)
         self._r = []
@@ -53,8 +53,9 @@ class MfResponse(ift.LinearOperator):
         for band_index in np.unique(band_indices):
             sel = band_indices == band_index
             assert mask.shape[0] == 1
-            r = SingleResponse(domain[1], observation.uvw, observation.freq[sel],
-                               mask[0, :, sel].T, sp)
+            r = SingleResponse(
+                domain[1], observation.uvw, observation.freq[sel], mask[0, :, sel].T, sp
+            )
             self._r.append((band_index, sel, r))
         # Double check that all channels are written to
         check = np.zeros(len(data_freq))
@@ -131,18 +132,20 @@ class SingleResponse(ift.LinearOperator):
         # FIXME Currently only the response uses single_precision if possible.
         # Could be rolled out to the whole likelihood
         self._domain = ift.DomainTuple.make(domain)
-        self._target = ift.makeDomain(ift.UnstructuredDomain(ss) for ss in (uvw.shape[0], freq.size))
+        self._target = ift.makeDomain(
+            ift.UnstructuredDomain(ss) for ss in (uvw.shape[0], freq.size)
+        )
         self._capability = self.TIMES | self.ADJOINT_TIMES
         self._args = {
-            'uvw': uvw,
-            'freq': freq,
-            'mask': mask.astype(np.uint8),
-            'pixsize_x': self._domain[0].distances[0],
-            'pixsize_y': self._domain[0].distances[1],
-            'epsilon': epsilon(),
-            'do_wgridding': wgridding(),
-            'nthreads': nthreads(),
-            'flip_v': True,
+            "uvw": uvw,
+            "freq": freq,
+            "mask": mask.astype(np.uint8),
+            "pixsize_x": self._domain[0].distances[0],
+            "pixsize_y": self._domain[0].distances[1],
+            "epsilon": epsilon(),
+            "do_wgridding": wgridding(),
+            "nthreads": nthreads(),
+            "flip_v": True,
         }
         self._vol = self._domain[0].scalar_dvol
         self._target_dtype = np.complex64 if single_precision else np.complex128
@@ -153,26 +156,30 @@ class SingleResponse(ift.LinearOperator):
         self._check_input(x, mode)
         # FIXME mtr Is the sky in single precision mode single or double?
         # my_asserteq(x.dtype, self._domain_dtype if mode == self.TIMES else self._target_dtype)
-        x = x.val.astype(self._domain_dtype if mode == self.TIMES else self._target_dtype)
+        x = x.val.astype(
+            self._domain_dtype if mode == self.TIMES else self._target_dtype
+        )
         if mode == self.TIMES:
-            args1 = {'dirty': x}
+            args1 = {"dirty": x}
             if self._verbt:
-                args1['verbosity'] = True
+                args1["verbosity"] = True
                 self._verbt = False
             f = dirty2vis
             # FIXME Use vis_out keyword of wgridder
         else:
             # FIXME assert correct strides for visibilities
-            my_assert(x.flags['C_CONTIGUOUS'])
+            my_assert(x.flags["C_CONTIGUOUS"])
             args1 = {
-                'vis': x,
-                'npix_x': self._domain[0].shape[0],
-                'npix_y': self._domain.shape[1]
+                "vis": x,
+                "npix_x": self._domain[0].shape[0],
+                "npix_y": self._domain.shape[1],
             }
             if self._verbadj:
-                args1['verbosity'] = True
+                args1["verbosity"] = True
                 self._verbadj = False
             f = vis2dirty
-        res = ift.makeField(self._tgt(mode), f(**self._args, **args1)*self._vol)
-        my_asserteq(res.dtype, self._target_dtype if mode == self.TIMES else self._domain_dtype)
+        res = ift.makeField(self._tgt(mode), f(**self._args, **args1) * self._vol)
+        my_asserteq(
+            res.dtype, self._target_dtype if mode == self.TIMES else self._domain_dtype
+        )
         return res

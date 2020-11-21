@@ -19,7 +19,7 @@ def _get_mask(observation):
     vis = observation.vis
     flags = observation.flags
     if not np.any(flags):
-        return ift.ScalingOperator(vis.domain, 1.), vis, observation.weight
+        return ift.ScalingOperator(vis.domain, 1.0), vis, observation.weight
     mask = ift.MaskOperator(ift.makeField(vis.domain, flags))
     return mask, mask(vis), mask(observation.weight)
 
@@ -54,9 +54,9 @@ def _build_gauss_lh_nres(op, mean, invcov):
 def _build_varcov_gauss_lh_nres(residual, inverse_covariance, dtype):
     my_assert_isinstance(residual, inverse_covariance, ift.Operator)
     my_asserteq(residual.target, inverse_covariance.target)
-    op = residual.ducktape_left('r') + inverse_covariance.ducktape_left('ic')
-    lh = ift.VariableCovarianceGaussianEnergy(residual.target, 'r', 'ic', dtype) @ op
-    nres = residual*inverse_covariance.sqrt()
+    op = residual.ducktape_left("r") + inverse_covariance.ducktape_left("ic")
+    lh = ift.VariableCovarianceGaussianEnergy(residual.target, "r", "ic", dtype) @ op
+    nres = residual * inverse_covariance.sqrt()
     return _Likelihood(lh, nres)
 
 
@@ -75,18 +75,26 @@ def MfImagingLikelihood(observation, sky_operator):
     return _build_gauss_lh_nres(R @ sky_operator, observation.vis, observation.weight)
 
 
-def MfImagingLikelihoodVariableCovariance(observation, sky_operator, inverse_covariance_operator):
+def MfImagingLikelihoodVariableCovariance(
+    observation, sky_operator, inverse_covariance_operator
+):
     my_assert_isinstance(observation, Observation)
     my_assert_isinstance(sky_operator, ift.Operator)
     R = MfResponse(observation, sky_operator.target)
     return _varcov(observation, R @ sky_operator, inverse_covariance_operator)
 
 
-def ImagingLikelihoodVariableCovariance(observation, sky_operator, inverse_covariance_operator):
+def ImagingLikelihoodVariableCovariance(
+    observation, sky_operator, inverse_covariance_operator
+):
     my_assert_isinstance(observation, Observation)
     my_assert_isinstance(sky_operator, inverse_covariance_operator, ift.Operator)
-    my_assert_isinstance(inverse_covariance_operator.domain, sky_operator.domain, ift.MultiDomain)
-    my_assert_isinstance(inverse_covariance_operator.target, sky_operator.target, ift.DomainTuple)
+    my_assert_isinstance(
+        inverse_covariance_operator.domain, sky_operator.domain, ift.MultiDomain
+    )
+    my_assert_isinstance(
+        inverse_covariance_operator.target, sky_operator.target, ift.DomainTuple
+    )
     R = StokesIResponse(observation, sky_operator.target)
     return _varcov(observation, R @ sky_operator, inverse_covariance_operator)
 
@@ -102,20 +110,25 @@ def _varcov(observation, Rs, inverse_covariance_operator):
 
 def ImagingCalibrationLikelihood(observation, sky_operator, calibration_operator):
     if observation.npol == 1:
-        print('Warning: Use calibration with only one polarization present.')
+        print("Warning: Use calibration with only one polarization present.")
     my_assert_isinstance(observation, Observation)
     my_assert_isinstance(sky_operator, calibration_operator, ift.Operator)
     my_assert_isinstance(calibration_operator.domain, ift.MultiDomain)
     R = StokesIResponse(observation, sky_operator.target)
     my_asserteq(R.target, observation.vis.domain, calibration_operator.target)
-    modelvis = calibration_operator*(R @ sky_operator)
+    modelvis = calibration_operator * (R @ sky_operator)
     return _build_gauss_lh_nres(modelvis, observation.vis, observation.weight)
 
 
 def CalibrationLikelihood(observation, calibration_operator, model_visibilities):
     if observation.npol == 1:
-        print('Warning: Use calibration with only one polarization present.')
+        print("Warning: Use calibration with only one polarization present.")
     my_assert_isinstance(calibration_operator.domain, ift.MultiDomain)
-    my_asserteq(calibration_operator.target, model_visibilities.domain, observation.vis.domain)
-    return _build_gauss_lh_nres(ift.makeOp(model_visibilities) @ calibration_operator,
-                                observation.vis, observation.weight)
+    my_asserteq(
+        calibration_operator.target, model_visibilities.domain, observation.vis.domain
+    )
+    return _build_gauss_lh_nres(
+        ift.makeOp(model_visibilities) @ calibration_operator,
+        observation.vis,
+        observation.weight,
+    )

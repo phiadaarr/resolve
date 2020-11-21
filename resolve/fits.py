@@ -14,6 +14,7 @@ from .mpi import onlymaster
 def field2fits(field, file_name, overwrite, direction=None):
     from astropy.time import Time
     import astropy.io.fits as pyfits
+
     dom0 = field.domain
     assert len(dom0) == 1
     assert len(dom0[0].shape) == 2
@@ -21,20 +22,20 @@ def field2fits(field, file_name, overwrite, direction=None):
         pcx, pcy = direction.phase_center
     dom = dom0[0]
     h = pyfits.Header()
-    h['BUNIT'] = 'Jy/sr'
-    h['CTYPE1'] = 'RA---SIN'
-    h['CRVAL1'] = pcx*180/np.pi if direction is not None else 0.
-    h['CDELT1'] = -dom.distances[0]*180/np.pi
-    h['CRPIX1'] = dom.shape[0]/2
-    h['CUNIT1'] = 'deg'
-    h['CTYPE2'] = 'DEC---SIN'
-    h['CRVAL2'] = pcy*180/np.pi if direction is not None else 0.
-    h['CDELT2'] = dom.distances[1]*180/np.pi
-    h['CRPIX2'] = dom.shape[1]/2
-    h['CUNIT2'] = 'deg'
-    h['DATE-MAP'] = Time(time.time(), format='unix').iso.split()[0]
+    h["BUNIT"] = "Jy/sr"
+    h["CTYPE1"] = "RA---SIN"
+    h["CRVAL1"] = pcx * 180 / np.pi if direction is not None else 0.0
+    h["CDELT1"] = -dom.distances[0] * 180 / np.pi
+    h["CRPIX1"] = dom.shape[0] / 2
+    h["CUNIT1"] = "deg"
+    h["CTYPE2"] = "DEC---SIN"
+    h["CRVAL2"] = pcy * 180 / np.pi if direction is not None else 0.0
+    h["CDELT2"] = dom.distances[1] * 180 / np.pi
+    h["CRPIX2"] = dom.shape[1] / 2
+    h["CUNIT2"] = "deg"
+    h["DATE-MAP"] = Time(time.time(), format="unix").iso.split()[0]
     if direction is not None:
-        h['EQUINOX'] = direction.equinox
+        h["EQUINOX"] = direction.equinox
     hdu = pyfits.PrimaryHDU(field.val[:, :].T, header=h)
     hdulist = pyfits.HDUList([hdu])
     base, ext = splitext(file_name)

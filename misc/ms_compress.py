@@ -6,7 +6,7 @@ import sys
 
 import resolve as rve
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if len(sys.argv) != 3:
         raise RuntimeError("bad number of command line arguments")
     # Parameters

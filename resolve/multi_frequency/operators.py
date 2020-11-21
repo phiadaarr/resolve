@@ -14,7 +14,7 @@ class WienerIntegrations(ift.LinearOperator):
         # FIXME Write interface checks
         self._target = ift.makeDomain((freqdomain, imagedomain))
         dom = list(self._target)
-        dom = ift.UnstructuredDomain((2, freqdomain.size-1)), imagedomain
+        dom = ift.UnstructuredDomain((2, freqdomain.size - 1)), imagedomain
         self._domain = ift.makeDomain(dom)
         self._volumes = freqdomain.dvol[:, None, None]
         self._capability = self.TIMES | self.ADJOINT_TIMES
@@ -33,14 +33,16 @@ class WienerIntegrations(ift.LinearOperator):
             x = x.val
             res = np.zeros(self._target.shape)
             res[from_second] = np.cumsum(x[second], axis=0)
-            res[from_second] = (res[from_second] + res[no_border])/2*self._volumes + x[first]
+            res[from_second] = (
+                res[from_second] + res[no_border]
+            ) / 2 * self._volumes + x[first]
             res[from_second] = np.cumsum(res[from_second], axis=0)
         else:
             x = x.val_rw()
             res = np.zeros(self._domain.shape)
             x[from_second] = np.cumsum(x[from_second][reverse], axis=0)[reverse]
             res[first] += x[from_second]
-            x[from_second] *= self._volumes/2.
+            x[from_second] *= self._volumes / 2.0
             x[no_border] += x[from_second]
             res[second] += np.cumsum(x[from_second][reverse], axis=0)[reverse]
         return ift.makeField(self._tgt(mode), res)

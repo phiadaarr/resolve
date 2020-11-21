@@ -35,12 +35,12 @@ class IRGSpace(ift.StructuredDomain):
         bb = np.array(coordinates)
         if bb.ndim != 1:
             raise TypeError
-        if np.any(np.diff(bb) <= 0.):
+        if np.any(np.diff(bb) <= 0.0):
             raise ValueError("Coordinates must be sorted and strictly ascending")
         self._coordinates = tuple(bb)
 
     def __repr__(self):
-        return (f"IRGSpace(shape={self.shape}, coordinates=...)")
+        return f"IRGSpace(shape={self.shape}, coordinates=...)"
 
     @property
     def harmonic(self):
@@ -49,7 +49,7 @@ class IRGSpace(ift.StructuredDomain):
 
     @property
     def shape(self):
-        return len(self._coordinates),
+        return (len(self._coordinates),)
 
     @property
     def size(self):

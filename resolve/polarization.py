@@ -4,16 +4,7 @@
 
 from .util import compare_attributes, my_assert
 
-TABLE = {
-    5: "RR",
-    6: "RL",
-    7: "LR",
-    8: "LL",
-    9: "XX",
-    10: "XY",
-    11: "YX",
-    12: "YY"
-}
+TABLE = {5: "RR", 6: "RL", 7: "LR", 8: "LL", 9: "XX", 10: "XY", 11: "YX", 12: "YY"}
 INVTABLE = {val: key for key, val in TABLE.items()}
 
 
@@ -27,6 +18,7 @@ class Polarization:
     indices : tuple of polarization indices.
         Takes integer values between 5 and including 12.
     """
+
     def __init__(self, indices):
         self._ind = tuple(indices)
         my_assert(len(self._ind) <= 4)
@@ -81,7 +73,7 @@ class Polarization:
     def __eq__(self, other):
         if not isinstance(other, Polarization):
             return False
-        return compare_attributes(self, other, ('_ind',))
+        return compare_attributes(self, other, ("_ind",))
 
     def __repr__(self):
-        return f'Polarization({self._ind})'
+        return f"Polarization({self._ind})"

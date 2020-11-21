@@ -20,8 +20,8 @@ class PointInserter(ift.LinearOperator):
         my_asserteq(len(positions.shape), 2)
         my_asserteq(positions.shape[1], 2)
         dx = np.array(self._target[0].distances)
-        center = np.array(self._target[0].shape)//2
-        self._inds = np.unique(np.round(positions/dx + center).astype(int).T, axis=1)
+        center = np.array(self._target[0].shape) // 2
+        self._inds = np.unique(np.round(positions / dx + center).astype(int).T, axis=1)
         self._domain = ift.makeDomain(ift.UnstructuredDomain(self._inds.shape[1]))
 
     def apply(self, x, mode):

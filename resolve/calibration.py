@@ -10,7 +10,9 @@ from .observation import Observation
 from .util import my_assert, my_assert_isinstance, my_asserteq
 
 
-def calibration_distribution(observation, phase_operator, logamplitude_operator, antenna_dct, time_dct=None):
+def calibration_distribution(
+    observation, phase_operator, logamplitude_operator, antenna_dct, time_dct=None
+):
     my_assert_isinstance(observation, Observation)
     my_assert_isinstance(phase_operator, logamplitude_operator, ift.Operator)
     dom = phase_operator.target
@@ -22,7 +24,7 @@ def calibration_distribution(observation, phase_operator, logamplitude_operator,
     my_asserteq(cop1.domain, cop2.domain)
     my_asserteq(cop1.target, cop2.target)
     res0 = (cop1 + cop2).real @ logamplitude_operator
-    res1 = (1j*(cop1 - cop2).real) @ phase_operator
+    res1 = (1j * (cop1 - cop2).real) @ phase_operator
     return (res0 + res1).exp()
 
 
@@ -69,7 +71,12 @@ class CalibrationDistributor(ift.LinearOperator):
                 if res is None:
                     shp = self._target.shape
                     if mode == self.ADJOINT_TIMES:
-                        shp = self._target.shape[0], self._nantennas, self._ntimes, self._target.shape[2]
+                        shp = (
+                            self._target.shape[0],
+                            self._nantennas,
+                            self._ntimes,
+                            self._target.shape[2],
+                        )
                     res = np.empty(shp, dtype=tmp.dtype)
                 if mode == self.TIMES:
                     res[pol, :, freq] = tmp
@@ -92,11 +99,13 @@ class MyLinearInterpolator(ift.LinearOperator):
         my_asserteq(ant_col.ndim, time_col.ndim, 1)
         my_asserteq(ant_col.shape, time_col.shape)
         my_assert(np.min(ant_col) >= 0)
-        my_assert(np.max(ant_col) < self._domain.shape[0]*dom[0].distances[0])
+        my_assert(np.max(ant_col) < self._domain.shape[0] * dom[0].distances[0])
         my_assert(np.min(time_col) >= 0)
-        my_assert(np.max(time_col) < self._domain.shape[1]*dom[0].distances[1])
+        my_assert(np.max(time_col) < self._domain.shape[1] * dom[0].distances[1])
         my_assert(np.issubdtype(ant_col.dtype, np.integer))
-        my_assert(np.issubdtype(time_col.dtype, np.floating if floattime else np.integer))
+        my_assert(
+            np.issubdtype(time_col.dtype, np.floating if floattime else np.integer)
+        )
 
     def apply(self, x, mode):
         self._check_input(x, mode)

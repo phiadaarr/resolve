@@ -8,6 +8,7 @@ import nifty7 as ift
 
 try:
     from mpi4py import MPI
+
     master = MPI.COMM_WORLD.Get_rank() == 0
     comm = MPI.COMM_WORLD
     ntask = comm.Get_size()
@@ -31,4 +32,5 @@ def onlymaster(func):
         state1 = ift.random.getState()
         my_asserteq(state0, state1)
         return f
+
     return wrapper
