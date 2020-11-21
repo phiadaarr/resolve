@@ -26,14 +26,15 @@ class Minimization:
             self._n = n_samples
         else:
             my_assert(n_samples > 0)
-            dct = {'mean': position,
-                   'hamiltonian': operator,
-                   'n_samples': n_samples,
-                   'constants': constants,
-                   'point_estimates': point_estimates,
-                   'mirror_samples': True,
-                   'comm': comm,
-                   'nanisinf': True
+            dct = {
+                "mean": position,
+                "hamiltonian": operator,
+                "n_samples": n_samples,
+                "constants": constants,
+                "point_estimates": point_estimates,
+                "mirror_samples": True,
+                "comm": comm,
+                "nanisinf": True,
             }
             self._e = ift.MetricGaussianKL.make(**dct)
             self._n, self._m = dct['n_samples'], dct['mirror_samples']

@@ -6,7 +6,7 @@ import numpy as np
 
 import nifty7 as ift
 
-from ..util import my_assert_isinstance, my_asserteq
+from ..util import my_asserteq
 
 
 class WienerIntegrations(ift.LinearOperator):
