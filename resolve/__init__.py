@@ -1,5 +1,6 @@
 from .calibration import calibration_distribution
 from .constants import *
+from .fits import field2fits
 from .global_config import *
 from .likelihood import (CalibrationLikelihood, ImagingCalibrationLikelihood,
                          ImagingLikelihood,
