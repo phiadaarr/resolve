@@ -36,3 +36,8 @@ mytest:
   script:
     - pytest-3 -q --cov=resolve test.py
   coverage: '/^TOTAL.+?(\d+\%)$/'
+
+staticchecks:
+  stage: testing
+  script:
+    - flake8 .
