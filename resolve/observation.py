@@ -112,9 +112,6 @@ class Observation:
             self._direction,
         )
 
-    def delete_antenna_information(self):
-        raise NotImplementedError
-
     def move_time(self, t0):
         antpos = self._antpos.move_time(t0)
         return Observation(

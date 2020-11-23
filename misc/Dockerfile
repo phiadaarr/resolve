@@ -6,4 +6,4 @@ RUN pip3 install scipy pybind11 git+https://gitlab.mpcdf.mpg.de/ift/nifty.git@NI
 RUN pip3 install git+https://gitlab.mpcdf.mpg.de/mtr/ducc.git@ducc0
 COPY . /resolve
 RUN cd resolve && python3 setup.py install
-ENTRYPOINT ["python3", "resolve/misc/ms_compress.py"]
+ENTRYPOINT ["python3", "resolve/misc/ms2npz.py"]
