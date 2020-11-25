@@ -1,4 +1,4 @@
-FROM kernsuite/base:dev
+FROM kernsuite/base:latest
 ENV DEBIAN_FRONTEND noninteractive
 RUN docker-apt-install dysco python3-casacore
 RUN apt-get update -qq && apt-get install -qq python3-pip python3-matplotlib git
