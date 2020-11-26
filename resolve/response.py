@@ -8,6 +8,7 @@ from ducc0.wgridder.experimental import dirty2vis, vis2dirty
 import nifty7 as ift
 
 from .global_config import epsilon, nthreads, wgridding
+from .multi_frequency.irg_space import IRGSpace
 from .observation import Observation
 from .util import my_assert, my_assert_isinstance, my_asserteq
 
@@ -33,10 +34,26 @@ def StokesIResponse(observation, domain):
 
 
 class MfResponse(ift.LinearOperator):
+    """Multi-frequency response
+
+    This class represents the linear operator that maps the a discretized brightness distribution into visibilities.
+
+    Parameters
+    ----------
+    observation : Observation
+        Instance of the :class:`Observation` that represents the measured data.
+    domain : tuple of Domain
+        A tuple containing the :class:`Domain` for the frequencies and the :class:`Domain` for the positions.
+        Be aware that for practical reasons the domain for the frequencies must be the first domain in the tuple.
+
+    """
+
     def __init__(self, observation, domain):
         my_assert_isinstance(observation, Observation)
         # FIXME Add polarization support
         my_asserteq(observation.npol, 1)
+        my_assert_isinstance(domain[0], IRGSpace)
+        my_assert_isinstance(domain[1], ift.RGSpace)
         self._domain = ift.DomainTuple.make(domain)
         self._target = observation.vis.domain
         self._capability = self.TIMES | self.ADJOINT_TIMES
