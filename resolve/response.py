@@ -36,15 +36,19 @@ def StokesIResponse(observation, domain):
 class MfResponse(ift.LinearOperator):
     """Multi-frequency response
 
-    This class represents the linear operator that maps the a discretized brightness distribution into visibilities.
+    This class represents the linear operator that maps the discretized
+    brightness distribution into visibilities. It supports mapping a single
+    frequency in its domain to multiple channels in its target with a
+    nearest-neighbour interpolation. This may be useful for contiuum imaging.
 
     Parameters
     ----------
     observation : Observation
         Instance of the :class:`Observation` that represents the measured data.
     domain : tuple of Domain
-        A tuple containing the :class:`Domain` for the frequencies and the :class:`Domain` for the positions.
-        Be aware that for practical reasons the domain for the frequencies must be the first domain in the tuple.
+        Contains the :class:`Domain` for the frequencies and the :class:`Domain`
+        for the positions. Be aware that for practical reasons the domain for
+        the frequencies must be the first domain in the tuple.
 
     """
 
