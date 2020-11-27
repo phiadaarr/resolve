@@ -32,6 +32,31 @@ class Plotter:
         makedirs(self._dir, exist_ok=True)
 
     @onlymaster
+    def add_npy(self, name, operator, nsamples=0):
+        """Save output of operator as npy files.
+
+        This function may be useful for saving results of a resolve run and
+        plotting them later with dedicated plotting scripts.
+
+        If the plotter gets samples during plotting, the posterior mean and the
+        posterior standard deviation are saved. Additionally, a number of
+        posterior samples are saved. If no samples are available, only one npy
+        array will be saved.
+
+        Parameters
+        ----------
+        name : str
+            Naming of the output directory and files.
+        operator : Operator
+            The output of this operator is saved
+        nsamples : int
+            Determines how many posterior samples shall be saved additionally to
+            the posterior mean.
+
+        """
+        raise NotImplementedError
+
+    @onlymaster
     def add(self, name, operator, **kwargs):
         my_assert_isinstance(operator, ift.Operator)
         self._nifty.append({"operator": operator, "title": str(name), "kwargs": kwargs})
