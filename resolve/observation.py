@@ -15,6 +15,27 @@ from .util import compare_attributes, my_assert, my_assert_isinstance, my_assert
 
 
 class Observation:
+    """Observation data
+
+    This class represents all the data and information about an observation for a given direction.
+
+    Parameters
+    ----------
+    antenna_positions : AntennaPositions
+        Instance of the :class:`AntennaPositions` that contains all information on antennas and baselines.
+    vis : numpy.ndarray
+        Contains the measured visibilities.
+    weight : numpy.ndarray
+        Contains the given systematic error of the baseline measurements
+    polarization : Polarization
+    freq : numpy.ndarray
+        Contains the measured frequencies
+    direction : Direction
+
+    Note
+    ----
+    vis and weight must have the same dimensions
+    """
     def __init__(self, antenna_positions, vis, weight, polarization, freq, direction):
         nrows = len(antenna_positions)
         my_assert_isinstance(direction, Direction)

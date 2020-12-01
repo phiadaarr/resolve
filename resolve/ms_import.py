@@ -23,6 +23,7 @@ def ms2observations(
     channel_slice=slice(None),
 ):
     """
+    Reads and converts a given measurement set into an array of :class:`Observation`
 
     If WEIGHT_SPECTRUM is available this column is used for weighting.
     Otherwise fall back to WEIGHT.
@@ -49,6 +50,11 @@ def ms2observations(
     channel_slice : slice
         Slice of selected channels. Default: select all channels
         FIXME Select channels by indices
+
+    Returns
+    -------
+    array[Observation]
+        an array of :class:`Observation` found in the measurement set
 
     Note
     ----
