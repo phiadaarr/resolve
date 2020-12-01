@@ -45,10 +45,10 @@ class MfResponse(ift.LinearOperator):
     ----------
     observation : Observation
         Instance of the :class:`Observation` that represents the measured data.
-    frequency_domain : Domain
-        Contains the :class:`Domain` for the frequencies.
-    position_domain : Domain
-        Contains the the :class:`Domain` for the positions.
+    frequency_domain : IRGSpace
+        Contains the :class:`IRGSpace` for the frequencies.
+    position_domain : nifty7.RGSpace
+        Contains the the :class:`nifty7.RGSpace` for the positions.
     """
 
     def __init__(self, observation, frequency_domain, position_domain):
