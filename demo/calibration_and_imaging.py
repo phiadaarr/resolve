@@ -15,7 +15,7 @@ def main():
     rve.set_nthreads(8)
     rve.set_wgridding(True)
     obs = rve.ms2observations(
-        "/data/AM754_A030124_flagged.ms", "DATA", True, 0, "stokesi"
+        "data/AM754_A030124_flagged.ms", "DATA", True, 0, "stokesi"
     )
     t0, _ = rve.tmin_tmax(*obs)
     obs = [oo.move_time(-t0) for oo in obs]
