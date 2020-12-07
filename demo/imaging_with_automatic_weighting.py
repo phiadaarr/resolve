@@ -32,6 +32,9 @@ def main():
     parser.add_argument("diffusefluxlevel", type=float)
     args = parser.parse_args()
 
+    ############################################################################
+    # Define likelihood(s)
+    ############################################################################
     if splitext(args.ms)[1] == ".npz":
         obs = rve.Observation.load(args.ms)
     else:
@@ -79,6 +82,10 @@ def main():
     plotter.add("bayesian weighting", logwgt.exp())
     plotter.add("power spectrum bayesian weighting", logwgt.power_spectrum)
 
+
+    ############################################################################
+    # MINIMIZATION
+    ############################################################################
     if rve.mpi.master:
         if args.point is not None:
             # MAP points with original weights
@@ -118,7 +125,7 @@ def main():
             plotter.plot("stage1", state)
             state.save("stage1")
 
-        # MGVI weights
+        # Only weights
         lh = rve.ImagingLikelihoodVariableCovariance(obs, sky, weightop)
         plotter.add_histogram(
             "normalized residuals (learned weights)", lh.normalized_residual
