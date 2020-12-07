@@ -24,22 +24,12 @@ def _get_mask(observation):
     return mask, mask(vis), mask(observation.weight)
 
 
-class _Likelihood(ift.EnergyOperator):
-    def __init__(self, operator, normalized_residual_operator):
-        my_assert_isinstance(operator, ift.Operator)
-        my_asserteq(operator.target, ift.DomainTuple.scalar_domain())
-        my_assert_isinstance(normalized_residual_operator, ift.Operator)
-        self._op = operator
-        self._domain = operator.domain
-        self.apply = operator.apply
-        self._nres = normalized_residual_operator
-
-    @property
-    def normalized_residual(self):
-        return self._nres
-
-    def __repr__(self):
-        return self._op.__repr__()
+def _Likelihood(operator, normalized_residual_operator):
+    my_assert_isinstance(operator, ift.Operator)
+    my_asserteq(operator.target, ift.DomainTuple.scalar_domain())
+    my_assert_isinstance(normalized_residual_operator, ift.Operator)
+    operator.normalized_residual = normalized_residual_operator
+    return operator
 
 
 def _build_gauss_lh_nres(op, mean, invcov):
