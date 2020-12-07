@@ -8,3 +8,33 @@ ARCMIN2RAD = np.pi / 60 / 180
 AS2RAD = ARCMIN2RAD / 60
 DEG2RAD = np.pi / 180
 SPEEDOFLIGHT = 299792458
+
+
+def str2rad(s):
+    """Convert string of number and unit to radian.
+
+    Support the following units: muas mas as amin deg rad.
+
+    Parameters
+    ----------
+    s : str
+        TODO
+
+    """
+    c = {
+        "muas": AS2RAD * 1e-6,
+        "mas": AS2RAD * 1e-3,
+        "as": AS2RAD,
+        "amin": ARCMIN2RAD,
+        "deg": DEG2RAD,
+        "rad": 1,
+    }
+    keys = list(c.keys())
+    keys.sort(key=len)
+    for kk in reversed(keys):
+        nn = -len(kk)
+        unit = s[nn:]
+        print(unit, kk)
+        if unit == kk:
+            return float(s[:nn])*c[kk]
+    raise RuntimeError("Unit not understood")

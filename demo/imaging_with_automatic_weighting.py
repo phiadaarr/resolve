@@ -13,33 +13,54 @@ from os.path import isfile, splitext
 
 def main():
     parser = argparse.ArgumentParser()
+    # TODO Add modes: reconstruct, plot
+    # TODO OU process for automatic weighting
     parser.add_argument("-j", type=int, default=1)
     parser.add_argument("--use-cached", action="store_true")
-    parser.add_argument("ms")
+    parser.add_argument("--use-wgridding", action="store_true")
+    parser.add_argument(
+        "--data-column",
+        default="DATA",
+        help="Only active if a measurement set is read.",
+    )
+    parser.add_argument("--point", action="append", nargs=2)
+    parser.add_argument("ms", type=str)
+    parser.add_argument("xfov", type=str)
+    parser.add_argument("yfov", type=str)
+    parser.add_argument("xpix", type=int)
+    parser.add_argument("ypix", type=int)
+    parser.add_argument("diffusefluxlevel", type=float)
     args = parser.parse_args()
 
-    rve.set_nthreads(args.j)
-    rve.set_wgridding(False)
     if splitext(args.ms)[1] == ".npz":
         obs = rve.Observation.load(args.ms)
     else:
-        obs = rve.ms2observations(args.ms, "DATA", False, 0, "stokesiavg")[0]
+        obs = rve.ms2observations(args.ms, args.data_column, False, 0, "stokesiavg")[0]
 
+    rve.set_nthreads(args.j)
+    rve.set_wgridding(args.use_wgridding)
+    fov = np.array([rve.str2rad(args.xfov), rve.str2rad(args.yfov)])
+    npix = np.array([args.xpix, args.ypix])
     rve.set_epsilon(1 / 10 / obs.max_snr())
-    fov = np.array([3, 1.5]) * rve.ARCMIN2RAD
-    npix = np.array([4096, 2048])
-    npix = np.array([4096, 2048]) / 4  # FIXME QUICK
+
     dom = ift.RGSpace(npix, fov / npix)
     logsky = ift.SimpleCorrelatedField(
-        dom, 21, (1, 0.1), (5, 1), (1.2, 0.4), (0.2, 0.2), (-2, 0.5)
+        dom, args.diffusefluxlevel, (1, 0.1), (5, 1), (1.2, 0.4), (0.2, 0.2), (-2, 0.5)
     )
     diffuse = logsky.exp()
-    inserter = rve.PointInserter(dom, np.array([[0, 0], [0.7, -0.34]]) * rve.AS2RAD)
-    points = ift.InverseGammaOperator(
-        inserter.domain, alpha=0.5, q=0.2 / dom.scalar_dvol
-    ).ducktape("points")
-    points = inserter @ points
-    sky = points + diffuse
+    if args.point is not None:
+        ppos = []
+        for point in args.point:
+            ppos.append([rve.str2rad(point[0]), rve.str2rad(point[1])])
+        inserter = rve.PointInserter(dom, ppos)
+        points = ift.InverseGammaOperator(
+            inserter.domain, alpha=0.5, q=0.2 / dom.scalar_dvol
+        ).ducktape("points")
+        points = inserter @ points
+        sky = diffuse + points
+    else:
+        sky = diffuse
+    # TODO Add mode with independent noise learning
     npix = 2500
     effuv = np.linalg.norm(obs.effective_uv().T, axis=1)
     assert obs.nfreq == obs.npol == 1
@@ -59,17 +80,20 @@ def main():
     plotter.add("power spectrum bayesian weighting", logwgt.power_spectrum)
 
     if rve.mpi.master:
-        # MAP points with original weights
-        lh = rve.ImagingLikelihood(obs, points)
-        ham = ift.StandardHamiltonian(lh)
-        state = rve.MinimizationState(0.1 * ift.from_random(ham.domain), [])
-        mini = ift.NewtonCG(ift.GradientNormController(name="newton", iteration_limit=4))
-        if args.use_cached and isfile("stage0"):
-            state = rve.MinimizationState.load("stage0")
-        else:
-            state = rve.simple_minimize(ham, state.mean, 0, mini)
-            plotter.plot("stage0", state)
-            state.save("stage0")
+        if args.point is not None:
+            # MAP points with original weights
+            lh = rve.ImagingLikelihood(obs, points)
+            ham = ift.StandardHamiltonian(lh)
+            state = rve.MinimizationState(0.1 * ift.from_random(ham.domain), [])
+            mini = ift.NewtonCG(
+                ift.GradientNormController(name="newton", iteration_limit=4)
+            )
+            if args.use_cached and isfile("stage0"):
+                state = rve.MinimizationState.load("stage0")
+            else:
+                state = rve.simple_minimize(ham, state.mean, 0, mini)
+                plotter.plot("stage0", state)
+                state.save("stage0")
 
         # MAP diffuse with original weights
         lh = rve.ImagingLikelihood(obs, sky)
@@ -77,10 +101,16 @@ def main():
             "normalized residuals (original weights)", lh.normalized_residual
         )
         ham = ift.StandardHamiltonian(lh)
-        state = rve.MinimizationState(
-            ift.MultiField.union([0.1 * ift.from_random(diffuse.domain), state.mean]), []
+        if args.point is None:
+            fld = 0.1 * ift.from_random(diffuse.domain)
+        else:
+            fld = ift.MultiField.union(
+                [0.1 * ift.from_random(diffuse.domain), state.mean]
+            )
+        state = rve.MinimizationState(fld, [])
+        mini = ift.NewtonCG(
+            ift.GradientNormController(name="newton", iteration_limit=20)
         )
-        mini = ift.NewtonCG(ift.GradientNormController(name="newton", iteration_limit=20))
         if args.use_cached and isfile("stage1"):
             state = rve.MinimizationState.load("stage1")
         else:
@@ -97,7 +127,8 @@ def main():
         ham = ift.StandardHamiltonian(lh, ic)
         cst = sky.domain.keys()
         state = rve.MinimizationState(
-            ift.MultiField.union([0.1 * ift.from_random(weightop.domain), state.mean]), []
+            ift.MultiField.union([0.1 * ift.from_random(weightop.domain), state.mean]),
+            [],
         )
         mini = ift.VL_BFGS(ift.GradientNormController(name="bfgs", iteration_limit=20))
         if args.use_cached and isfile("stage2"):
@@ -134,9 +165,13 @@ def main():
     ham = ift.StandardHamiltonian(lh, ic)
     for ii in range(30):
         if ii < 5:
-            mini = ift.VL_BFGS(ift.GradientNormController(name="newton", iteration_limit=15))
+            mini = ift.VL_BFGS(
+                ift.GradientNormController(name="newton", iteration_limit=15)
+            )
         else:
-            mini = ift.NewtonCG(ift.GradientNormController(name="newton", iteration_limit=15))
+            mini = ift.NewtonCG(
+                ift.GradientNormController(name="newton", iteration_limit=15)
+            )
         fname = f"stage4_{ii}"
         if args.use_cached and isfile(fname):
             state = rve.MinimizationState.load(fname)
