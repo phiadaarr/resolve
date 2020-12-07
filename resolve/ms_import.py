@@ -11,7 +11,7 @@ from .observation import Observation
 from .polarization import Polarization
 from .util import my_assert, my_asserteq, my_assert_isinstance
 
-CFG = {"readonly": True, "ack": False}
+_CASACORE_TABLE_CFG = {"readonly": True, "ack": False}
 
 
 def ms2observations(
@@ -23,6 +23,7 @@ def ms2observations(
     channel_slice=slice(None),
 ):
     """
+    Reads and converts a given measurement set into an array of :class:`Observation`
 
     If WEIGHT_SPECTRUM is available this column is used for weighting.
     Otherwise fall back to WEIGHT.
@@ -50,6 +51,11 @@ def ms2observations(
         Slice of selected channels. Default: select all channels
         FIXME Select channels by indices
 
+    Returns
+    -------
+    array[Observation]
+        an array of :class:`Observation` found in the measurement set
+
     Note
     ----
     We cannot import multiple spectral windows into one Observation instance
@@ -76,11 +82,11 @@ def ms2observations(
     my_assert_isinstance(spectral_window, int)
     my_assert(spectral_window >= 0)
     my_assert(spectral_window < ms_n_spectral_windows(ms))
-    with table(join(ms, "SPECTRAL_WINDOW"), **CFG) as t:
+    with table(join(ms, "SPECTRAL_WINDOW"), **_CASACORE_TABLE_CFG) as t:
         freq = t.getcol("CHAN_FREQ")[spectral_window]
 
     # Polarization
-    with table(join(ms, "POLARIZATION"), **CFG) as t:
+    with table(join(ms, "POLARIZATION"), **_CASACORE_TABLE_CFG) as t:
         pol = t.getcol("CORR_TYPE")
         my_asserteq(pol.ndim, 2)
         my_asserteq(pol.shape[0], 1)
@@ -101,7 +107,7 @@ def ms2observations(
             pol_summation = False
 
     # Field
-    with table(join(ms, "FIELD"), **CFG) as t:
+    with table(join(ms, "FIELD"), **_CASACORE_TABLE_CFG) as t:
         equinox = t.coldesc("REFERENCE_DIR")["desc"]["keywords"]["MEASINFO"]["Ref"]
         equinox = str(equinox)[1:]
         # FIXME Put proper support for equinox here
@@ -176,7 +182,8 @@ def read_ms_i(
     if pol_summation:
         my_asserteq(len(pol_indices), 2)
 
-    with table(name, readonly=True, ack=False) as t:
+    with table(name, **_CASACORE_TABLE_CFG) as t:
+        # FIXME Get rid of fullwgt
         fullwgt, weightcol = _determine_weighting(t)
         nrow = t.nrows()
         nmspol = t.getcol("FLAG", startrow=0, nrow=1).shape[2]
@@ -315,6 +322,6 @@ def read_ms_i(
 def ms_n_spectral_windows(ms):
     from casacore.tables import table
 
-    with table(join(ms, "SPECTRAL_WINDOW"), **CFG) as t:
+    with table(join(ms, "SPECTRAL_WINDOW"), **_CASACORE_TABLE_CFG) as t:
         freq = t.getcol("CHAN_FREQ")
     return freq.shape[0]

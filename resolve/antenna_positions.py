@@ -10,8 +10,19 @@ from .util import compare_attributes, my_assert, my_asserteq
 class AntennaPositions:
     """Summarizes all information on antennas and baselines. If calibration is
     performed this class stores also antenna indices and time information.
-    For imaging only this is not necessary."""
+    For imaging only this is not necessary.
 
+    Parameters
+    ----------
+    uvw : numpy.ndarray
+        two-dimensional array of shape (n_rows, 3)
+    ant1 : numpy.ndarray(dtype=int)
+        one-dimensional array of shape (n_rows,)
+    ant2 : numpy.ndarray(dtype=int)
+        two-dimensional array of shape (n_rows,)
+    time : float
+        time of measurement
+    """
     # FIXME Split this class into two. One for only imaging, one also for calibration
     def __init__(self, uvw, ant1=None, ant2=None, time=None):
         if ant1 is None:

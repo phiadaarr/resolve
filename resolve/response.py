@@ -8,6 +8,7 @@ from ducc0.wgridder.experimental import dirty2vis, vis2dirty
 import nifty7 as ift
 
 from .global_config import epsilon, nthreads, wgridding
+from .multi_frequency.irg_space import IRGSpace
 from .observation import Observation
 from .util import my_assert, my_assert_isinstance, my_asserteq
 
@@ -33,20 +34,41 @@ def StokesIResponse(observation, domain):
 
 
 class MfResponse(ift.LinearOperator):
-    def __init__(self, observation, domain):
+    """Multi-frequency response
+
+    This class represents the linear operator that maps the discretized
+    brightness distribution into visibilities. It supports mapping a single
+    frequency in its domain to multiple channels in its target with a
+    nearest-neighbour interpolation. This may be useful for contiuum imaging.
+
+    Parameters
+    ----------
+    observation : Observation
+        Instance of the :class:`Observation` that represents the measured data.
+    frequency_domain : IRGSpace
+        Contains the :class:`IRGSpace` for the frequencies.
+    position_domain : nifty7.RGSpace
+        Contains the the :class:`nifty7.RGSpace` for the positions.
+    """
+
+    def __init__(self, observation, frequency_domain, position_domain):
         my_assert_isinstance(observation, Observation)
         # FIXME Add polarization support
         my_asserteq(observation.npol, 1)
-        self._domain = ift.DomainTuple.make(domain)
+        my_assert_isinstance(frequency_domain, IRGSpace)
+        my_assert_isinstance(position_domain, ift.RGSpace)
+
+        domain_tuple = (frequency_domain, position_domain)
+        self._domain = ift.DomainTuple.make(domain_tuple)
         self._target = observation.vis.domain
         self._capability = self.TIMES | self.ADJOINT_TIMES
 
         data_freq = observation.freq
         my_assert(np.all(np.diff(data_freq) > 0))
-        sky_freq = np.array(domain[0].coordinates)
+        sky_freq = np.array(frequency_domain.coordinates)
         band_indices = [np.argmin(np.abs(ff - sky_freq)) for ff in data_freq]
         # Make sure that no index is wasted
-        my_asserteq(len(set(band_indices)), domain[0].size)
+        my_asserteq(len(set(band_indices)), frequency_domain.size)
         self._r = []
         sp = observation.vis.dtype == np.complex64
         mask = observation.mask
@@ -54,7 +76,7 @@ class MfResponse(ift.LinearOperator):
             sel = band_indices == band_index
             assert mask.shape[0] == 1
             r = SingleResponse(
-                domain[1], observation.uvw, observation.freq[sel], mask[0, :, sel].T, sp
+                position_domain, observation.uvw, observation.freq[sel], mask[0, :, sel].T, sp
             )
             self._r.append((band_index, sel, r))
         # Double check that all channels are written to

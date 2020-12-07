@@ -15,6 +15,30 @@ from .util import compare_attributes, my_assert, my_assert_isinstance, my_assert
 
 
 class Observation:
+    """Observation data
+
+    This class contains all the data and information about an observation.
+    It supports a single field (phase center) and a single spectral window.
+
+    Parameters
+    ----------
+    antenna_positions : AntennaPositions
+        Instance of the :class:`AntennaPositions` that contains all information on antennas and baselines.
+    vis : numpy.ndarray
+        Contains the measured visibilities. Shape (n_polarizations, n_rows, n_channels)
+    weight : numpy.ndarray
+        Contains the information from the WEIGHT or SPECTRUM_WEIGHT column.
+        This is in many cases the inverse of the thermal noise covariance. Shape same as vis.
+    polarization : Polarization
+    freq : numpy.ndarray
+        Contains the measured frequencies. Shape (n_channels)
+    direction : Direction
+
+    Note
+    ----
+    vis and weight must have the same dimensions
+    """
+
     def __init__(self, antenna_positions, vis, weight, polarization, freq, direction):
         nrows = len(antenna_positions)
         my_assert_isinstance(direction, Direction)
@@ -181,6 +205,18 @@ class Observation:
 
 
 def tmin_tmax(*args):
+    """
+
+    Parameters
+    ----------
+    args : Observation or list of Observation
+
+    Returns
+    -------
+    mi, ma : tuple of float
+        first and last measurement time point
+
+    """
     my_assert_isinstance(*args, Observation)
     mi = min([np.min(aa.antenna_positions.time) for aa in args])
     ma = max([np.max(aa.antenna_positions.time) for aa in args])

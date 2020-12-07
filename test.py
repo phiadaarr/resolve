@@ -264,8 +264,8 @@ def test_mfweighting():
 def test_mf_response():
     ms = join(direc, 'CYG-D-6680-64CH-10S.ms')
     obs = rve.ms2observations(ms, 'DATA', False, 0, "stokesiavg")[0]
-    skydom = rve.IRGSpace(obs.freq), dom
-    R = rve.MfResponse(obs, skydom)
+    frequency_domain = rve.IRGSpace(obs.freq)
+    R = rve.MfResponse(obs, frequency_domain, dom)
     ift.extra.check_linear_operator(R, rtol=1e-5, atol=1e-5,
                                     target_dtype=np.complex128,
                                     only_r_linear=True)
