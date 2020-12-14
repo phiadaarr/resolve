@@ -78,7 +78,11 @@ class Plotter:
             op, fname = self._plot_init(obj, state, identifier)
             if fname is None:
                 continue
-            _plot_nifty(state, op, obj["kwargs"], fname)
+            print(ii, obj)
+            try:
+                _plot_nifty(state, op, obj["kwargs"], fname)
+            except:
+                pass
         for ii, obj in enumerate(self._calib):
             op, fname = self._plot_init(obj, state, identifier)
             if fname is None:

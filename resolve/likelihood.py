@@ -7,7 +7,7 @@ import numpy as np
 import nifty7 as ift
 
 from .observation import Observation
-from .response import MfResponse, StokesIResponse
+from .response import FullPolResponse, MfResponse, StokesIResponse
 from .util import my_assert_isinstance, my_asserteq
 
 # FIXME VariableCovariance version for all likelihoods
@@ -50,10 +50,12 @@ def _build_varcov_gauss_lh_nres(residual, inverse_covariance, dtype):
     return _Likelihood(lh, nres)
 
 
-def ImagingLikelihood(observation, sky_operator):
+def ImagingLikelihood(observation, sky_operator, polmode=False):
     my_assert_isinstance(observation, Observation)
     my_assert_isinstance(sky_operator, ift.Operator)
-    R = StokesIResponse(observation, sky_operator.target)
+    R = (FullPolResponse if polmode else StokesIResponse)(observation, sky_operator.target)
+    # TODO Why is the adjointness so bad?
+    # ift.extra.check_linear_operator(R, target_dtype=np.complex64, only_r_linear=True)
     my_asserteq(R.target, observation.vis.domain)
     return _build_gauss_lh_nres(R @ sky_operator, observation.vis, observation.weight)
 
@@ -75,17 +77,18 @@ def MfImagingLikelihoodVariableCovariance(
 
 
 def ImagingLikelihoodVariableCovariance(
-    observation, sky_operator, inverse_covariance_operator
+    observation, sky_operator, inverse_covariance_operator, polmode=False
 ):
     my_assert_isinstance(observation, Observation)
     my_assert_isinstance(sky_operator, inverse_covariance_operator, ift.Operator)
-    my_assert_isinstance(
-        inverse_covariance_operator.domain, sky_operator.domain, ift.MultiDomain
-    )
-    my_assert_isinstance(
-        inverse_covariance_operator.target, sky_operator.target, ift.DomainTuple
-    )
-    R = StokesIResponse(observation, sky_operator.target)
+    # my_assert_isinstance(
+    #     inverse_covariance_operator.domain, sky_operator.domain, ift.MultiDomain
+    # )
+    # my_assert_isinstance(
+    #     inverse_covariance_operator.target, sky_operator.target, ift.DomainTuple
+    # )
+    R = (FullPolResponse if polmode else StokesIResponse)(observation, sky_operator.target)
+    my_asserteq(R.target, observation.vis.domain)
     return _varcov(observation, R @ sky_operator, inverse_covariance_operator)
 
 

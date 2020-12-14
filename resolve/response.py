@@ -33,6 +33,45 @@ def StokesIResponse(observation, domain):
     raise RuntimeError
 
 
+class FullPolResponse(ift.LinearOperator):
+    def __init__(self, observation, domain):
+        my_assert_isinstance(observation, Observation)
+        domain = ift.MultiDomain.make(domain)
+        self._domain = domain
+        self._target = observation.vis.domain
+        # TODO Add support for Stokes V
+        my_asserteq(set(domain.keys()), set(["I", "Q", "U"]))
+        my_asserteq(len(domain["I"]), 1)
+        my_asserteq(len(domain["I"].shape), 2)
+        my_asserteq(dd for dd in domain)
+        npol = observation.npol
+        my_asserteq(npol, 4)
+        sp = observation.vis.dtype == np.complex64
+        domain = domain["I"]
+        mask = np.all(observation.mask, axis=0)
+        self._sr = SingleResponse(domain, observation.uvw, observation.freq, mask, sp)
+        self._capability = self.TIMES | self.ADJOINT_TIMES
+
+    def apply(self, x, mode):
+        self._check_input(x, mode)
+        if mode == self.TIMES:
+            res = np.empty(self._target.shape, dtype=np.complex64)
+            res[0] = res[3] = self._sr(x["I"]).val
+            Q = self._sr(x["Q"]).val
+            assert Q.dtype == np.complex64
+            U = self._sr(x["U"]).val
+            res[1] = U-1j*Q
+            res[2] = -U-1j*Q
+        else:
+            op = lambda inp: self._sr.adjoint(ift.makeField(self._sr.target, inp))
+            x = x.val
+            res = {}
+            res["I"] = op(x[0] + x[3]).val
+            res["Q"] = op(1j*(x[1] + x[2])).val
+            res["U"] = op(x[1] - x[2]).val
+        return ift.makeField(self._tgt(mode), res)
+
+
 class MfResponse(ift.LinearOperator):
     """Multi-frequency response
 
