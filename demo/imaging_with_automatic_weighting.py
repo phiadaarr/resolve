@@ -156,7 +156,10 @@ def main():
     ic = ift.AbsDeltaEnergyController(0.1, 3, 200, name="Sampling")
     lh = rve.ImagingLikelihoodVariableCovariance(obs, sky, weightop)
     ham = ift.StandardHamiltonian(lh, ic)
-    cst = list(points.domain.keys()) + list(weightop.domain.keys())
+    if args.point is not None:
+        cst = list(points.domain.keys()) + list(weightop.domain.keys())
+    else:
+        cst = list(weightop.domain.keys())
     mini = ift.NewtonCG(ift.GradientNormController(name="newton", iteration_limit=15))
     for ii in range(4):
         fname = f"stage3_{ii}"
