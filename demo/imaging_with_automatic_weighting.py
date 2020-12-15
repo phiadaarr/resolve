@@ -82,7 +82,6 @@ def main():
     plotter.add("bayesian weighting", logwgt.exp())
     plotter.add("power spectrum bayesian weighting", logwgt.power_spectrum)
 
-
     ############################################################################
     # MINIMIZATION
     ############################################################################
