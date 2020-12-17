@@ -78,7 +78,6 @@ class Plotter:
             op, fname = self._plot_init(obj, state, identifier)
             if fname is None:
                 continue
-            print(ii, obj)
             try:
                 _plot_nifty(state, op, obj["kwargs"], fname)
             except:

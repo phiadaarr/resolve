@@ -39,8 +39,12 @@ class FullPolResponse(ift.LinearOperator):
         domain = ift.MultiDomain.make(domain)
         self._domain = domain
         self._target = observation.vis.domain
-        # TODO Add support for Stokes V
-        my_asserteq(set(domain.keys()), set(["I", "Q", "U"]))
+        if set(domain.keys()) == set(["I", "Q", "U", "V"]):
+            self._with_v = True
+        elif set(domain.keys()) == set(["I", "Q", "U"]):
+            self._with_v = False
+        else:
+            RuntimeError
         my_asserteq(len(domain["I"]), 1)
         my_asserteq(len(domain["I"].shape), 2)
         my_asserteq(dd for dd in domain)
@@ -56,19 +60,25 @@ class FullPolResponse(ift.LinearOperator):
         self._check_input(x, mode)
         if mode == self.TIMES:
             res = np.empty(self._target.shape, dtype=np.complex64)
-            res[0] = res[3] = self._sr(x["I"]).val
             Q = self._sr(x["Q"]).val
             assert Q.dtype == np.complex64
             U = self._sr(x["U"]).val
-            res[1] = U-1j*Q
-            res[2] = -U-1j*Q
+            res[0] = res[3] = self._sr(x["I"]).val
+            if self._with_v:
+                V = self._sr(x["V"]).val
+                res[0] += V
+                res[3] -= -V
+            res[1] = Q+1j*U
+            res[2] = Q-1j*Q
         else:
             op = lambda inp: self._sr.adjoint(ift.makeField(self._sr.target, inp))
             x = x.val
             res = {}
             res["I"] = op(x[0] + x[3]).val
-            res["Q"] = op(1j*(x[1] + x[2])).val
-            res["U"] = op(x[1] - x[2]).val
+            if self._with_v:
+                res["V"] = op(x[0] - x[3]).val
+            res["Q"] = op(x[1] + x[2]).val
+            res["U"] = op(1j*(x[2] - x[1])).val
         return ift.makeField(self._tgt(mode), res)
 
 

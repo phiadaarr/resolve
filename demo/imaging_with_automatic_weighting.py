@@ -20,6 +20,7 @@ def main():
     parser.add_argument("-j", type=int, default=1)
     parser.add_argument("--use-cached", action="store_true")
     parser.add_argument("--use-wgridding", action="store_true")
+    parser.add_argument("--with-v", action="store_true")
     parser.add_argument(
         "--data-column",
         default="DATA",
@@ -73,8 +74,14 @@ def main():
         ift.extra.check_linear_operator(empty)
         ift.extra.check_linear_operator(li)
         weightop = ift.makeOp(obs.weight) @ (empty @ li @ logwgt.exp()) ** (-2)
-        plotter.add("bayesian weighting", logwgt.exp())
-        plotter.add("power spectrum bayesian weighting", cfm.power_spectrum)
+        plotter.add("bayesian weighting", ift.DomainTupleFieldInserter(logwgt.target, 0, (0,)).adjoint @ logwgt.exp())
+        plotter.add("bayesian weighting1", ift.DomainTupleFieldInserter(logwgt.target, 0, (1,)).adjoint @ logwgt.exp())
+        plotter.add("bayesian weighting2", ift.DomainTupleFieldInserter(logwgt.target, 0, (2,)).adjoint @ logwgt.exp())
+        plotter.add("bayesian weighting3", ift.DomainTupleFieldInserter(logwgt.target, 0, (3,)).adjoint @ logwgt.exp())
+        plotter.add("power spectrum bayesian weighting0", ift.DomainTupleFieldInserter(cfm.power_spectrum.target, 0, (0,)).adjoint@ cfm.power_spectrum)
+        plotter.add("power spectrum bayesian weighting1", ift.DomainTupleFieldInserter(cfm.power_spectrum.target, 0, (1,)).adjoint@ cfm.power_spectrum)
+        plotter.add("power spectrum bayesian weighting2", ift.DomainTupleFieldInserter(cfm.power_spectrum.target, 0, (2,)).adjoint@ cfm.power_spectrum)
+        plotter.add("power spectrum bayesian weighting3", ift.DomainTupleFieldInserter(cfm.power_spectrum.target, 0, (3,)).adjoint@ cfm.power_spectrum)
 
     dom = ift.RGSpace(npix, fov / npix)
     if polmode:
@@ -84,12 +91,16 @@ def main():
             "i": args.diffusefluxlevel,
             "q": 0,
             "u": 0,
+            "v": 0,
         }
         opdct = {}
-        for kk in ["i", "q", "u"]:
+        keys = ["i", "q", "u"]
+        if args.with_v:
+            keys += "v"
+        for kk in keys:
             opdct[kk] = ift.SimpleCorrelatedField(
                 dom,
-                args.diffusefluxlevel,
+                params[kk],
                 (1, 0.1),
                 (5, 1),
                 (1.2, 0.4),
@@ -98,18 +109,23 @@ def main():
                 prefix=f"log{kk}",
             )
         logop = reduce(add, [vv.ducktape_left(kk) for kk, vv in opdct.items()])
-        mexp = rve.polarization_matrix_exponential(logop.target)
+        mexp = rve.polarization_matrix_exponential(logop.target, args.with_v)
         # ift.extra.check_operator(mexp, ift.from_random(mexp.domain)*0.1, ntries=5)
         sky = mexp @ logop
         duckI = ift.ducktape(None, sky.target, "I")
         duckQ = ift.ducktape(None, sky.target, "Q")
         duckU = ift.ducktape(None, sky.target, "U")
-        polarized_part = duckQ(sky) ** 2 + duckU(sky) ** 2  # + V ** 2
+        polarized_part = duckQ(sky) ** 2 + duckU(sky) ** 2
+        lim = 600000
+        if args.with_v:
+            duckV = ift.ducktape(None, sky.target, "V")
+            polarized_part = polarized_part + duckV(sky) ** 2
+            plotter.add("stokesv", duckV(sky), vmin=-lim, vmax=lim, cmap="seismic")
         frac_pol = polarized_part * (polarized_part + duckI(sky) ** 2).reciprocal()
         plotter.add("logstokesi", duckI(sky).log())
-        plotter.add("stokesq", duckQ(sky))
-        plotter.add("stokesu", duckU(sky))
-        plotter.add("fractional_polarization", frac_pol, vmin=0, vmax=1, cmap="Greys")
+        plotter.add("stokesq", duckQ(sky), vmin=-lim, vmax=lim, cmap="seismic")
+        plotter.add("stokesu", duckU(sky), vmin=-lim, vmax=lim, cmap="seismic")
+        plotter.add("fractional_polarization", frac_pol.sqrt(), vmin=0, vmax=1, cmap="Greys")
     else:
         logsky = ift.SimpleCorrelatedField(
             dom,
@@ -174,13 +190,14 @@ def main():
                 )
         state = rve.MinimizationState(fld, [])
         mini = ift.NewtonCG(
-            ift.GradientNormController(name="newton", iteration_limit=40)
+            ift.GradientNormController(name="newton", iteration_limit=10)
         )
         if args.use_cached and isfile("stage1"):
             state = rve.MinimizationState.load("stage1")
         else:
-            state = rve.simple_minimize(ham, state.mean, 0, mini)
-            plotter.plot("stage1", state)
+            for ii in range(4):
+                state = rve.simple_minimize(ham, state.mean, 0, mini)
+                plotter.plot(f"stage1_{ii}", state)
             state.save("stage1")
 
         # Only weights
@@ -204,6 +221,11 @@ def main():
                 plotter.plot(f"stage2_{ii}", state)
             state.save("stage2")
 
+
+        state = rve.MinimizationState(
+            ift.MultiField.union([0.1 * ift.from_random(sky.domain), state.mean]),
+            [],
+        )
     if rve.mpi.mpi:
         if not rve.mpi.master:
             state = None
@@ -218,15 +240,16 @@ def main():
         cst = list(points.domain.keys()) + list(weightop.domain.keys())
     else:
         cst = list(weightop.domain.keys())
-    mini = ift.NewtonCG(ift.GradientNormController(name="newton", iteration_limit=15))
-    for ii in range(4):
+    mini = ift.NewtonCG(ift.GradientNormController(name="newton", iteration_limit=10))
+    for ii in range(10):
         fname = f"stage3_{ii}"
         if args.use_cached and isfile(fname):
             state = rve.MinimizationState.load(fname)
         else:
-            state = rve.simple_minimize(ham, state.mean, 5, mini, cst, cst)
+            state = rve.simple_minimize(ham, state.mean, 0, mini, cst, cst)
             plotter.plot(f"stage3_{ii}", state)
             state.save(fname)
+    exit()
 
     # Sky + weighting simultaneously
     ic = ift.AbsDeltaEnergyController(0.1, 3, 700, name="Sampling")
