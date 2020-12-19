@@ -74,14 +74,9 @@ def main():
         ift.extra.check_linear_operator(empty)
         ift.extra.check_linear_operator(li)
         weightop = ift.makeOp(obs.weight) @ (empty @ li @ logwgt.exp()) ** (-2)
-        plotter.add("bayesian weighting", ift.DomainTupleFieldInserter(logwgt.target, 0, (0,)).adjoint @ logwgt.exp())
-        plotter.add("bayesian weighting1", ift.DomainTupleFieldInserter(logwgt.target, 0, (1,)).adjoint @ logwgt.exp())
-        plotter.add("bayesian weighting2", ift.DomainTupleFieldInserter(logwgt.target, 0, (2,)).adjoint @ logwgt.exp())
-        plotter.add("bayesian weighting3", ift.DomainTupleFieldInserter(logwgt.target, 0, (3,)).adjoint @ logwgt.exp())
-        plotter.add("power spectrum bayesian weighting0", ift.DomainTupleFieldInserter(cfm.power_spectrum.target, 0, (0,)).adjoint@ cfm.power_spectrum)
-        plotter.add("power spectrum bayesian weighting1", ift.DomainTupleFieldInserter(cfm.power_spectrum.target, 0, (1,)).adjoint@ cfm.power_spectrum)
-        plotter.add("power spectrum bayesian weighting2", ift.DomainTupleFieldInserter(cfm.power_spectrum.target, 0, (2,)).adjoint@ cfm.power_spectrum)
-        plotter.add("power spectrum bayesian weighting3", ift.DomainTupleFieldInserter(cfm.power_spectrum.target, 0, (3,)).adjoint@ cfm.power_spectrum)
+        for ii in range(4):
+            plotter.add(f"bayesian weighting{ii}", ift.DomainTupleFieldInserter(logwgt.target, 0, (ii,)).adjoint @ logwgt.exp())
+            plotter.add(f"power spectrum bayesian weighting{ii}", ift.DomainTupleFieldInserter(cfm.power_spectrum.target, 0, (ii,)).adjoint@ cfm.power_spectrum)
 
     dom = ift.RGSpace(npix, fov / npix)
     if polmode:
@@ -121,7 +116,7 @@ def main():
             duckV = ift.ducktape(None, sky.target, "V")
             polarized_part = polarized_part + duckV(sky) ** 2
             plotter.add("stokesv", duckV(sky), vmin=-lim, vmax=lim, cmap="seismic")
-        frac_pol = polarized_part * (polarized_part + duckI(sky) ** 2).reciprocal()
+        frac_pol = polarized_part.sqrt() * duckI(sky).reciprocal()
         plotter.add("logstokesi", duckI(sky).log())
         plotter.add("stokesq", duckQ(sky), vmin=-lim, vmax=lim, cmap="seismic")
         plotter.add("stokesu", duckU(sky), vmin=-lim, vmax=lim, cmap="seismic")
@@ -175,9 +170,9 @@ def main():
 
         # MAP diffuse with original weights
         lh = rve.ImagingLikelihood(obs, sky, polmode)
-        plotter.add_histogram(
-            "normalized residuals (original weights)", lh.normalized_residual
-        )
+        for ii in range(4):
+            foo = lh.normalized_residual
+            plotter.add_histogram(f"normalized residuals (original weights){ii}", ift.DomainTupleFieldInserter(foo.target, 0, (ii,)).adjoint @ foo)
         ham = ift.StandardHamiltonian(lh)
         if polmode:
             fld = 0.1 * ift.from_random(sky.domain)
@@ -202,9 +197,9 @@ def main():
 
         # Only weights
         lh = rve.ImagingLikelihoodVariableCovariance(obs, sky, weightop, polmode)
-        plotter.add_histogram(
-            "normalized residuals (learned weights)", lh.normalized_residual
-        )
+        for ii in range(4):
+            foo = lh.normalized_residual
+            plotter.add_histogram(f"normalized residuals (learned weights){ii}", ift.DomainTupleFieldInserter(foo.target, 0, (ii,)).adjoint @ foo)
         ic = ift.AbsDeltaEnergyController(0.1, 3, 100, name="Sampling")
         ham = ift.StandardHamiltonian(lh, ic)
         cst = sky.domain.keys()
@@ -246,7 +241,7 @@ def main():
         if args.use_cached and isfile(fname):
             state = rve.MinimizationState.load(fname)
         else:
-            state = rve.simple_minimize(ham, state.mean, 0, mini, cst, cst)
+            state = rve.simple_minimize(ham, state.mean, 5, mini, cst, cst)
             plotter.plot(f"stage3_{ii}", state)
             state.save(fname)
     exit()
