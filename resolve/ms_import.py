@@ -193,6 +193,10 @@ def read_ms_i(
         active_channels = np.zeros(nchan, dtype=np.bool)
         step = max(1, nrow // 100)  # how many rows to read in every step
 
+
+        # Check if data column is available
+        t.getcol(data_column, startrow=0, nrow=10)
+
         # Determine which subset of rows/channels we need to input
         start = 0
         while start < nrow:
