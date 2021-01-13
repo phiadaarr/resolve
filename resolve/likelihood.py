@@ -8,7 +8,7 @@ import nifty7 as ift
 
 from .observation import Observation
 from .response import FullPolResponse, MfResponse, StokesIResponse
-from .util import my_assert_isinstance, my_asserteq
+from .util import my_assert_isinstance, my_asserteq, my_assert
 
 
 def _get_mask(observation):
