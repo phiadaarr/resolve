@@ -53,7 +53,9 @@ def _build_varcov_gauss_lh_nres(residual, inverse_covariance, dtype):
 def ImagingLikelihood(observation, sky_operator, polmode=False):
     my_assert_isinstance(observation, Observation)
     my_assert_isinstance(sky_operator, ift.Operator)
-    R = (FullPolResponse if polmode else StokesIResponse)(observation, sky_operator.target)
+    R = (FullPolResponse if polmode else StokesIResponse)(
+        observation, sky_operator.target
+    )
     # TODO Why is the adjointness so bad?
     # ift.extra.check_linear_operator(R, target_dtype=np.complex64, only_r_linear=True)
     my_asserteq(R.target, observation.vis.domain)
@@ -87,7 +89,9 @@ def ImagingLikelihoodVariableCovariance(
     # my_assert_isinstance(
     #     inverse_covariance_operator.target, sky_operator.target, ift.DomainTuple
     # )
-    R = (FullPolResponse if polmode else StokesIResponse)(observation, sky_operator.target)
+    R = (FullPolResponse if polmode else StokesIResponse)(
+        observation, sky_operator.target
+    )
     my_asserteq(R.target, observation.vis.domain)
     return _varcov(observation, R @ sky_operator, inverse_covariance_operator)
 

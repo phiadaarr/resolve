@@ -302,7 +302,7 @@ def read_ms_i(
             time = np.ascontiguousarray(t.getcol("TIME")[active_rows])
         else:
             ant1 = ant2 = time = None
-    print("Selected:", 10*" ")
+    print("Selected:", 10 * " ")
     print(f"  shape: {vis.shape}")
     print(f"  flagged: {(1.0-np.sum(wgt!=0)/wgt.size)*100:.1f} %")
     freq = freq[active_channels]

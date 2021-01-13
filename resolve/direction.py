@@ -14,6 +14,7 @@ class Direction:
     equinox : int
         reference year of the equinox
     """
+
     def __init__(self, phase_center, equinox):
         my_asserteq(len(phase_center), 2)
         self._pc = phase_center

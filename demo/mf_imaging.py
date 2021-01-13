@@ -183,5 +183,5 @@ def main():
         plotter.plot(f"iter{ii}", state)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

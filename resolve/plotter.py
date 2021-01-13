@@ -303,7 +303,7 @@ def _plot_histograms(state, fname, lim, width, postop=None):
                 )
             xs = np.linspace(-5, 5)
             axx.set_yscale("log")
-            axx.plot(xs, np.exp(-xs ** 2 / 2) / np.sqrt(2 * np.pi))
+            axx.plot(xs, np.exp(-(xs ** 2) / 2) / np.sqrt(2 * np.pi))
             redchisq = (
                 np.sum((np.abs(lstD) if np.iscomplexobj(lstD) else lstD) ** 2)
                 / lstD.size

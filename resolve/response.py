@@ -68,8 +68,8 @@ class FullPolResponse(ift.LinearOperator):
                 V = self._sr(x["V"]).val
                 res[0] += V
                 res[3] -= -V
-            res[1] = Q+1j*U
-            res[2] = Q-1j*Q
+            res[1] = Q + 1j * U
+            res[2] = Q - 1j * Q
         else:
             op = lambda inp: self._sr.adjoint(ift.makeField(self._sr.target, inp))
             x = x.val
@@ -78,7 +78,7 @@ class FullPolResponse(ift.LinearOperator):
             if self._with_v:
                 res["V"] = op(x[0] - x[3]).val
             res["Q"] = op(x[1] + x[2]).val
-            res["U"] = op(1j*(x[2] - x[1])).val
+            res["U"] = op(1j * (x[2] - x[1])).val
         return ift.makeField(self._tgt(mode), res)
 
 
@@ -125,7 +125,11 @@ class MfResponse(ift.LinearOperator):
             sel = band_indices == band_index
             assert mask.shape[0] == 1
             r = SingleResponse(
-                position_domain, observation.uvw, observation.freq[sel], mask[0, :, sel].T, sp
+                position_domain,
+                observation.uvw,
+                observation.freq[sel],
+                mask[0, :, sel].T,
+                sp,
             )
             self._r.append((band_index, sel, r))
         # Double check that all channels are written to

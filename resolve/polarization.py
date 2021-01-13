@@ -91,7 +91,9 @@ class polarization_matrix_exponential(ift.Operator):
         assert self._domain["i"] == self._domain["q"] == self._domain["u"]
         if with_v:
             self._domain["i"] == self._domain["v"]
-        self._target = ift.makeDomain({kk.upper(): self._domain["i"] for kk in self._domain.keys()})
+        self._target = ift.makeDomain(
+            {kk.upper(): self._domain["i"] for kk in self._domain.keys()}
+        )
         self._with_v = with_v
 
     def apply(self, x):
@@ -102,7 +104,7 @@ class polarization_matrix_exponential(ift.Operator):
         tmpi = x["i"].exp()
         if self._with_v:
             duckV = ift.ducktape(None, self._domain["u"], "V")
-            log_p = (x["q"] ** 2 + x["u"] ** 2 + x["v"]**2).sqrt()
+            log_p = (x["q"] ** 2 + x["u"] ** 2 + x["v"] ** 2).sqrt()
         else:
             log_p = (x["q"] ** 2 + x["u"] ** 2).sqrt()
         I = duckI(tmpi * log_p.cosh())

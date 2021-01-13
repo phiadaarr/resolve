@@ -69,14 +69,26 @@ def main():
         cfm = ift.CorrelatedFieldMaker.make(0, (2, 2), "invcov", 4)
         cfm.add_fluctuations(dom, (2, 2), (1.2, 0.4), (0.5, 0.2), (-2, 0.5))
         logwgt = cfm.finalize(0)
-        li = rve.LinearOperatorOverAxis(ift.LinearInterpolator(dom, effuv), logwgt.target)
+        li = rve.LinearOperatorOverAxis(
+            ift.LinearInterpolator(dom, effuv), logwgt.target
+        )
         empty = rve.AddEmptyDimensionAtEnd(li.target)
         ift.extra.check_linear_operator(empty)
         ift.extra.check_linear_operator(li)
         weightop = ift.makeOp(obs.weight) @ (empty @ li @ logwgt.exp()) ** (-2)
         for ii in range(4):
-            plotter.add(f"bayesian weighting{ii}", ift.DomainTupleFieldInserter(logwgt.target, 0, (ii,)).adjoint @ logwgt.exp())
-            plotter.add(f"power spectrum bayesian weighting{ii}", ift.DomainTupleFieldInserter(cfm.power_spectrum.target, 0, (ii,)).adjoint@ cfm.power_spectrum)
+            plotter.add(
+                f"bayesian weighting{ii}",
+                ift.DomainTupleFieldInserter(logwgt.target, 0, (ii,)).adjoint
+                @ logwgt.exp(),
+            )
+            plotter.add(
+                f"power spectrum bayesian weighting{ii}",
+                ift.DomainTupleFieldInserter(
+                    cfm.power_spectrum.target, 0, (ii,)
+                ).adjoint
+                @ cfm.power_spectrum,
+            )
 
     dom = ift.RGSpace(npix, fov / npix)
     if polmode:
@@ -120,7 +132,9 @@ def main():
         plotter.add("logstokesi", duckI(sky).log())
         plotter.add("stokesq", duckQ(sky), vmin=-lim, vmax=lim, cmap="seismic")
         plotter.add("stokesu", duckU(sky), vmin=-lim, vmax=lim, cmap="seismic")
-        plotter.add("fractional_polarization", frac_pol.sqrt(), vmin=0, vmax=1, cmap="Greys")
+        plotter.add(
+            "fractional_polarization", frac_pol.sqrt(), vmin=0, vmax=1, cmap="Greys"
+        )
     else:
         logsky = ift.SimpleCorrelatedField(
             dom,
@@ -172,7 +186,10 @@ def main():
         lh = rve.ImagingLikelihood(obs, sky, polmode)
         for ii in range(4):
             foo = lh.normalized_residual
-            plotter.add_histogram(f"normalized residuals (original weights){ii}", ift.DomainTupleFieldInserter(foo.target, 0, (ii,)).adjoint @ foo)
+            plotter.add_histogram(
+                f"normalized residuals (original weights){ii}",
+                ift.DomainTupleFieldInserter(foo.target, 0, (ii,)).adjoint @ foo,
+            )
         ham = ift.StandardHamiltonian(lh)
         if polmode:
             fld = 0.1 * ift.from_random(sky.domain)
@@ -199,7 +216,10 @@ def main():
         lh = rve.ImagingLikelihoodVariableCovariance(obs, sky, weightop, polmode)
         for ii in range(4):
             foo = lh.normalized_residual
-            plotter.add_histogram(f"normalized residuals (learned weights){ii}", ift.DomainTupleFieldInserter(foo.target, 0, (ii,)).adjoint @ foo)
+            plotter.add_histogram(
+                f"normalized residuals (learned weights){ii}",
+                ift.DomainTupleFieldInserter(foo.target, 0, (ii,)).adjoint @ foo,
+            )
         ic = ift.AbsDeltaEnergyController(0.1, 3, 100, name="Sampling")
         ham = ift.StandardHamiltonian(lh, ic)
         cst = sky.domain.keys()
@@ -215,7 +235,6 @@ def main():
                 state = rve.simple_minimize(ham, state.mean, 0, mini, cst, cst)
                 plotter.plot(f"stage2_{ii}", state)
             state.save("stage2")
-
 
         state = rve.MinimizationState(
             ift.MultiField.union([0.1 * ift.from_random(sky.domain), state.mean]),

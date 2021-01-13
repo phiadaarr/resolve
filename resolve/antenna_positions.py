@@ -23,6 +23,7 @@ class AntennaPositions:
     time : float
         time of measurement
     """
+
     # FIXME Split this class into two. One for only imaging, one also for calibration
     def __init__(self, uvw, ant1=None, ant2=None, time=None):
         if ant1 is None:
