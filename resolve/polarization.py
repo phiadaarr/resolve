@@ -90,7 +90,7 @@ class polarization_matrix_exponential(ift.Operator):
         assert set(self._domain.keys()) == set(keys)
         assert self._domain["i"] == self._domain["q"] == self._domain["u"]
         if with_v:
-            self._domain["i"] == self._domain["v"]
+            assert self._domain["i"] == self._domain["v"]
         self._target = ift.makeDomain(
             {kk.upper(): self._domain["i"] for kk in self._domain.keys()}
         )

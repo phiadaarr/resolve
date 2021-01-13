@@ -44,7 +44,7 @@ class FullPolResponse(ift.LinearOperator):
         elif set(domain.keys()) == set(["I", "Q", "U"]):
             self._with_v = False
         else:
-            RuntimeError
+            raise RuntimeError
         my_asserteq(len(domain["I"]), 1)
         my_asserteq(len(domain["I"].shape), 2)
         my_asserteq(dd for dd in domain)

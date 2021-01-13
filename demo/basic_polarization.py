@@ -183,7 +183,7 @@ def main():
                 state.save("stage0")
 
         # MAP diffuse with original weights
-        lh = rve.ImagingLikelihood(obs, sky, polmode)
+        lh = rve.ImagingLikelihood(obs, sky)
         for ii in range(4):
             foo = lh.normalized_residual
             plotter.add_histogram(
@@ -213,7 +213,7 @@ def main():
             state.save("stage1")
 
         # Only weights
-        lh = rve.ImagingLikelihoodVariableCovariance(obs, sky, weightop, polmode)
+        lh = rve.ImagingLikelihood(obs, sky, inverse_covariance_operator=weightop)
         for ii in range(4):
             foo = lh.normalized_residual
             plotter.add_histogram(
@@ -248,7 +248,7 @@ def main():
 
     # MGVI sky
     ic = ift.AbsDeltaEnergyController(0.1, 3, 200, name="Sampling")
-    lh = rve.ImagingLikelihoodVariableCovariance(obs, sky, weightop, polmode)
+    lh = rve.ImagingLikelihood(obs, sky, inverse_covariance_operator=weightop)
     ham = ift.StandardHamiltonian(lh, ic)
     if args.point is not None:
         cst = list(points.domain.keys()) + list(weightop.domain.keys())

@@ -92,7 +92,7 @@ def main():
     abc_science = rve.calibration_distribution(
         oscience, phase, logampl, antenna_dct, None
     )
-    lh1 = rve.ImagingCalibrationLikelihood(oscience, sky, abc_science)
+    lh1 = rve.ImagingLikelihood(oscience, sky, calibration_operator=abc_science)
 
     plotter = rve.Plotter("png", "plots")
     plotter.add_calibration_solution("calibration_logamplitude", logampl)

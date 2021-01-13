@@ -16,7 +16,8 @@ setup(
     # install_requires=["nifty7", "ducc0"],
     license="GPLv3",
     classifiers=[
-        "Development Status :: 3 - Alpha", "Topic :: Utilities",
-        "License :: OSI Approved :: GNU General Public License v3 "
-        "or later (GPLv3+)"
-    ])
+        "Development Status :: 3 - Alpha",
+        "Topic :: Utilities",
+        "License :: OSI Approved :: GNU General Public License v3 " "or later (GPLv3+)",
+    ],
+)

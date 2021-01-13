@@ -23,18 +23,36 @@ def mf_logsky(domain, freq, prefix, plotter):
     # FIXME Figure out why the values are so freaking big/small
     flexibility, asperity = (1e-11, 1e-14), (1e14, 1e14)
 
-    a0 = ift.SimpleCorrelatedField(domain, 21, (1, 0.1), (5, 1), (1.2, 0.4), (0.2, 0.2), (-2, 0.5),
-                                   prefix=f'{prefix}a0')
-    b0 = ift.SimpleCorrelatedField(domain, 0, (1e-7, 1e-7), (1e-7, 1e-7), (1.2, 0.4), (0.2, 0.2), (-2, 0.5),
-                                   prefix=f'{prefix}b0')
+    a0 = ift.SimpleCorrelatedField(
+        domain,
+        21,
+        (1, 0.1),
+        (5, 1),
+        (1.2, 0.4),
+        (0.2, 0.2),
+        (-2, 0.5),
+        prefix=f"{prefix}a0",
+    )
+    b0 = ift.SimpleCorrelatedField(
+        domain,
+        0,
+        (1e-7, 1e-7),
+        (1e-7, 1e-7),
+        (1.2, 0.4),
+        (0.2, 0.2),
+        (-2, 0.5),
+        prefix=f"{prefix}b0",
+    )
     # FIXME Is there a bug in the b0 handling?
-    b0 = ift.ScalingOperator(domain, 0.).ducktape(f'{prefix}b0')
+    b0 = ift.ScalingOperator(domain, 0.0).ducktape(f"{prefix}b0")
     plotter.add("a0", a0)
     plotter.add("b0", b0)
 
     # IDEA Try to use individual power spectra
     # FIXME Support fixed variance for zero mode
-    cfm = ift.CorrelatedFieldMaker.make(0., (1, 0.00001), f'{prefix}freqxi', total_N=2*(nfreq-1))
+    cfm = ift.CorrelatedFieldMaker.make(
+        0.0, (1, 0.00001), f"{prefix}freqxi", total_N=2 * (nfreq - 1)
+    )
     # FIXME Support fixed fluctuations
     cfm.add_fluctuations(domain, (1, 0.00001), (1.2, 0.4), (0.2, 0.2), (-2, 0.5))
     freqxi = cfm.finalize(0)
@@ -51,30 +69,30 @@ def mf_logsky(domain, freq, prefix, plotter):
     expander = ift.ContractionOperator(intop.domain, (0, 1)).adjoint
     vol = freqdom.dvol
 
-    flex = ift.LognormalTransform(*flexibility, prefix + 'flexibility', 0)
+    flex = ift.LognormalTransform(*flexibility, prefix + "flexibility", 0)
     dom = intop.domain[0]
     vflex = np.empty(dom.shape)
     vflex[0] = vflex[1] = np.sqrt(vol)
-    vflex = ift.DiagonalOperator(ift.makeField(dom, vflex),
-                                 domain=expander.target,
-                                 spaces=0)
+    vflex = ift.DiagonalOperator(
+        ift.makeField(dom, vflex), domain=expander.target, spaces=0
+    )
     sig_flex = vflex @ expander @ flex
     shift = np.empty(expander.target.shape)
-    shift[0] = (vol**2 / 12.)[..., None, None]
+    shift[0] = (vol ** 2 / 12.0)[..., None, None]
     shift[1] = 1
     shift = ift.makeField(expander.target, shift)
     if asperity is None:
-        asp = ift.makeOp(shift.ptw("sqrt")) @ (freqxi*sig_flex)
+        asp = ift.makeOp(shift.ptw("sqrt")) @ (freqxi * sig_flex)
     else:
-        asp = ift.LognormalTransform(*asperity, prefix + 'asperity', 0)
+        asp = ift.LognormalTransform(*asperity, prefix + "asperity", 0)
         vasp = np.empty(dom.shape)
         vasp[0] = 1
         vasp[1] = 0
-        vasp = ift.DiagonalOperator(ift.makeField(dom, vasp),
-                                    domain=expander.target,
-                                    spaces=0)
+        vasp = ift.DiagonalOperator(
+            ift.makeField(dom, vasp), domain=expander.target, spaces=0
+        )
         sig_asp = vasp @ expander @ asp
-        asp = freqxi*sig_flex*(ift.Adder(shift) @ sig_asp).ptw("sqrt")
+        asp = freqxi * sig_flex * (ift.Adder(shift) @ sig_asp).ptw("sqrt")
 
     # FIXME shift, vasp, vflex have far more pixels than needed
 
@@ -91,8 +109,8 @@ def mf_logsky(domain, freq, prefix, plotter):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-j', type=int, default=1)
-    parser.add_argument('--automatic-weighting', action='store_true')
+    parser.add_argument("-j", type=int, default=1)
+    parser.add_argument("--automatic-weighting", action="store_true")
     args = parser.parse_args()
     rve.set_nthreads(args.j)
     rve.set_wgridding(False)
@@ -102,33 +120,41 @@ def main():
     # obs = rve.Observation.load('/data/g330field0.npz')
 
     print("Load")
-    obs = rve.Observation.load('/data/hydraC_every10th_channel.npz')
+    obs = rve.Observation.load("/data/hydraC_every10th_channel.npz")
     print("Done")
 
-    print('Frequencies:')
+    print("Frequencies:")
     print(obs.freq)
-    print('Shape visibilities:', obs.vis.shape)
-    plt.scatter(np.arange(len(obs.freq)), obs.freq*1e-6)
-    plt.ylabel('Frequency [MHz]')
-    plt.xlabel('Channel')
-    plt.savefig('debug_channels.png')
+    print("Shape visibilities:", obs.vis.shape)
+    plt.scatter(np.arange(len(obs.freq)), obs.freq * 1e-6)
+    plt.ylabel("Frequency [MHz]")
+    plt.xlabel("Channel")
+    plt.savefig("debug_channels.png")
     plt.close()
 
-    rve.set_epsilon(1/10/obs.max_snr())
+    rve.set_epsilon(1 / 10 / obs.max_snr())
 
-    fov = np.array([3, 3])*rve.ARCMIN2RAD
+    fov = np.array([3, 3]) * rve.ARCMIN2RAD
     # Do not use powers of two here, otherwise super slow
     npix = np.array([250, 250])
 
     if False:
-        R = rve.response.MfResponse(obs, rve.IRGSpace(obs.freq), ift.RGSpace(npix, fov/npix))
-        j = R.adjoint(obs.vis*obs.weight)
-        rve.plotter._plot_mf(rve.MinimizationState(j, []), ift.ScalingOperator(j.domain, 1), "out", None, 3)
+        R = rve.response.MfResponse(
+            obs, rve.IRGSpace(obs.freq), ift.RGSpace(npix, fov / npix)
+        )
+        j = R.adjoint(obs.vis * obs.weight)
+        rve.plotter._plot_mf(
+            rve.MinimizationState(j, []),
+            ift.ScalingOperator(j.domain, 1),
+            "out",
+            None,
+            3,
+        )
 
-    dom = ift.RGSpace(npix, fov/npix)
-    plotter = rve.MfPlotter('png', 'plots')
+    dom = ift.RGSpace(npix, fov / npix)
+    plotter = rve.MfPlotter("png", "plots")
     jump = 15
-    logsky = mf_logsky(dom, obs.freq[jump//2::jump], 'sky', plotter)
+    logsky = mf_logsky(dom, obs.freq[jump // 2 :: jump], "sky", plotter)
 
     # Plot prior samples
     if False:
@@ -142,27 +168,31 @@ def main():
         # FIXME Figure out how to do automatic weighting for mf
         npix = 2500
         effuv = np.linalg.norm(obs.effective_uvw(), axis=1)
-        dom = ift.RGSpace(npix, 2*np.max(effuv)/npix)
+        dom = ift.RGSpace(npix, 2 * np.max(effuv) / npix)
 
-        cfm = ift.CorrelatedFieldMaker.make(0, (2, 2), 'invcov', total_N=obs.nfreq)
+        cfm = ift.CorrelatedFieldMaker.make(0, (2, 2), "invcov", total_N=obs.nfreq)
         cfm.add_fluctuations(dom, (2, 2), (1.2, 0.4), (0.5, 0.2), (-2, 0.5))
         logweighting = cfm.finalize(0)
 
         interpolation = rve.MfWeightingInterpolation(effuv, logweighting.target)
-        weightop = ift.makeOp(obs.weight) @ (interpolation @ logweighting.exp())**(-2)
-        lh_wgt = rve.MfImagingLikelihoodVariableCovariance(obs, sky, weightop)
-        plotter.add_histogram('normalized residuals autowgts', lh_wgt.normalized_residual)
+        weightop = ift.makeOp(obs.weight) @ (interpolation @ logweighting.exp()) ** (-2)
+        lh_wgt = rve.ImagingLikelihood(obs, sky, inverse_covariance_operator=weightop)
+        plotter.add_histogram(
+            "normalized residuals autowgts", lh_wgt.normalized_residual
+        )
 
         # FIXME
         # plotter.add('bayesian weighting', logweighting.exp())
-        plotter.add_multiple1d('power spectrum bayesian weighting', cfm.power_spectrum)
-    lh = rve.MfImagingLikelihood(obs, sky)
-    plotter.add_histogram('normalized residuals', lh.normalized_residual)
+        plotter.add_multiple1d("power spectrum bayesian weighting", cfm.power_spectrum)
+    lh = rve.ImagingLikelihood(obs, sky)
+    plotter.add_histogram("normalized residuals", lh.normalized_residual)
 
-    minimizer = ift.NewtonCG(ift.GradientNormController(name='newton', iteration_limit=5))
+    minimizer = ift.NewtonCG(
+        ift.GradientNormController(name="newton", iteration_limit=5)
+    )
 
     ham = ift.StandardHamiltonian(lh)
-    state = rve.MinimizationState(0.1*ift.from_random(ham.domain), [])
+    state = rve.MinimizationState(0.1 * ift.from_random(ham.domain), [])
 
     if args.automatic_weighting:
         for ii in range(5):
@@ -171,11 +201,13 @@ def main():
 
         lh = lh_wgt
         ham = ift.StandardHamiltonian(lh)
-        pos = ift.MultiField.union([0.1*ift.from_random(ham.domain), state.mean])
+        pos = ift.MultiField.union([0.1 * ift.from_random(ham.domain), state.mean])
         state = rve.MinimizationState(pos, [])
 
         for ii in range(5):
-            state = rve.simple_minimize(ham, state.mean, 0, minimizer, constants=sky.domain.keys())
+            state = rve.simple_minimize(
+                ham, state.mean, 0, minimizer, constants=sky.domain.keys()
+            )
             plotter.plot(f"pre_wgt_{ii}", state)
 
     for ii in range(20):
