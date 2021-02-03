@@ -13,7 +13,6 @@ from os.path import isfile, splitext
 
 def main():
     parser = argparse.ArgumentParser()
-    # TODO Add modes: reconstruct, plot
     # TODO OU process for automatic weighting
     parser.add_argument("-j", type=int, default=1)
     parser.add_argument("--use-cached", action="store_true")
@@ -125,7 +124,7 @@ def main():
             state.save("stage1")
 
         # Only weights
-        lh = rve.ImagingLikelihoodVariableCovariance(obs, sky, weightop)
+        lh = rve.ImagingLikelihood(obs, sky, inverse_covariance_operator=weightop)
         plotter.add_histogram(
             "normalized residuals (learned weights)", lh.normalized_residual
         )

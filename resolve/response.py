@@ -33,6 +33,55 @@ def StokesIResponse(observation, domain):
     raise RuntimeError
 
 
+class FullPolResponse(ift.LinearOperator):
+    def __init__(self, observation, domain):
+        my_assert_isinstance(observation, Observation)
+        domain = ift.MultiDomain.make(domain)
+        self._domain = domain
+        self._target = observation.vis.domain
+        if set(domain.keys()) == set(["I", "Q", "U", "V"]):
+            self._with_v = True
+        elif set(domain.keys()) == set(["I", "Q", "U"]):
+            self._with_v = False
+        else:
+            raise RuntimeError
+        my_asserteq(len(domain["I"]), 1)
+        my_asserteq(len(domain["I"].shape), 2)
+        my_asserteq(dd for dd in domain)
+        npol = observation.npol
+        my_asserteq(npol, 4)
+        sp = observation.vis.dtype == np.complex64
+        domain = domain["I"]
+        mask = np.all(observation.mask, axis=0)
+        self._sr = SingleResponse(domain, observation.uvw, observation.freq, mask, sp)
+        self._capability = self.TIMES | self.ADJOINT_TIMES
+
+    def apply(self, x, mode):
+        self._check_input(x, mode)
+        if mode == self.TIMES:
+            res = np.empty(self._target.shape, dtype=np.complex64)
+            Q = self._sr(x["Q"]).val
+            assert Q.dtype == np.complex64
+            U = self._sr(x["U"]).val
+            res[0] = res[3] = self._sr(x["I"]).val
+            if self._with_v:
+                V = self._sr(x["V"]).val
+                res[0] += V
+                res[3] -= -V
+            res[1] = Q + 1j * U
+            res[2] = Q - 1j * Q
+        else:
+            op = lambda inp: self._sr.adjoint(ift.makeField(self._sr.target, inp))
+            x = x.val
+            res = {}
+            res["I"] = op(x[0] + x[3]).val
+            if self._with_v:
+                res["V"] = op(x[0] - x[3]).val
+            res["Q"] = op(x[1] + x[2]).val
+            res["U"] = op(1j * (x[2] - x[1])).val
+        return ift.makeField(self._tgt(mode), res)
+
+
 class MfResponse(ift.LinearOperator):
     """Multi-frequency response
 
@@ -76,7 +125,11 @@ class MfResponse(ift.LinearOperator):
             sel = band_indices == band_index
             assert mask.shape[0] == 1
             r = SingleResponse(
-                position_domain, observation.uvw, observation.freq[sel], mask[0, :, sel].T, sp
+                position_domain,
+                observation.uvw,
+                observation.freq[sel],
+                mask[0, :, sel].T,
+                sp,
             )
             self._r.append((band_index, sel, r))
         # Double check that all channels are written to

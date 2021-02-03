@@ -34,7 +34,7 @@ if __name__ == "__main__":
         args.include_calibration_info,
         args.spectral_window,
         args.polarization_mode,
-        slice(args.ch_begin, args.ch_end, args.ch_jump)
+        slice(args.ch_begin, args.ch_end, args.ch_jump),
     )
     for ifield, oo in enumerate(obs):
         fname = join(args.output_folder, f"{name}field{ifield}.npz")
