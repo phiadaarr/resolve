@@ -4,12 +4,14 @@
 
 import nifty7 as ift
 
-_wgridding = False
-_epsilon = 1e-12
+_wgridding = None
+_epsilon = None
 _nthreads = 1
 
 
 def wgridding():
+    if _wgridding is None:
+        raise ValueError("Please set a value for wgridding via resolve.set_wgridding().")
     return _wgridding
 
 
@@ -20,6 +22,8 @@ def set_wgridding(val):
 
 
 def epsilon():
+    if _epsilon is None:
+        raise ValueError("Please set a value for epsilon via resolve.set_epsilon().")
     return _epsilon
 
 
