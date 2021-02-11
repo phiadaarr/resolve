@@ -17,6 +17,22 @@ class DummyResponse(ift.LinearOperator):
         return ift.makeField(self._tgt(mode), res)
 
 
+class MPIAdder(ift.EndomorphicOperator):
+    def __init__(self, domain, comm):
+        self._domain = ift.makeDomain(domain)
+        self._capability = self.TIMES | self.ADJOINT_TIMES
+        self._comm = comm
+
+    def apply(self, x, mode):
+        self._check_input(x, mode)
+        if mode == self.TIMES:
+            res = ift.utilities.allreduce_sum([x.val], self._comm)
+        else:
+            # FIXME assert x same on all tasks?
+            res = x.val
+        return ift.makeField(self._tgt(mode), res)
+
+
 def getop(domain, comm=None):
     """Return energy operator that maps the full multi-frequency sky onto
     the log-likelihood value for a frequency slice."""
@@ -43,7 +59,12 @@ def getop(domain, comm=None):
     # Instantiate response (dependent on rank via e.g. freq)
     # In the end: MfResponse(...., freq[lo:hi], ...) @ SkySlicer
     R = DummyResponse(domain, d.domain)
-    return ift.GaussianEnergy(d) @ R
+    ift.extra.check_linear_operator(R)
+    localop = ift.GaussianEnergy(d) @ R
+    adder = MPIAdder(localop.target, comm)
+    # ift.extra.check_linear_operator(adder)
+    totalop = adder @ localop
+    return totalop
 
 
 def main():
@@ -52,8 +73,10 @@ def main():
     np.save("data.npy", data.val)
     sky_domain = ift.RGSpace((2, 2))
     lh = getop(sky_domain)
-
-    # TODO MPI allreduce or something similar
+    lh1 = getop(sky_domain, False)
+    pos = ift.from_random(lh.domain)
+    print(lh(pos))
+    print(lh1(pos))
 
 
 if __name__ == "__main__":
