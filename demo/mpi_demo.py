@@ -21,7 +21,7 @@ class DummyResponse(ift.LinearOperator):
         return f"DummyResponse {self._domain.shape} -> {self._target.shape}"
 
 
-class _MPIAdder(ift.EndomorphicOperator):
+class MPIAdder(ift.EndomorphicOperator):
     def __init__(self, domain, comm, _callfrommake=False):
         if not _callfrommake:
             raise RuntimeError("Use MPIAdder.make for instantiation.")
@@ -56,36 +56,12 @@ class _MPIAdder(ift.EndomorphicOperator):
             return ift.ScalingOperator(domain, 1.0)
         return cls(domain, comm, True)
 
-
-class MPIAdder(ift.Operator):
-    def __init__(self, domain, comm, _callfrommake=False):
-        if not _callfrommake:
-            raise RuntimeError("Use MPIAdder.make for instantiation.")
-        self._domain = self._target = ift.makeDomain(domain)
-        self._comm = comm
-
-    def apply(self, x):
-        self._check_input(x)
-        if not ift.is_linearization(x):
-            return allreduce_sum([x], self._comm)
-        val = allreduce_sum([x.val], self._comm)
-        # FIXME Why normalizing?
-        norm = 1 / self._comm.Get_size()
-        jac = allreduce_sum([x.jac], self._comm).scale(norm)
-        return x.new(val, jac)
-
     def __call__(self, x):
         # Hook for preserving the metric
         if x.metric is not None:
             metric = allreduce_sum([x.metric], self._comm)
-            return self.apply(x.trivial_jac()).prepend_jac(x.jac).add_metric(metric)
+            return x.new(self(x._val), self).prepend_jac(x.jac).add_metric(metric)
         return super(MPIAdder, self).__call__(x)
-
-    @classmethod
-    def make(cls, domain, comm):
-        if comm is None:
-            return ift.ScalingOperator(domain, 1.0)
-        return cls(domain, comm, True)
 
 
 def getop(domain, comm):
@@ -136,18 +112,22 @@ def main():
         ift.extra.assert_allclose(res0.val, res1.val)
         for _ in range(10):
             foo = ift.from_random(lh.domain)
-            # FIXME Is this really what we want?
-            ift.extra.assert_allclose(
-                allreduce_sum([res0.jac(foo)], comm), res1.jac(foo)
-            )
+            ift.extra.assert_allclose(res0.jac(foo), res1.jac(foo))
         # FIXME Is this really what we want?
         grad0 = allreduce_sum([res0.gradient], comm)
         ift.extra.assert_allclose(grad0, res1.gradient)
         if not wm:
             continue
-
         foo = ift.from_random(lh.domain)
         ift.extra.assert_allclose(res0.metric(foo), res1.metric(foo))
+
+    ham = ift.StandardHamiltonian(lh, ift.GradientNormController(iteration_limit=10))
+    ham1 = ift.StandardHamiltonian(lh1, ift.GradientNormController(iteration_limit=10))
+
+    pos = ift.from_random(lh.domain)
+    lin = ift.Linearization.make_var(pos, True)
+    ham(lin).metric.draw_sample()
+    ham1(lin).metric.draw_sample()
 
 
 if __name__ == "__main__":
