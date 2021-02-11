@@ -27,13 +27,24 @@ class MPIAdder(ift.EndomorphicOperator):
 
     def apply(self, x, mode):
         self._check_input(x, mode)
+
         if mode == self.TIMES:
             res = ift.utilities.allreduce_sum([x.val], self._comm)
-        else:
-            # FIXME assert x same on all tasks?
-            raise NotImplementedError("Try mpi.gather here.")
-            res = x.val
-        return ift.makeField(self._tgt(mode), res)
+            return ift.makeField(self.target, res)
+
+        if not isinstance(self._domain, ift.DomainTuple):
+            raise NotImplementedError("Sanity check not implemented")
+        size, rank, master = ift.utilities.get_MPI_params_from_comm(self._comm)
+        recv = None
+        if master:
+            shp = (self._comm.Get_size(),) + self._domain.shape
+            recv = np.empty(shp, dtype=x.val.dtype)
+        self._comm.Gather(x.val, recv, root=0)
+        if master:
+            ref = recv[0]
+            for ii in range(size):
+                np.testing.assert_equal(recv[ii], ref)
+        return x
 
     @classmethod
     def make(cls, domain, comm):
@@ -74,16 +85,27 @@ def main():
     data = ift.from_random(ddomain)
     if master:
         np.save("data.npy", data.val)
-    comm.Barrier()
+    if comm is not None:
+        comm.Barrier()
 
     sky_domain = ift.RGSpace((2, 2))
-
     lh = getop(sky_domain, comm)
     lh1 = getop(sky_domain, None)
+
     pos = ift.from_random(lh.domain)
     res0 = lh(pos)
     res1 = lh1(pos)
     ift.extra.assert_allclose(res0, res1)
+
+    lin = ift.Linearization.make_var(pos)
+    res0 = lh(lin)
+    res1 = lh1(lin)
+    ift.extra.assert_allclose(res0.val, res1.val)
+    for _ in range(10):
+        foo = ift.from_random(lh.domain)
+        ift.extra.assert_allclose(res0.jac(foo), res1.jac(foo))
+    grad0 = ift.utilities.allreduce_sum([res0.gradient], comm)
+    ift.extra.assert_allclose(grad0, res1.gradient)
 
 
 if __name__ == "__main__":
