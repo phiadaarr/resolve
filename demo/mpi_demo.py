@@ -1,5 +1,6 @@
 import nifty7 as ift
 import numpy as np
+from nifty7.utilities import allreduce_sum
 
 
 class DummyResponse(ift.LinearOperator):
@@ -16,8 +17,11 @@ class DummyResponse(ift.LinearOperator):
             res = np.full(self._tgt(mode).shape, np.sum(x.val))
         return ift.makeField(self._tgt(mode), res)
 
+    def __repr__(self):
+        return f"DummyResponse {self._domain.shape} -> {self._target.shape}"
 
-class MPIAdder(ift.EndomorphicOperator):
+
+class _MPIAdder(ift.EndomorphicOperator):
     def __init__(self, domain, comm, _callfrommake=False):
         if not _callfrommake:
             raise RuntimeError("Use MPIAdder.make for instantiation.")
@@ -29,7 +33,7 @@ class MPIAdder(ift.EndomorphicOperator):
         self._check_input(x, mode)
 
         if mode == self.TIMES:
-            res = ift.utilities.allreduce_sum([x.val], self._comm)
+            res = allreduce_sum([x.val], self._comm)
             return ift.makeField(self.target, res)
 
         if not isinstance(self._domain, ift.DomainTuple):
@@ -53,6 +57,37 @@ class MPIAdder(ift.EndomorphicOperator):
         return cls(domain, comm, True)
 
 
+class MPIAdder(ift.Operator):
+    def __init__(self, domain, comm, _callfrommake=False):
+        if not _callfrommake:
+            raise RuntimeError("Use MPIAdder.make for instantiation.")
+        self._domain = self._target = ift.makeDomain(domain)
+        self._comm = comm
+
+    def apply(self, x):
+        self._check_input(x)
+        if not ift.is_linearization(x):
+            return allreduce_sum([x], self._comm)
+        val = allreduce_sum([x.val], self._comm)
+        # FIXME Why normalizing?
+        norm = 1 / self._comm.Get_size()
+        jac = allreduce_sum([x.jac], self._comm).scale(norm)
+        return x.new(val, jac)
+
+    def __call__(self, x):
+        # Hook for preserving the metric
+        if x.metric is not None:
+            metric = allreduce_sum([x.metric], self._comm)
+            return self.apply(x.trivial_jac()).prepend_jac(x.jac).add_metric(metric)
+        return super(MPIAdder, self).__call__(x)
+
+    @classmethod
+    def make(cls, domain, comm):
+        if comm is None:
+            return ift.ScalingOperator(domain, 1.0)
+        return cls(domain, comm, True)
+
+
 def getop(domain, comm):
     """Return energy operator that maps the full multi-frequency sky onto
     the log-likelihood value for a frequency slice."""
@@ -67,16 +102,13 @@ def getop(domain, comm):
     d = d[lo:hi]
     d = ift.makeField((ift.UnstructuredDomain(ii) for ii in d.shape), d)
 
-    # Instantiate response (dependent on rank via e.g. freq)
-    # In the end: MfResponse(...., freq[lo:hi], ...) @ SkySlicer
+    # Instantiate response and likelihood (dependent on rank via e.g. freq)
     R = DummyResponse(domain, d.domain)
-    # Warning: the next line changes the random state!
-    # ift.extra.check_linear_operator(R)
     localop = ift.GaussianEnergy(d) @ R
+
+    # Add contributions from all tasks together
     adder = MPIAdder.make(localop.target, comm)
-    # ift.extra.check_linear_operator(adder)
-    totalop = adder @ localop
-    return totalop
+    return adder @ localop
 
 
 def main():
@@ -97,15 +129,25 @@ def main():
     res1 = lh1(pos)
     ift.extra.assert_allclose(res0, res1)
 
-    lin = ift.Linearization.make_var(pos)
-    res0 = lh(lin)
-    res1 = lh1(lin)
-    ift.extra.assert_allclose(res0.val, res1.val)
-    for _ in range(10):
+    for wm in [False, True]:
+        lin = ift.Linearization.make_var(pos, wm)
+        res0 = lh(lin)
+        res1 = lh1(lin)
+        ift.extra.assert_allclose(res0.val, res1.val)
+        for _ in range(10):
+            foo = ift.from_random(lh.domain)
+            # FIXME Is this really what we want?
+            ift.extra.assert_allclose(
+                allreduce_sum([res0.jac(foo)], comm), res1.jac(foo)
+            )
+        # FIXME Is this really what we want?
+        grad0 = allreduce_sum([res0.gradient], comm)
+        ift.extra.assert_allclose(grad0, res1.gradient)
+        if not wm:
+            continue
+
         foo = ift.from_random(lh.domain)
-        ift.extra.assert_allclose(res0.jac(foo), res1.jac(foo))
-    grad0 = ift.utilities.allreduce_sum([res0.gradient], comm)
-    ift.extra.assert_allclose(grad0, res1.gradient)
+        ift.extra.assert_allclose(res0.metric(foo), res1.metric(foo))
 
 
 if __name__ == "__main__":
