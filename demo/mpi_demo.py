@@ -31,11 +31,14 @@ class MPIAdder(ift.EndomorphicOperator):
 
     def apply(self, x, mode):
         self._check_input(x, mode)
+        if mode == self.ADJOINT_TIMES:
+            # FIXME Is this too expensive? If so, remove eventually.
+            self._input_sanity_check(x)
+            return x
+        res = allreduce_sum([x.val], self._comm)
+        return ift.makeField(self.target, res)
 
-        if mode == self.TIMES:
-            res = allreduce_sum([x.val], self._comm)
-            return ift.makeField(self.target, res)
-
+    def _input_sanity_check(self, x):
         if not isinstance(self._domain, ift.DomainTuple):
             raise NotImplementedError("Sanity check not implemented")
         size, rank, master = ift.utilities.get_MPI_params_from_comm(self._comm)
@@ -48,7 +51,6 @@ class MPIAdder(ift.EndomorphicOperator):
             ref = recv[0]
             for ii in range(size):
                 np.testing.assert_equal(recv[ii], ref)
-        return x
 
     @classmethod
     def make(cls, domain, comm):
@@ -100,11 +102,13 @@ def main():
     lh = getop(sky_domain, comm)
     lh1 = getop(sky_domain, None)
 
+    # Evaluate Field
     pos = ift.from_random(lh.domain)
     res0 = lh(pos)
     res1 = lh1(pos)
     ift.extra.assert_allclose(res0, res1)
 
+    # Evaluate Linearization
     for wm in [False, True]:
         lin = ift.Linearization.make_var(pos, wm)
         res0 = lh(lin)
@@ -112,8 +116,8 @@ def main():
         ift.extra.assert_allclose(res0.val, res1.val)
         for _ in range(10):
             foo = ift.from_random(lh.domain)
+            # FIXME Is this really what we want? Why no reduce_sum?
             ift.extra.assert_allclose(res0.jac(foo), res1.jac(foo))
-        # FIXME Is this really what we want?
         grad0 = allreduce_sum([res0.gradient], comm)
         ift.extra.assert_allclose(grad0, res1.gradient)
         if not wm:
@@ -121,9 +125,9 @@ def main():
         foo = ift.from_random(lh.domain)
         ift.extra.assert_allclose(res0.metric(foo), res1.metric(foo))
 
+    # Draw samples
     ham = ift.StandardHamiltonian(lh, ift.GradientNormController(iteration_limit=10))
     ham1 = ift.StandardHamiltonian(lh1, ift.GradientNormController(iteration_limit=10))
-
     pos = ift.from_random(lh.domain)
     lin = ift.Linearization.make_var(pos, True)
     ham(lin).metric.draw_sample()
