@@ -60,9 +60,24 @@ class MPIAdder(ift.EndomorphicOperator):
 
     def __call__(self, x):
         # Hook for preserving the metric
-        if x.want_metric:
-            return x.new(self(x._val), self).prepend_jac(x.jac).add_metric(x.metric)
-        return super(MPIAdder, self).__call__(x)
+        res = super(MPIAdder, self).__call__(x)
+        if not x.want_metric:
+            return res
+        return res.add_metric(x.metric)
+
+
+def MPISamplingDistributor(op, comm):
+    f = op.draw_sample_with_dtype
+
+    def newfunc(dtype, from_inverse=False):
+        ntask, rank, _ = ift.utilities.get_MPI_params_from_comm(comm)
+        sseq = ift.random.spawn_sseq(ntask)
+        with ift.random.Context(sseq[rank]):
+            res = f(dtype, from_inverse)
+        return res
+
+    op.draw_sample_with_dtype = newfunc
+    return op
 
 
 def getop(domain, comm):
@@ -71,9 +86,11 @@ def getop(domain, comm):
 
     # Load data
     d = np.load("data.npy")
+    invcov = np.load("invcov.npy")
 
     if comm == -1:
         d = ift.makeField((ift.UnstructuredDomain(ii) for ii in d.shape), d)
+        invcov = ift.makeOp(ift.makeField(d.domain, invcov))
     else:
         # Select relevant part of data
         size, rank, master = ift.utilities.get_MPI_params_from_comm(comm)
@@ -81,11 +98,13 @@ def getop(domain, comm):
         lo, hi = ift.utilities.shareRange(nwork, size, rank)
         d = d[lo:hi]
         d = ift.makeField((ift.UnstructuredDomain(ii) for ii in d.shape), d)
+        invcov = ift.makeOp(ift.makeField(d.domain, invcov[lo:hi]))
+        invcov = MPISamplingDistributor(invcov, comm)
 
     # Instantiate response and likelihood (dependent on rank via e.g. freq)
     R = DummyResponse(domain, d.domain)
     sky = ift.FieldAdapter(R.domain, "sky").exp()
-    localop = ift.GaussianEnergy(d) @ R
+    localop = ift.GaussianEnergy(d, invcov) @ R
 
     if comm == -1:
         return localop @ sky
@@ -99,8 +118,10 @@ def main():
     ddomain = ift.UnstructuredDomain(4), ift.UnstructuredDomain(1)
     comm, size, rank, master = ift.utilities.get_MPI_params()
     data = ift.from_random(ddomain).exp()
+    invcov = ift.from_random(ddomain).exp() * 0 + 1
     if master:
         np.save("data.npy", data.val)
+        np.save("invcov.npy", invcov.val)
     if comm is not None:
         comm.Barrier()
 
@@ -166,12 +187,14 @@ def main():
         ift.extra.assert_allclose(res0.metric(foo), res1.metric(foo))
 
         # Draw samples
-        # FIXME Write better test
         pos = ift.from_random(lh.domain)
         lin = ift.Linearization.make_var(pos, True)
-        ham(lin).metric.draw_sample()
-        ham1(lin).metric.draw_sample()
-        ham2(lin).metric.draw_sample()
+        samp = ham(lin).metric.draw_sample()
+        samp1 = ham1(lin).metric.draw_sample()
+        samp2 = ham2(lin).metric.draw_sample()
+        # FIXME
+        # ift.extra.assert_allclose(samp, samp1)
+        # ift.extra.assert_allclose(samp, samp2)
 
 
 if __name__ == "__main__":
