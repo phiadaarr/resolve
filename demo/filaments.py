@@ -26,7 +26,7 @@ def main():
     obs = rve.Observation.load("CYG-ALL-13360-8MHZfield0.npz")
     rve.set_epsilon(1 / 10 / obs.max_snr())
 
-    xfov = yfov = "150as", "150as"
+    xfov = yfov = "150as"
     npix = 4000
     npix = 400
     fov = np.array([rve.str2rad(xfov), rve.str2rad(yfov)])
