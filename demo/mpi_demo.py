@@ -59,11 +59,9 @@ class MPIAdder(ift.EndomorphicOperator):
         return cls(domain, comm, True)
 
     def __call__(self, x):
-        # FIXME
         # Hook for preserving the metric
-        # if self.domain == ift.DomainTuple.scalar_domain() and x.want_metric and x.metric is not None:
-        #     metric = allreduce_sum([x.metric], self._comm)
-        #     return x.new(self(x._val), self).prepend_jac(x.jac).add_metric(metric)
+        if x.want_metric:
+            return x.new(self(x._val), self).prepend_jac(x.jac).add_metric(x.metric)
         return super(MPIAdder, self).__call__(x)
 
 
@@ -86,26 +84,27 @@ def getop(domain, comm):
 
     # Instantiate response and likelihood (dependent on rank via e.g. freq)
     R = DummyResponse(domain, d.domain)
+    sky = ift.FieldAdapter(R.domain, "sky").exp()
     localop = ift.GaussianEnergy(d) @ R
 
     if comm == -1:
-        return localop
+        return localop @ sky
 
     # Add contributions from all tasks together
     adder = MPIAdder.make(localop.target, comm)
-    return adder @ localop @ MPIAdder.make(R.domain, comm).adjoint
+    return adder @ localop @ MPIAdder.make(R.domain, comm).adjoint @ sky
 
 
 def main():
     ddomain = ift.UnstructuredDomain(4), ift.UnstructuredDomain(1)
     comm, size, rank, master = ift.utilities.get_MPI_params()
-    data = ift.from_random(ddomain)
+    data = ift.from_random(ddomain).exp()
     if master:
         np.save("data.npy", data.val)
     if comm is not None:
         comm.Barrier()
 
-    sky_domain = ift.RGSpace((2, 2))
+    sky_domain = ift.RGSpace((100, 100))
     lh = getop(sky_domain, comm)
     lh1 = getop(sky_domain, None)
     lh2 = getop(sky_domain, -1)
@@ -119,7 +118,7 @@ def main():
     ift.extra.assert_allclose(res0, res2)
 
     # Evaluate Linearization
-    for wm in [False, True][0:1]:  # FIXME
+    for wm in [False, True]:
         lin = ift.Linearization.make_var(pos, wm)
         res0 = lh(lin)
         res1 = lh1(lin)
@@ -139,12 +138,21 @@ def main():
 
         # Dummy minimization
         pos = ift.from_random(lh.domain)
-        e = ift.EnergyAdapter(pos, lh, want_metric=wm)
-        e1 = ift.EnergyAdapter(pos, lh1, want_metric=wm)
-        e2 = ift.EnergyAdapter(pos, lh2, want_metric=wm)
+        ham = ift.StandardHamiltonian(
+            lh, ift.GradientNormController(iteration_limit=10)
+        )
+        ham1 = ift.StandardHamiltonian(
+            lh1, ift.GradientNormController(iteration_limit=10)
+        )
+        ham2 = ift.StandardHamiltonian(
+            lh2, ift.GradientNormController(iteration_limit=10)
+        )
+        e = ift.EnergyAdapter(pos, ham, want_metric=wm)
+        e1 = ift.EnergyAdapter(pos, ham1, want_metric=wm)
+        e2 = ift.EnergyAdapter(pos, ham2, want_metric=wm)
 
         mini = ift.NewtonCG if wm else ift.SteepestDescent
-        mini = mini(ift.GradientNormController(iteration_limit=2))
+        mini = mini(ift.GradientNormController(iteration_limit=5))
         mini_e, _ = mini(e)
         mini_e1, _ = mini(e1)
         mini_e2, _ = mini(e2)
@@ -153,19 +161,17 @@ def main():
 
         if not wm:
             continue
+
         foo = ift.from_random(lh.domain)
         ift.extra.assert_allclose(res0.metric(foo), res1.metric(foo))
 
         # Draw samples
-        ham = ift.StandardHamiltonian(lh, ift.GradientNormController(iteration_limit=10))
-        ham1 = ift.StandardHamiltonian(lh1, ift.GradientNormController(iteration_limit=10))
-        ham2 = ift.StandardHamiltonian(lh2, ift.GradientNormController(iteration_limit=10))
+        # FIXME Write better test
         pos = ift.from_random(lh.domain)
         lin = ift.Linearization.make_var(pos, True)
         ham(lin).metric.draw_sample()
         ham1(lin).metric.draw_sample()
         ham2(lin).metric.draw_sample()
-
 
 
 if __name__ == "__main__":
