@@ -21,101 +21,60 @@ class DummyResponse(ift.LinearOperator):
         return f"DummyResponse {self._domain.shape} -> {self._target.shape}"
 
 
-class MPIAdder(ift.EndomorphicOperator):
-    def __init__(self, domain, comm, _callfrommake=False):
-        if not _callfrommake:
-            raise RuntimeError("Use MPIAdder.make for instantiation.")
-        self._domain = ift.makeDomain(domain)
-        self._capability = self.TIMES | self.ADJOINT_TIMES
-        self._comm = comm
+# def MPISamplingDistributor(op, comm):
+#     f = op.draw_sample_with_dtype
 
-    def apply(self, x, mode):
-        self._check_input(x, mode)
-        if mode == self.ADJOINT_TIMES:
-            # FIXME Is this too expensive? If so, remove eventually.
-            self._input_sanity_check(x)
-            return x
-        res = allreduce_sum([x.val], self._comm)
-        return ift.makeField(self.target, res)
+#     def newfunc(dtype, from_inverse=False):
+#         ntask, rank, _ = ift.utilities.get_MPI_params_from_comm(comm)
+#         sseq = ift.random.spawn_sseq(ntask)
+#         with ift.random.Context(sseq[rank]):
+#             res = f(dtype, from_inverse)
+#         return res
 
-    def _input_sanity_check(self, x):
-        if not isinstance(self._domain, ift.DomainTuple):
-            raise NotImplementedError("Sanity check not implemented")
-        size, rank, master = ift.utilities.get_MPI_params_from_comm(self._comm)
-        recv = None
-        if master:
-            shp = (self._comm.Get_size(),) + self._domain.shape
-            recv = np.empty(shp, dtype=x.val.dtype)
-        self._comm.Gather(x.val, recv, root=0)
-        if master:
-            ref = recv[0]
-            for ii in range(size):
-                np.testing.assert_equal(recv[ii], ref)
-
-    @classmethod
-    def make(cls, domain, comm):
-        if comm is None:
-            return ift.ScalingOperator(domain, 1.0)
-        return cls(domain, comm, True)
-
-    def __call__(self, x):
-        # Hook for preserving the metric
-        res = super(MPIAdder, self).__call__(x)
-        if not x.want_metric:
-            return res
-        return res.add_metric(x.metric)
-
-
-def MPISamplingDistributor(op, comm):
-    f = op.draw_sample_with_dtype
-
-    def newfunc(dtype, from_inverse=False):
-        ntask, rank, _ = ift.utilities.get_MPI_params_from_comm(comm)
-        sseq = ift.random.spawn_sseq(ntask)
-        with ift.random.Context(sseq[rank]):
-            res = f(dtype, from_inverse)
-        return res
-
-    op.draw_sample_with_dtype = newfunc
-    return op
+#     op.draw_sample_with_dtype = newfunc
+#     return op
 
 
 def getop(domain, comm):
     """Return energy operator that maps the full multi-frequency sky onto
     the log-likelihood value for a frequency slice."""
 
-    # Load data
-    d = np.load("data.npy")
-    invcov = np.load("invcov.npy")
+    # Non-parallel operators
+    sky = ift.FieldAdapter(domain, "sky").exp()
 
-    if comm == -1:
-        d = ift.makeField((ift.UnstructuredDomain(ii) for ii in d.shape), d)
-        invcov = ift.makeOp(ift.makeField(d.domain, invcov))
-    else:
-        # Select relevant part of data
-        size, rank, master = ift.utilities.get_MPI_params_from_comm(comm)
+    def get_local_oplist(comm):
+        d = np.load("data.npy")
+        invcov = np.load("invcov.npy")
         nwork = d.shape[0]
-        lo, hi = ift.utilities.shareRange(nwork, size, rank)
-        d = d[lo:hi]
-        d = ift.makeField((ift.UnstructuredDomain(ii) for ii in d.shape), d)
-        invcov = ift.makeOp(ift.makeField(d.domain, invcov[lo:hi]))
-        invcov = MPISamplingDistributor(invcov, comm)
+        size, rank, _ = ift.utilities.get_MPI_params_from_comm(comm)
+        local_indices = range(*ift.utilities.shareRange(nwork, size, rank))
+        lst = []
+        for ii in local_indices:
+            ddom = ift.UnstructuredDomain(d[ii].shape)
+            dd = ift.makeField(ddom, d[ii])
+            iicc = ift.makeOp(ift.makeField(ddom, invcov[ii]))
+            rr = DummyResponse(domain, ddom)
+            ee = ift.GaussianEnergy(dd, iicc)
+            lst.append(ee @ rr)
+        return lst
 
-    # Instantiate response and likelihood (dependent on rank via e.g. freq)
-    R = DummyResponse(domain, d.domain)
-    sky = ift.FieldAdapter(R.domain, "sky").exp()
-    localop = ift.GaussianEnergy(d, invcov) @ R
+    return AllreduceSum(get_local_oplist, comm) @ sky
 
-    if comm == -1:
-        return localop @ sky
 
-    # Add contributions from all tasks together
-    adder = MPIAdder.make(localop.target, comm)
-    return adder @ localop @ MPIAdder.make(R.domain, comm).adjoint @ sky
+class AllreduceSum(ift.Operator):
+    def __init__(self, get_oplist, comm):
+        self._comm = comm
+        self._oplist = get_oplist(comm)
+        self._domain = self._oplist[0].domain
+        self._target = self._oplist[0].target
+
+    def apply(self, x):
+        self._check_input(x)
+        return ift.utilities.allreduce_sum([op(x) for op in self._oplist], self._comm)
 
 
 def main():
-    ddomain = ift.UnstructuredDomain(4), ift.UnstructuredDomain(1)
+    ddomain = ift.UnstructuredDomain(7), ift.UnstructuredDomain(1)
     comm, size, rank, master = ift.utilities.get_MPI_params()
     data = ift.from_random(ddomain).exp()
     invcov = ift.from_random(ddomain).exp() * 0 + 1
@@ -128,34 +87,26 @@ def main():
     sky_domain = ift.RGSpace((100, 100))
     lh = getop(sky_domain, comm)
     lh1 = getop(sky_domain, None)
-    lh2 = getop(sky_domain, -1)
 
     # Evaluate Field
     pos = ift.from_random(lh.domain)
     res0 = lh(pos)
     res1 = lh1(pos)
-    res2 = lh2(pos)
     ift.extra.assert_allclose(res0, res1)
-    ift.extra.assert_allclose(res0, res2)
 
     # Evaluate Linearization
     for wm in [False, True]:
         lin = ift.Linearization.make_var(pos, wm)
         res0 = lh(lin)
         res1 = lh1(lin)
-        res2 = lh2(lin)
         ift.extra.assert_allclose(res0.val, res1.val)
-        ift.extra.assert_allclose(res0.val, res2.val)
         for _ in range(10):
             foo = ift.from_random(lh.domain)
             ift.extra.assert_allclose(res0.jac(foo), res1.jac(foo))
-            ift.extra.assert_allclose(res0.jac(foo), res2.jac(foo))
 
             foo = ift.from_random(res0.jac.target)
             ift.extra.assert_allclose(res0.jac.adjoint(foo), res1.jac.adjoint(foo))
-            ift.extra.assert_allclose(res0.jac.adjoint(foo), res2.jac.adjoint(foo))
         ift.extra.assert_allclose(res0.gradient, res1.gradient)
-        ift.extra.assert_allclose(res0.gradient, res2.gradient)
 
         # Dummy minimization
         pos = ift.from_random(lh.domain)
@@ -165,20 +116,14 @@ def main():
         ham1 = ift.StandardHamiltonian(
             lh1, ift.GradientNormController(iteration_limit=10)
         )
-        ham2 = ift.StandardHamiltonian(
-            lh2, ift.GradientNormController(iteration_limit=10)
-        )
         e = ift.EnergyAdapter(pos, ham, want_metric=wm)
         e1 = ift.EnergyAdapter(pos, ham1, want_metric=wm)
-        e2 = ift.EnergyAdapter(pos, ham2, want_metric=wm)
 
         mini = ift.NewtonCG if wm else ift.SteepestDescent
         mini = mini(ift.GradientNormController(iteration_limit=5))
         mini_e, _ = mini(e)
         mini_e1, _ = mini(e1)
-        mini_e2, _ = mini(e2)
         ift.extra.assert_allclose(mini_e.position, mini_e1.position)
-        ift.extra.assert_allclose(mini_e.position, mini_e2.position)
 
         if not wm:
             continue
@@ -191,10 +136,7 @@ def main():
         lin = ift.Linearization.make_var(pos, True)
         samp = ham(lin).metric.draw_sample()
         samp1 = ham1(lin).metric.draw_sample()
-        samp2 = ham2(lin).metric.draw_sample()
-        # FIXME
         # ift.extra.assert_allclose(samp, samp1)
-        # ift.extra.assert_allclose(samp, samp2)
 
 
 if __name__ == "__main__":
