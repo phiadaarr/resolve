@@ -27,7 +27,7 @@ def getop(comm):
             iicc = ift.makeOp(ift.makeField(ddom, invcov[ii]))
             ee = ift.GaussianEnergy(dd, iicc)
             lst.append(ee)
-        return lst, nwork, lo, hi
+        return lst
 
     if comm == -1:
         d = np.load("data.npy")
@@ -53,7 +53,7 @@ def getop(comm):
 class AllreduceSum(ift.Operator):
     def __init__(self, get_oplist, comm):
         self._comm = comm
-        self._oplist, self._nwork, self._lo, self._hi = get_oplist(comm)
+        self._oplist = get_oplist(comm)
         self._domain = self._oplist[0].domain
         self._target = self._oplist[0].target
 
