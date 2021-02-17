@@ -52,9 +52,8 @@ class AllreduceSumLinear(ift.LinearOperator):
 
     def apply(self, x, mode):
         self._check_input(x, mode)
-        return ift.utilities.allreduce_sum(
-            [op.apply(x, mode) for op in self._oplist], self._comm
-        )
+        lst = [op.apply(x, mode) for op in self._oplist]
+        return ift.utilities.allreduce_sum(lst, self._comm)
 
     def draw_sample(self, from_inverse=False):
         sseq = ift.random.spawn_sseq(self._nwork)
