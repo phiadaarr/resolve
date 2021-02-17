@@ -40,7 +40,7 @@ def getop(comm):
             iicc = ift.makeOp(ift.makeField(ddom, invcov[ii]))
             ee = ift.GaussianEnergy(dd, iicc)
             lst.append(ee)
-        op = rve.AllreduceSum(lst, comm, nwork)
+        op = rve.AllreduceSum(lst, comm)
     ift.extra.check_operator(op, ift.from_random(op.domain))
     sky = ift.FieldAdapter(op.domain, "sky")
     return op @ sky.exp()

@@ -6,12 +6,10 @@ import nifty7 as ift
 
 
 class AllreduceSum(ift.Operator):
-    def __init__(self, oplist, comm, nwork=None):
-        """nwork only needed if samples need to be drawn and oplist are EnergyOperators."""
+    def __init__(self, oplist, comm):
         self._oplist, self._comm = oplist, comm
         self._domain = self._oplist[0].domain
         self._target = self._oplist[0].target
-        self._nwork = nwork
 
     def apply(self, x):
         self._check_input(x)
@@ -24,12 +22,12 @@ class AllreduceSum(ift.Operator):
         jac = AllreduceSumLinear([lin.jac for lin in opx], self._comm)
         if opx[0].metric is None:
             return x.new(val, jac)
-        met = AllreduceSumLinear([lin.metric for lin in opx], self._comm, self._nwork)
+        met = AllreduceSumLinear([lin.metric for lin in opx], self._comm)
         return x.new(val, jac, met)
 
 
 class AllreduceSumLinear(ift.LinearOperator):
-    def __init__(self, oplist, comm=None, nwork=None):
+    def __init__(self, oplist, comm=None):
         assert all(isinstance(oo, ift.LinearOperator) for oo in oplist)
         self._domain = ift.makeDomain(oplist[0].domain)
         self._target = ift.makeDomain(oplist[0].target)
@@ -40,7 +38,9 @@ class AllreduceSumLinear(ift.LinearOperator):
         self._capability = (self.TIMES | self.ADJOINT_TIMES) & cap
         self._oplist = oplist
         self._comm = comm
-        self._nwork = nwork
+        self._nwork = len(self._oplist)
+        if comm is not None:
+            self._nwork = sum(self._comm.allgather(self._nwork))
 
     def apply(self, x, mode):
         self._check_input(x, mode)
