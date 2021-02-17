@@ -2,6 +2,8 @@
 # Copyright(C) 2021 Max-Planck-Society
 # Author: Philipp Arras
 
+import numpy as np
+
 import nifty7 as ift
 
 
@@ -43,9 +45,10 @@ class AllreduceSumLinear(ift.LinearOperator):
         self._capability = (self.TIMES | self.ADJOINT_TIMES) & cap
         self._oplist = oplist
         self._comm = comm
-        self._nwork = len(self._oplist)
-        if comm is not None:
-            self._nwork = sum(self._comm.allgather(self._nwork))
+        local_nwork = [len(oplist)] if comm is None else comm.allgather(len(oplist))
+        size, rank, _ = ift.utilities.get_MPI_params_from_comm(comm)
+        self._nwork = sum(local_nwork)
+        self._lo = ([0] + list(np.cumsum(local_nwork)))[rank]
 
     def apply(self, x, mode):
         self._check_input(x, mode)
@@ -54,12 +57,10 @@ class AllreduceSumLinear(ift.LinearOperator):
         )
 
     def draw_sample(self, from_inverse=False):
-        size, rank, _ = ift.utilities.get_MPI_params_from_comm(self._comm)
-        lo, _ = ift.utilities.shareRange(self._nwork, size, rank)
         sseq = ift.random.spawn_sseq(self._nwork)
         local_samples = []
         for ii, op in enumerate(self._oplist):
-            with ift.random.Context(sseq[lo + ii]):
+            with ift.random.Context(sseq[self._lo + ii]):
                 local_samples.append(op.draw_sample(from_inverse))
         return ift.utilities.allreduce_sum(local_samples, self._comm)
 
