@@ -62,16 +62,20 @@ class AllreduceSum(ift.Operator):
         return ift.utilities.allreduce_sum([op(x) for op in self._oplist], self._comm)
 
 
-def allclose(*args):
-    for aa in args[1:]:
-        ift.extra.assert_allclose(args[0], aa)
+def allclose(gen):
+    from types import GeneratorType
+
+    ref = next(gen) if isinstance(gen, GeneratorType) else gen[0]
+    for aa in gen:
+        print(aa)
+        ift.extra.assert_allclose(ref, aa)
 
 
 def main():
     ddomain = ift.UnstructuredDomain(7), ift.UnstructuredDomain(5)
     comm, size, rank, master = ift.utilities.get_MPI_params()
     data = ift.from_random(ddomain)
-    invcov = ift.from_random(ddomain).exp() * 0 + 1
+    invcov = ift.from_random(ddomain).exp()
     if master:
         np.save("data.npy", data.val)
         np.save("invcov.npy", invcov.val)
@@ -98,13 +102,13 @@ def main():
         allclose(lh(lin).gradient for lh in lhs)
 
         for _ in range(10):
-            foo = ift.from_random(lh0.domain)
+            foo = ift.Linearization.make_var(ift.from_random(lh0.domain), wm)
             bar = ift.from_random(lh0.domain)
-            allclose(lh(pos).jac(bar) for lh in lhs)
+            allclose(lh(foo).jac(bar) for lh in lhs)
             if wm:
-                allclose(lh(pos).metric(bar) for lh in lhs)
+                allclose(lh(foo).metric(bar) for lh in lhs)
             bar = ift.from_random(lh0.target)
-            allclose(lh(pos).jac.target(bar) for lh in lhs)
+            allclose(lh(foo).jac.adjoint(bar) for lh in lhs)
 
         # Minimization
         pos = ift.from_random(lh0.domain)
@@ -121,13 +125,12 @@ def main():
             with ift.random.Context(42):
                 samps_lh.append(lhs[ii](lin).metric.draw_sample())
                 samps_ham.append(hams[ii](lin).metric.draw_sample())
-        allclose(*samps_lh)
-        allclose(*samps_ham)
+        allclose(samps_lh)
+        allclose(samps_ham)
 
         allclose(
-            mini(ift.MetricGaussianKL.make(pos, ham, 3))[0].position for ham in hams
+            mini(ift.MetricGaussianKL.make(pos, ham, 3, True))[0].position for ham in hams
         )
-
 
 if __name__ == "__main__":
     main()
