@@ -3,6 +3,7 @@
 
 from functools import reduce
 from operator import add
+from types import GeneratorType
 
 import numpy as np
 
@@ -59,7 +60,9 @@ class AllreduceSum(ift.Operator):
             jac = AllreduceSumLinear([lin.jac for lin in res], self._comm)
             ift.extra.check_linear_operator(jac)  # FIXME Temporary
             if res[0].want_metric and res[0].metric is not None:
-                met = AllreduceSumLinear([lin.metric for lin in res], self._comm, self._nwork)
+                met = AllreduceSumLinear(
+                    [lin.metric for lin in res], self._comm, self._nwork
+                )
                 ift.extra.check_linear_operator(met)  # FIXME Temporary
                 return x.new(val, jac, met)
             res = x.new(val, jac)
@@ -83,7 +86,9 @@ class AllreduceSumLinear(ift.LinearOperator):
 
     def apply(self, x, mode):
         self._check_input(x, mode)
-        return ift.utilities.allreduce_sum([op.apply(x, mode) for op in self._oplist], self._comm)
+        return ift.utilities.allreduce_sum(
+            [op.apply(x, mode) for op in self._oplist], self._comm
+        )
 
     def draw_sample(self, from_inverse=False):
         size, rank, _ = ift.utilities.get_MPI_params_from_comm(self._comm)
@@ -91,14 +96,12 @@ class AllreduceSumLinear(ift.LinearOperator):
         sseq = ift.random.spawn_sseq(self._nwork)
         local_samples = []
         for ii, op in enumerate(self._oplist):
-            with ift.random.Context(sseq[lo+ii]):
+            with ift.random.Context(sseq[lo + ii]):
                 local_samples.append(op.draw_sample(from_inverse))
         return ift.utilities.allreduce_sum(local_samples, self._comm)
 
 
 def allclose(gen):
-    from types import GeneratorType
-
     ref = next(gen) if isinstance(gen, GeneratorType) else gen[0]
     for aa in gen:
         ift.extra.assert_allclose(ref, aa)
