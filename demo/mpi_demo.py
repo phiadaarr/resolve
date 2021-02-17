@@ -43,6 +43,9 @@ def getop(comm):
         op = reduce(add, ops)
     else:
         op = AllreduceSum(get_local_oplist, comm)
+
+    ift.extra.check_operator(op, ift.from_random(op.domain))
+
     sky = ift.FieldAdapter(op.domain, "sky")
     return op @ sky.exp()
 
@@ -120,6 +123,10 @@ def main():
                 samps_ham.append(hams[ii](lin).metric.draw_sample())
         allclose(*samps_lh)
         allclose(*samps_ham)
+
+        allclose(
+            mini(ift.MetricGaussianKL.make(pos, ham, 3))[0].position for ham in hams
+        )
 
 
 if __name__ == "__main__":
