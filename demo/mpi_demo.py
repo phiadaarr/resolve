@@ -58,12 +58,10 @@ class AllreduceSum(ift.Operator):
             res = [op(x) for op in self._oplist]
             val = ift.utilities.allreduce_sum([lin.val for lin in res], self._comm)
             jac = AllreduceSumLinear([lin.jac for lin in res], self._comm)
-            ift.extra.check_linear_operator(jac)  # FIXME Temporary
             if res[0].want_metric and res[0].metric is not None:
                 met = AllreduceSumLinear(
                     [lin.metric for lin in res], self._comm, self._nwork
                 )
-                ift.extra.check_linear_operator(met)  # FIXME Temporary
                 return x.new(val, jac, met)
             res = x.new(val, jac)
             return res
