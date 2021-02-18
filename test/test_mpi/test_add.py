@@ -53,6 +53,7 @@ def allclose(gen):
 
 
 def test_mpi_adder():
+    # FIXME Write tests for non-EnergyOperators and linear operators.
     ddomain = ift.UnstructuredDomain(4), ift.UnstructuredDomain(1)
     comm, size, rank, master = ift.utilities.get_MPI_params()
     data = ift.from_random(ddomain)

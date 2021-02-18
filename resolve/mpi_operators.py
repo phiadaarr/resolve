@@ -9,6 +9,14 @@ import nifty7 as ift
 
 class AllreduceSum(ift.Operator):
     def __init__(self, oplist, comm):
+        # FIXME Currently all operators in the oplist need to have the same
+        # domain and target. In NIFTy, we generally support the addition of
+        # operators that have different domains (not all keys need to be present
+        # in all domains). This could be done here as well.
+
+        # FIXME If all operators in oplist are linear operators, we could
+        # automatically instantiate AllreduceSumLinear.
+
         self._oplist, self._comm = oplist, comm
         self._domain = ift.makeDomain(
             _get_global_unique(oplist, lambda op: op.domain, comm)
