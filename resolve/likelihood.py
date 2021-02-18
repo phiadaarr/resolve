@@ -99,6 +99,8 @@ def ImagingLikelihood(
         Operator that generates sky. Can have as a target either a two-dimensional
         DomainTuple (single-frequency imaging), a three-dimensional DomainTuple
         (multi-frequency imaging) or a MultiDomain (polarization imaging).
+        For multi-frequency imaging it is required that the first entry of the
+        three-dimensional DomainTuple represents the domain of the frequencies.
 
     inverse_covariance_operator : Operator
         Optional. Target needs to be the same space as observation.vis. If it is
