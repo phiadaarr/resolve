@@ -100,7 +100,7 @@ class MfResponse(ift.LinearOperator):
         Contains the the :class:`nifty7.RGSpace` for the positions.
     """
 
-    def __init__(self, observation, frequency_domain, position_domain):
+    def __init__(self, observation, frequency_domain, position_domain, verbose=True):
         my_assert_isinstance(observation, Observation)
         # FIXME Add polarization support
         my_asserteq(observation.npol, 1)
@@ -115,6 +115,7 @@ class MfResponse(ift.LinearOperator):
         data_freq = observation.freq
         my_assert(np.all(np.diff(data_freq) > 0))
         sky_freq = np.array(frequency_domain.coordinates)
+        # TOASK: Why is it necessary to construct band indices like this?
         band_indices = [np.argmin(np.abs(ff - sky_freq)) for ff in data_freq]
         # Make sure that no index is wasted
         my_asserteq(len(set(band_indices)), frequency_domain.size)
@@ -130,6 +131,7 @@ class MfResponse(ift.LinearOperator):
                 observation.freq[sel],
                 mask[0, :, sel].T,
                 sp,
+                verbose
             )
             self._r.append((band_index, sel, r))
         # Double check that all channels are written to
@@ -203,7 +205,7 @@ class FullResponse(ift.LinearOperator):
 
 
 class SingleResponse(ift.LinearOperator):
-    def __init__(self, domain, uvw, freq, mask, single_precision):
+    def __init__(self, domain, uvw, freq, mask, single_precision, verbose=True):
         # FIXME Currently only the response uses single_precision if possible.
         # Could be rolled out to the whole likelihood
         self._domain = ift.DomainTuple.make(domain)
@@ -225,7 +227,7 @@ class SingleResponse(ift.LinearOperator):
         self._vol = self._domain[0].scalar_dvol
         self._target_dtype = np.complex64 if single_precision else np.complex128
         self._domain_dtype = np.float32 if single_precision else np.float64
-        self._verbt, self._verbadj = True, True
+        self._verbt, self._verbadj = verbose, verbose
 
     def apply(self, x, mode):
         self._check_input(x, mode)
