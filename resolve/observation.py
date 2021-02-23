@@ -93,7 +93,7 @@ class Observation:
         f(file_name, **dct)
 
     @staticmethod
-    def load(file_name):
+    def load(file_name, lo_hi_index=None):
         dct = dict(np.load(file_name))
         antpos = []
         for ii in range(4):
@@ -103,6 +103,17 @@ class Observation:
             antpos.append(val)
         pol = Polarization.from_list(dct["polarization"])
         direction = Direction.from_list(dct["direction"])
+        if lo_hi_index is not None:
+            lo, hi = lo_hi_index
+            # FIXME: implement with less code duplication
+            return Observation(
+                AntennaPositions.from_list(antpos),
+                dct["vis"][:, :, lo:hi],
+                dct["weight"][:, :, lo:hi],
+                pol,
+                dct["freq"][lo:hi],
+                direction,
+            )
         return Observation(
             AntennaPositions.from_list(antpos),
             dct["vis"],
