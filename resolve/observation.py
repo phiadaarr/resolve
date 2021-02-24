@@ -103,23 +103,13 @@ class Observation:
             antpos.append(val)
         pol = Polarization.from_list(dct["polarization"])
         direction = Direction.from_list(dct["direction"])
-        if lo_hi_index is not None:
-            lo, hi = lo_hi_index
-            # FIXME: implement with less code duplication
-            return Observation(
-                AntennaPositions.from_list(antpos),
-                dct["vis"][:, :, lo:hi],
-                dct["weight"][:, :, lo:hi],
-                pol,
-                dct["freq"][lo:hi],
-                direction,
-            )
+        slc = slice(None) if lo_hi_index is None else slice(*lo_hi_index)
         return Observation(
             AntennaPositions.from_list(antpos),
-            dct["vis"],
-            dct["weight"],
+            dct["vis"][..., slc],
+            dct["weight"][..., slc],
             pol,
-            dct["freq"],
+            dct["freq"][slc],
             direction,
         )
 
