@@ -18,6 +18,7 @@ def getop(comm):
 
     d = np.load("data.npy")
     invcov = np.load("invcov.npy")
+    skydom = ift.UnstructuredDomain(d.shape[0]), ift.UnstructuredDomain(d.shape[1:])
     if comm == -1:
         nwork = d.shape[0]
         ddom = ift.UnstructuredDomain(d[0].shape)
@@ -25,6 +26,7 @@ def getop(comm):
             ift.GaussianEnergy(
                 ift.makeField(ddom, d[ii]), ift.makeOp(ift.makeField(ddom, invcov[ii]))
             )
+            @ ift.DomainTupleFieldInserter(skydom, 0, (ii,)).adjoint
             for ii in range(nwork)
         ]
         op = reduce(add, ops)
@@ -38,11 +40,14 @@ def getop(comm):
             ddom = ift.UnstructuredDomain(d[ii].shape)
             dd = ift.makeField(ddom, d[ii])
             iicc = ift.makeOp(ift.makeField(ddom, invcov[ii]))
-            ee = ift.GaussianEnergy(dd, iicc)
+            ee = (
+                ift.GaussianEnergy(dd, iicc)
+                @ ift.DomainTupleFieldInserter(skydom, 0, (ii,)).adjoint
+            )
             lst.append(ee)
         op = rve.AllreduceSum(lst, comm)
     ift.extra.check_operator(op, ift.from_random(op.domain))
-    sky = ift.FieldAdapter(op.domain, "sky")
+    sky = ift.FieldAdapter(skydom, "sky")
     return op @ sky.exp()
 
 
