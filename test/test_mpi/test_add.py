@@ -12,12 +12,13 @@ import nifty7 as ift
 import resolve as rve
 
 
-def getop(comm):
+def getop(comm, typ):
     """Return energy operator that maps the full multi-frequency sky onto
     the log-likelihood value for a frequency slice."""
 
     d = np.load("data.npy")
     invcov = np.load("invcov.npy")
+    skydom = ift.UnstructuredDomain(d.shape[0]), ift.UnstructuredDomain(d.shape[1:])
     if comm == -1:
         nwork = d.shape[0]
         ddom = ift.UnstructuredDomain(d[0].shape)
@@ -25,6 +26,7 @@ def getop(comm):
             ift.GaussianEnergy(
                 ift.makeField(ddom, d[ii]), ift.makeOp(ift.makeField(ddom, invcov[ii]))
             )
+            @ ift.DomainTupleFieldInserter(skydom, 0, (ii,)).adjoint
             for ii in range(nwork)
         ]
         op = reduce(add, ops)
@@ -39,10 +41,15 @@ def getop(comm):
             dd = ift.makeField(ddom, d[ii])
             iicc = ift.makeOp(ift.makeField(ddom, invcov[ii]))
             ee = ift.GaussianEnergy(dd, iicc)
+            if typ == 0:
+                ee = ee @ ift.DomainTupleFieldInserter(skydom, 0, (ii,)).adjoint
             lst.append(ee)
-        op = rve.AllreduceSum(lst, comm)
+        if typ == 0:
+            op = rve.AllreduceSum(lst, comm)
+        else:
+            op = rve.SliceSum(lst, lo, skydom[0], comm)
     ift.extra.check_operator(op, ift.from_random(op.domain))
-    sky = ift.FieldAdapter(op.domain, "sky")
+    sky = ift.FieldAdapter(skydom, "sky")
     return op @ sky.exp()
 
 
@@ -64,13 +71,20 @@ def test_mpi_adder():
     if comm is not None:
         comm.Barrier()
 
-    lhs = getop(-1), getop(None), getop(comm)
+    lhs = (
+        getop(-1, 0),
+        getop(-1, 1),
+        getop(None, 0),
+        getop(None, 1),
+        getop(comm, 0),
+        getop(comm, 1),
+    )
     hams = tuple(
         ift.StandardHamiltonian(lh, ift.GradientNormController(iteration_limit=10))
         for lh in lhs
     )
-    lhs_for_sampling = lhs[1:]
-    hams_for_sampling = hams[1:]
+    lhs_for_sampling = lhs[2:]
+    hams_for_sampling = hams[2:]
 
     # Evaluate Field
     dom, tgt = lhs[0].domain, lhs[0].target
