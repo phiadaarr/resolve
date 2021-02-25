@@ -40,6 +40,8 @@ class AllreduceSum(ift.Operator):
 
 class SliceSum(ift.Operator):
     def __init__(self, oplist, index_low, parallel_space, comm):
+        # FIXME if oplist contains only linear operators instantiate
+        # SliceSumLinear instead
         self._oplist, self._comm = oplist, comm
         self._lo = int(index_low)
         assert len(parallel_space.shape) == 1
@@ -108,6 +110,7 @@ class SliceSumLinear(ift.LinearOperator):
 
 
 class SliceLinear(ift.EndomorphicOperator):
+    # FIXME Generalize to ift.LinearOperator
     def __init__(self, oplist, index_low, parallel_space, comm):
         assert all(isinstance(oo, ift.LinearOperator) for oo in oplist)
         doms = _get_global_unique(oplist, lambda op: op.domain, comm)
