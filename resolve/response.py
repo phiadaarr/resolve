@@ -115,7 +115,6 @@ class MfResponse(ift.LinearOperator):
         data_freq = observation.freq
         my_assert(np.all(np.diff(data_freq) > 0))
         sky_freq = np.array(frequency_domain.coordinates)
-        # TOASK: Why is it necessary to construct band indices like this?
         band_indices = [np.argmin(np.abs(ff - sky_freq)) for ff in data_freq]
         # Make sure that no index is wasted
         my_asserteq(len(set(band_indices)), frequency_domain.size)

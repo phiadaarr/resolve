@@ -13,7 +13,6 @@ class AllreduceSum(ift.Operator):
         # domain and target. In NIFTy, we generally support the addition of
         # operators that have different domains (not all keys need to be present
         # in all domains). This could be done here as well.
-        # TOASK: What domain would be picked if I have IRGSpaces with different freq_domains?
 
         # FIXME If all operators in oplist are linear operators, we could
         # automatically instantiate AllreduceSumLinear.
