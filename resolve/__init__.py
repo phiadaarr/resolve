@@ -18,7 +18,7 @@ from .plotter import MfPlotter, Plotter
 from .points import PointInserter
 from .polarization import polarization_matrix_exponential
 from .primary_beam import vla_beam
-from .response import MfResponse, ResponseDistributor, StokesIResponse
+from .response import MfResponse, ResponseDistributor, StokesIResponse, SingleResponse
 from .simple_operators import *
 from .util import (
     Reshaper,
