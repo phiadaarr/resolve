@@ -119,6 +119,7 @@ class MfResponse(ift.LinearOperator):
         # Make sure that no index is wasted
         my_asserteq(len(set(band_indices)), frequency_domain.size)
         self._r = []
+        # FIXME: Make sure to use double precision despite having data in single precision
         sp = observation.vis.dtype == np.complex64
         mask = observation.mask
         for band_index in np.unique(band_indices):
@@ -129,7 +130,7 @@ class MfResponse(ift.LinearOperator):
                 observation.uvw,
                 observation.freq[sel],
                 mask[0, :, sel].T,
-                sp,
+                False,
                 verbose
             )
             self._r.append((band_index, sel, r))
