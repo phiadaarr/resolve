@@ -13,7 +13,7 @@ from .util import compare_attributes, my_assert, my_assert_isinstance, my_assert
 def simple_minimize(
     operator, position, n_samples, minimizer, constants=[], point_estimates=[]
 ):
-    mini = Minimization(operator, position, n_samples, constants, point_estimates, comm)
+    mini = Minimization(operator, position, n_samples, constants, point_estimates, comm=None)
     return mini.minimize(minimizer)
 
 
