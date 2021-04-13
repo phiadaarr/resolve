@@ -59,7 +59,7 @@ def get_filament_prior(domain):
     ### 2.Calculate initial wave function operator Psi_0
 
     hbar = 5 * 10 ** -3
-    a = 1.0  # time scale
+    a = 0.3  # time scale
     Half_operator_ = ift.ScalingOperator(C0.target, 0.5)
     Hbar_operator = ift.ScalingOperator(Phi0.target, -1j / hbar)
     Complexifier = ift.Realizer(Phi0.target).adjoint
@@ -118,19 +118,25 @@ def main():
 
     # Load data
     obs = rve.Observation.load("CYG-ALL-13360-8MHZfield0.npz")
-    rve.set_epsilon(1 / 10 / obs.max_snr())
+    rve.set_epsilon(1e-6)
     rve.set_nthreads(16)
 
-    xfov = yfov = "150as"
+    xfov = yfov = "250as"
     npix = 4000
-    npix = 400
+    npix = 1000
 
     fov = np.array([rve.str2rad(xfov), rve.str2rad(yfov)])
 
     npix = np.array([npix, npix])
     dom = ift.RGSpace(npix, fov / npix)
 
-    sky = get_filament_prior(dom).scale(1e9)
+    inserter = rve.PointInserter(dom, [[0, 0]])
+    points = ift.InverseGammaOperator(
+        inserter.domain, alpha=0.5, q=0.2 / dom.scalar_dvol
+    ).ducktape("points")
+    points = inserter @ points
+    filaments = get_filament_prior(dom).scale(1e10)
+    sky = filaments + points
 
     p = ift.Plot()
     for ii in range(9):
@@ -149,21 +155,30 @@ def main():
     #     rve.AddEmptyDimension(li.target) @ li @ logwgt.exp()
     # ) ** (-2)
 
-    # R = rve.StokesIResponse(obs, dom)
-    # d = (R @ sky)(ift.from_random(sky.domain))
-
+    mini = ift.NewtonCG(ift.GradientNormController(name="newton", iteration_limit=5))
+    # Fit point source only
     state = rve.MinimizationState(0.1 * ift.from_random(sky.domain), [])
     lh = rve.ImagingLikelihood(obs, sky)
     ham = ift.StandardHamiltonian(
         lh, ift.AbsDeltaEnergyController(0.5, iteration_limit=100)
     )
+    cst = filaments.domain.keys()
+    state = rve.simple_minimize(
+        ham, state.mean, 0, mini, constants=cst, point_estimates=cst
+    )
 
-    mini = ift.NewtonCG(ift.GradientNormController(name="newton", iteration_limit=5))
+    # Fit diffuse + points
     for ii in range(10):
         state = rve.simple_minimize(ham, state.mean, 0, mini)
         state.save(f"filaments{ii}")
         ift.single_plot(sky.log10()(state.mean), name=f"sky{ii}.png")
 
+        R = rve.StokesIResponse(obs, dom)
+        print((R @ sky)(state.mean))
+        print(obs.vis)
+        ift.extra.minisanity(
+            obs.vis, lambda pos: ift.makeOp(obs.weight), R @ sky, state.mean
+        )
 
 
 if __name__ == "__main__":
