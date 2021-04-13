@@ -25,7 +25,9 @@ def get_filament_prior(domain):
     # HarmonicTransformOperator is actually Hartley transform, only take real value
     HT = ift.HarmonicTransformOperator(harmonic_space, normalized_domain)
     # FFTOperator(real FFT) produce complex number, we need to take real number(by .real)
-    ifft = ift.FFTOperator(harmonic_space, normalized_domain)  # from k-space to position space
+    ifft = ift.FFTOperator(
+        harmonic_space, normalized_domain
+    )  # from k-space to position space
     fft = ifft.inverse
 
     ### 1.Generate gaussian random field c0 and phi0
@@ -112,11 +114,12 @@ def main():
     # https://wwwmpa.mpa-garching.mpg.de/~parras/papers/dissertation.pdf.
     # w-gridding becomes important if w*(n-1) is not negligable. It could be
     # relevant for this data set but probably not.
-    # rve.set_wgridding(True)
+    rve.set_wgridding(False)
 
     # Load data
     obs = rve.Observation.load("CYG-ALL-13360-8MHZfield0.npz")
     rve.set_epsilon(1 / 10 / obs.max_snr())
+    rve.set_nthreads(16)
 
     xfov = yfov = "150as"
     npix = 4000
@@ -127,106 +130,40 @@ def main():
     npix = np.array([npix, npix])
     dom = ift.RGSpace(npix, fov / npix)
 
-    sky = get_filament_prior(dom)
+    sky = get_filament_prior(dom).scale(1e9)
 
     p = ift.Plot()
-    for _ in range(9):
+    for ii in range(9):
         p.add(sky(ift.from_random(sky.domain)))
     p.output(name="prior_samples.png")
 
-    npix = 2500
-    effuv = np.linalg.norm(obs.effective_uv().T, axis=1)
-    assert obs.nfreq == obs.npol == 1
-    dom = ift.RGSpace(npix, 2 * np.max(effuv) / npix)
-    logwgt = ift.SimpleCorrelatedField(
-        dom, 0, (2, 2), (2, 2), (1.2, 0.4), (0.5, 0.2), (-2, 0.5), "invcov"
+    # npix = 2500
+    # effuv = np.linalg.norm(obs.effective_uv().T, axis=1)
+    # assert obs.nfreq == obs.npol == 1
+    # dom = ift.RGSpace(npix, 2 * np.max(effuv) / npix)
+    # logwgt = ift.SimpleCorrelatedField(
+    #     dom, 0, (2, 2), (2, 2), (1.2, 0.4), (0.5, 0.2), (-2, 0.5), "invcov"
+    # )
+    # li = ift.LinearInterpolator(dom, effuv)
+    # weightop = ift.makeOp(obs.weight) @ (
+    #     rve.AddEmptyDimension(li.target) @ li @ logwgt.exp()
+    # ) ** (-2)
+
+    # R = rve.StokesIResponse(obs, dom)
+    # d = (R @ sky)(ift.from_random(sky.domain))
+
+    state = rve.MinimizationState(0.1 * ift.from_random(sky.domain), [])
+    lh = rve.ImagingLikelihood(obs, sky)
+    ham = ift.StandardHamiltonian(
+        lh, ift.AbsDeltaEnergyController(0.5, iteration_limit=100)
     )
-    li = ift.LinearInterpolator(dom, effuv)
-    weightop = ift.makeOp(obs.weight) @ (
-        rve.AddEmptyDimension(li.target) @ li @ logwgt.exp()
-    ) ** (-2)
 
-    plotter = rve.Plotter("png", "plots")
-    plotter.add("bayesian weighting", logwgt.exp())
-    plotter.add("power spectrum bayesian weighting", logwgt.power_spectrum)
-
-    ############################################################################
-    # MINIMIZATION
-    ############################################################################
-    if rve.mpi.master:
-        # MAP diffuse with original weights
-        lh = rve.ImagingLikelihood(obs, sky)
-        plotter.add_histogram(
-            "normalized residuals (original weights)", lh.normalized_residual
-        )
-        ham = ift.StandardHamiltonian(lh)
-        fld = 0.1 * ift.from_random(sky.domain)
-
-        state = rve.MinimizationState(fld, [])
-        mini = ift.NewtonCG(
-            ift.GradientNormController(name="newton", iteration_limit=20)
-        )
-        # state = rve.MinimizationState.load("stage1")
+    mini = ift.NewtonCG(ift.GradientNormController(name="newton", iteration_limit=5))
+    for ii in range(10):
         state = rve.simple_minimize(ham, state.mean, 0, mini)
-        plotter.plot("stage1", state)
-        state.save("stage1")
+        state.save(f"filaments{ii}")
+        ift.single_plot(sky.log10()(state.mean), name=f"sky{ii}.png")
 
-        # Only weights. This learns what is plotted in Figure 8 of
-        # https://arxiv.org/pdf/2008.11435.pdf
-        lh = rve.ImagingLikelihood(obs, sky, inverse_covariance_operator=weightop)
-        plotter.add_histogram(
-            "normalized residuals (learned weights)", lh.normalized_residual
-        )
-        ic = ift.AbsDeltaEnergyController(0.1, 3, 100, name="Sampling")
-        ham = ift.StandardHamiltonian(lh, ic)
-        cst = sky.domain.keys()
-        state = rve.MinimizationState(
-            ift.MultiField.union([0.1 * ift.from_random(weightop.domain), state.mean]),
-            [],
-        )
-        mini = ift.VL_BFGS(ift.GradientNormController(name="bfgs", iteration_limit=20))
-        # state = rve.MinimizationState.load("stage2")
-        for ii in range(10):
-            state = rve.simple_minimize(ham, state.mean, 0, mini, cst, cst)
-            plotter.plot(f"stage2_{ii}", state)
-        state.save("stage2")
-
-    if rve.mpi.mpi:
-        if not rve.mpi.master:
-            state = None
-        state = rve.mpi.comm.bcast(state, root=0)
-    ift.random.push_sseq_from_seed(42)
-
-    # MGVI sky
-    ic = ift.AbsDeltaEnergyController(0.1, 3, 200, name="Sampling")
-    lh = rve.ImagingLikelihoodVariableCovariance(obs, sky, weightop)
-    ham = ift.StandardHamiltonian(lh, ic)
-    cst = list(weightop.domain.keys())
-    mini = ift.NewtonCG(ift.GradientNormController(name="newton", iteration_limit=15))
-    for ii in range(4):
-        fname = f"stage3_{ii}"
-        # state = rve.MinimizationState.load(fname)
-        state = rve.simple_minimize(ham, state.mean, 5, mini, cst, cst)
-        plotter.plot(f"stage3_{ii}", state)
-        state.save(fname)
-
-    # Sky + weighting simultaneously
-    ic = ift.AbsDeltaEnergyController(0.1, 3, 700, name="Sampling")
-    ham = ift.StandardHamiltonian(lh, ic)
-    for ii in range(30):
-        if ii < 5:
-            mini = ift.VL_BFGS(
-                ift.GradientNormController(name="newton", iteration_limit=15)
-            )
-        else:
-            mini = ift.NewtonCG(
-                ift.GradientNormController(name="newton", iteration_limit=15)
-            )
-        fname = f"stage4_{ii}"
-        # state = rve.MinimizationState.load(fname)
-        state = rve.simple_minimize(ham, state.mean, 5, mini)
-        plotter.plot(f"stage4_{ii}", state)
-        state.save(fname)
 
 
 if __name__ == "__main__":
