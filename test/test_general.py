@@ -154,20 +154,20 @@ def test_calibration_likelihood(time_mode):
     ]
     if time_mode:
         reshaper = rve.Reshaper([ift.UnstructuredDomain(total_N), time_domain], dom)
-        dct = {"offset_mean": 0, "offset_std": (1, 0.5), "prefix": "calibration_phases"}
+        dct = {"offset_mean": 0, "offset_std": (1, 0.5)}
         dct1 = {
             "fluctuations": (2.0, 1.0),
             "loglogavgslope": (-4.0, 1),
             "flexibility": (5, 2.0),
             "asperity": None,
         }
-        cfm = ift.CorrelatedFieldMaker.make(**dct, total_N=total_N)
+        cfm = ift.CorrelatedFieldMaker("calibration_phases", total_N=total_N)
         cfm.add_fluctuations(time_domain, **dct1)
+        cfm.set_amplitude_total_offset(**dct)
         phase = reshaper @ cfm.finalize(0)
         dct = {
             "offset_mean": 0,
             "offset_std": (1e-3, 1e-6),
-            "prefix": "calibration_logamplitudes",
         }
         dct1 = {
             "fluctuations": (2.0, 1.0),
@@ -175,8 +175,9 @@ def test_calibration_likelihood(time_mode):
             "flexibility": (5, 2.0),
             "asperity": None,
         }
-        cfm = ift.CorrelatedFieldMaker.make(**dct, total_N=total_N)
+        cfm = ift.CorrelatedFieldMaker("calibration_logamplitudes", total_N=total_N)
         cfm.add_fluctuations(time_domain, **dct1)
+        cfm.set_amplitude_total_offset(**dct)
         logampl = reshaper @ cfm.finalize(0)
     lh, constantshape = None, (obs[0].vis.shape[0], obs[0].vis.shape[2])
     for ii, oo in enumerate(obs):
