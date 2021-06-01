@@ -39,7 +39,7 @@ class Minimization:
                 "comm": comm,
                 "nanisinf": True,
             }
-            self._e = ift.MetricGaussianKL.make(**dct)
+            self._e = ift.MetricGaussianKL(**dct)
             self._n, self._m = dct["n_samples"], dct["mirror_samples"]
 
     def minimize(self, minimizer):
