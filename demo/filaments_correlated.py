@@ -143,7 +143,7 @@ def main():
 
     p = ift.Plot()
     for ii in range(9):
-        p.add(sky(ift.from_random(sky.domain)))
+        p.add(sky.log10()(ift.from_random(sky.domain)))
     p.output(name="prior_samples.png")
 
     # npix = 2500
@@ -181,8 +181,8 @@ def main():
         #ift.single_plot(sky.log10()(state.mean), name=f"sky{ii}.png")
 
         plot = ift.Plot()
-        plot.add(sky.log10()(state.mean), title="sky{:02d}(logscale) a=0.5".format(ii), fontsize=20)
-        plot.output(ny=1, nx=1, xsize=30, ysize=30, name="sky{:02d}_logscale.png".format(ii))
+        plot.add(sky.log10()(state.mean), title="sky{:02d}(logscale) a=0.3".format(ii), fontsize=20)
+        plot.output(ny=1, nx=1, xsize=20, ysize=20, name="sky{:02d}_logscale.png".format(ii))
 
         R = rve.StokesIResponse(obs, dom)
         print((R @ sky)(state.mean))
