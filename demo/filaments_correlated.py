@@ -40,7 +40,7 @@ def get_filament_prior(domain):
     # c0 by correlated field model, initial density (rho0) = exp(c0)
     cfmaker_c0 = ift.CorrelatedFieldMaker('')
     # add fluctuations, flexibility, asperity, loglogavgslope
-    cfmaker_c0.add_fluctuations(normalized_domain, (2.0, 1.0), (1.0, 0.2), None, (-4., 0.5), 'c0')
+    cfmaker_c0.add_fluctuations(normalized_domain, (5.0, 1.0), (2.4, 0.8), None, (-4., 1.0), 'c0')
     cfmaker_c0.set_amplitude_total_offset(21., (1.0, 0.1))
     Correlated_field_c0 = cfmaker_c0.finalize()
     C0 = Correlated_field_c0
@@ -57,7 +57,7 @@ def get_filament_prior(domain):
     ### 2.Calculate initial wave function operator Psi_0
 
     hbar = 5 * 10 ** -3
-    a = 0.50
+    a = 0.30
     # time scale
     Half_operator_ = ift.ScalingOperator(C0.target, 0.5)
     Hbar_operator = ift.ScalingOperator(Phi0.target, -1j / hbar)
