@@ -1,5 +1,8 @@
 # resolve
 
+Documentation:
+[http://ift.pages.mpcdf.de/resolve](http://ift.pages.mpcdf.de/resolve)
+
 Resolve aims to be a general radio aperature synthesis algorithm.
 It is based on Bayesian principles and formulated in the language of information field theory.
 Its features include single-frequency imaging with either only a diffuse or a diffuse+point-like sky model as prior, single-channel antenna-based calibration with a regularization in temporal domain and w-stacking.
