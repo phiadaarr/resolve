@@ -1,12 +1,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright(C) 2019-2020 Max-Planck-Society
+# Copyright(C) 2019-2021 Max-Planck-Society
 # Author: Philipp Arras
+
+from functools import reduce
+from operator import add
 
 import numpy as np
 
 import nifty7 as ift
 
-from .util import my_assert_isinstance, my_asserteq
+from .util import my_assert, my_assert_isinstance, my_asserteq
 
 
 class AddEmptyDimension(ift.LinearOperator):
@@ -64,3 +67,49 @@ class AddEmptyDimensionAtEnd(ift.LinearOperator):
         else:
             x = x.val[..., 0]
         return ift.makeField(self._tgt(mode), x)
+
+
+class KeyPrefixer(ift.LinearOperator):
+    def __init__(self, domain, prefix):
+        self._domain = ift.MultiDomain.make(domain)
+        self._target = ift.MultiDomain.make(
+            {prefix + kk: vv for kk, vv in self._domain.items()}
+        )
+        self._capability = self.TIMES | self.ADJOINT_TIMES
+        self._prefix = prefix
+
+    def apply(self, x, mode):
+        self._check_input(x, mode)
+        if mode == self.TIMES:
+            res = {self._prefix + kk: vv for kk, vv in x.items()}
+        else:
+            res = {kk[len(self._prefix) :]: vv for kk, vv in x.items()}
+        return ift.MultiField.from_dict(res)
+
+    def __repr__(self):
+        return f"{self.domain.keys()} -> {self.target.keys()}"
+
+
+def MultiDomainVariableCovarianceGaussianEnergy(data, signal_response, invcov):
+    from .likelihood import get_mask_multi_field
+
+    my_asserteq(data.domain, signal_response.target, invcov.target)
+    my_assert_isinstance(data.domain, ift.MultiDomain)
+    my_assert_isinstance(signal_response.domain, ift.MultiDomain)
+    my_assert(ift.is_operator(invcov))
+    my_assert(ift.is_operator(signal_response))
+    res = []
+    invcovfld = invcov(ift.full(invcov.domain, 1.0))
+    mask = get_mask_multi_field(invcovfld)
+    data = mask(data)
+    signal_response = mask @ signal_response
+    invcov = mask @ invcov
+    for kk in data.keys():
+        res.append(
+            ift.VariableCovarianceGaussianEnergy(
+                data.domain[kk], "resi" + kk, "icov" + kk, data[kk].dtype
+            )
+        )
+    resi = KeyPrefixer(data.domain, "resi") @ ift.Adder(data, True) @ signal_response
+    invcov = KeyPrefixer(data.domain, "icov") @ invcov
+    return reduce(add, res) @ (resi + invcov)

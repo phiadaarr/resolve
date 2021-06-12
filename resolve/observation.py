@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright(C) 2019-2020 Max-Planck-Society
+# Copyright(C) 2019-2021 Max-Planck-Society
 # Author: Philipp Arras
 
 import numpy as np
@@ -8,13 +8,138 @@ import nifty7 as ift
 
 from .antenna_positions import AntennaPositions
 from .constants import SPEEDOFLIGHT
-from .direction import Direction
+from .direction import Direction, Directions
 from .mpi import onlymaster
 from .polarization import Polarization
 from .util import compare_attributes, my_assert, my_assert_isinstance, my_asserteq
 
 
-class Observation:
+class _Observation:
+    @property
+    def vis(self):
+        dom = [ift.UnstructuredDomain(ss) for ss in self._vis.shape]
+        return ift.makeField(dom, self._vis)
+
+    @property
+    def weight(self):
+        dom = [ift.UnstructuredDomain(ss) for ss in self._weight.shape]
+        return ift.makeField(dom, self._weight)
+
+    @property
+    def freq(self):
+        return self._freq
+
+    @property
+    def polarization(self):
+        return self._polarization
+
+    @property
+    def direction(self):
+        return self._direction
+
+    @property
+    def npol(self):
+        return self._vis.shape[0]
+
+    @property
+    def nrow(self):
+        return self._vis.shape[1]
+
+    @property
+    def nfreq(self):
+        return self._vis.shape[2]
+
+    def apply_flags(self, arr):
+        return arr[self._weight != 0.0]
+
+    @property
+    def flags(self):
+        return self._weight == 0.0
+
+    @property
+    def mask(self):
+        return self._weight > 0.0
+
+    def max_snr(self):
+        return np.max(np.abs(self.apply_flags(self._vis * np.sqrt(self._weight))))
+
+    def fraction_useful(self):
+        return self.apply_flags(self._weight).size / self._weight.size
+
+
+class SingleDishObservation(_Observation):
+    def __init__(self, pointings, data, weight, polarization, freq):
+        my_assert_isinstance(pointings, Directions)
+        my_assert_isinstance(polarization, Polarization)
+        my_assert(data.dtype in [np.float32, np.float64])
+        nrows = len(pointings)
+        my_asserteq(weight.shape, data.shape)
+        my_asserteq(data.shape, (len(polarization), nrows, len(freq)))
+        my_asserteq(nrows, data.shape[1])
+
+        data.flags.writeable = False
+        weight.flags.writeable = False
+
+        my_assert(np.all(weight >= 0.0))
+        my_assert(np.all(np.isfinite(data)))
+        my_assert(np.all(np.isfinite(weight)))
+
+        self._pointings = pointings
+        self._vis = data
+        self._weight = weight
+        self._polarization = polarization
+        self._freq = freq
+
+    @onlymaster
+    def save(self, file_name, compress):
+        p = self._pointings.to_list()
+        dct = dict(
+            vis=self._vis,
+            weight=self._weight,
+            freq=self._freq,
+            polarization=self._polarization.to_list(),
+            pointings0=p[0],
+            pointings1=p[1],
+        )
+        f = np.savez_compressed if compress else np.savez
+        f(file_name, **dct)
+
+    @staticmethod
+    def load(file_name):
+        dct = dict(np.load(file_name))
+        pol = Polarization.from_list(dct["polarization"])
+        pointings = Directions.from_list([dct["pointings0"], dct["pointings1"]])
+        return SingleDishObservation(
+            pointings, dct["vis"], dct["weight"], pol, dct["freq"]
+        )
+
+    def __eq__(self, other):
+        if not isinstance(other, Observation):
+            return False
+        if (
+            self._vis.dtype != other._vis.dtype
+            or self._weight.dtype != other._weight.dtype
+        ):
+            return False
+        return compare_attributes(
+            self, other, ("_polarization", "_freq", "_pointings", "_vis", "_weight")
+        )
+
+    def __getitem__(self, slc):
+        return SingleDishObservation(
+            self._pointings[slc],
+            self._vis[:, slc],
+            self._weight[:, slc],
+            self._polarization,
+            self._freq,
+        )
+
+    @property
+    def pointings(self):
+        return self._pointings
+
+
+class Observation(_Observation):
     """Observation data
 
     This class contains all the data and information about an observation.
@@ -48,6 +173,8 @@ class Observation:
         my_asserteq(vis.shape, (len(polarization), nrows, len(freq)))
         my_asserteq(nrows, vis.shape[1])
         my_assert(np.all(weight >= 0.0))
+        my_assert(np.all(np.isfinite(vis)))
+        my_assert(np.all(np.isfinite(weight)))
 
         vis.flags.writeable = False
         weight.flags.writeable = False
@@ -58,23 +185,6 @@ class Observation:
         self._polarization = polarization
         self._freq = freq
         self._direction = direction
-
-    def apply_flags(self, arr):
-        return arr[self._weight != 0.0]
-
-    @property
-    def flags(self):
-        return self._weight == 0.0
-
-    @property
-    def mask(self):
-        return self._weight > 0.0
-
-    def max_snr(self):
-        return np.max(np.abs(self.apply_flags(self._vis * np.sqrt(self._weight))))
-
-    def fraction_useful(self):
-        return self.apply_flags(self._weight).size / self._weight.size
 
     @onlymaster
     def save(self, file_name, compress):
@@ -169,40 +279,6 @@ class Observation:
     def effective_uvwlen(self):
         uvlen = np.linalg.norm(self.uvw, axis=1)
         return np.outer(uvlen, self._freq / SPEEDOFLIGHT)
-
-    @property
-    def vis(self):
-        dom = [ift.UnstructuredDomain(ss) for ss in self._vis.shape]
-        return ift.makeField(dom, self._vis)
-
-    @property
-    def weight(self):
-        dom = [ift.UnstructuredDomain(ss) for ss in self._weight.shape]
-        return ift.makeField(dom, self._weight)
-
-    @property
-    def freq(self):
-        return self._freq
-
-    @property
-    def polarization(self):
-        return self._polarization
-
-    @property
-    def direction(self):
-        return self._direction
-
-    @property
-    def npol(self):
-        return self._vis.shape[0]
-
-    @property
-    def nrow(self):
-        return self._vis.shape[1]
-
-    @property
-    def nfreq(self):
-        return self._vis.shape[2]
 
 
 def tmin_tmax(*args):
