@@ -1,5 +1,7 @@
+from .antenna_positions import AntennaPositions
 from .calibration import calibration_distribution
 from .constants import *
+from .direction import Direction
 from .fits import field2fits
 from .global_config import *
 from .likelihood import *
@@ -16,7 +18,7 @@ from .multi_frequency.operators import (
 from .observation import Observation, tmin_tmax, unique_antennas, unique_times
 from .plotter import MfPlotter, Plotter
 from .points import PointInserter
-from .polarization import polarization_matrix_exponential
+from .polarization import Polarization, polarization_matrix_exponential
 from .primary_beam import vla_beam
 from .response import MfResponse, ResponseDistributor, StokesIResponse, SingleResponse
 from .simple_operators import *
