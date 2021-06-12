@@ -244,14 +244,15 @@ class SingleResponse(ift.LinearOperator):
             "flip_v": True,
         }
         self._vol = self._domain[0].scalar_dvol
-        self._target_dtype = np.complex128
-        self._domain_dtype = np.float64
+        self._target_dtype = np.complex64 if single_precision else np.complex128
+        self._domain_dtype = np.float32  if single_precision else np.float64
         self._verbt, self._verbadj = verbose, verbose
         self._facets = facets
 
     def apply(self, x, mode):
         self._check_input(x, mode)
         # FIXME mtr Is the sky in single precision mode single or double?
+        # FIXME Make sure that vdot in Gaussian Energy is always in double
         # my_asserteq(x.dtype, self._domain_dtype if mode == self.TIMES else self._target_dtype)
         x = x.val.astype(
             self._domain_dtype if mode == self.TIMES else self._target_dtype
