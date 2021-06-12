@@ -2,25 +2,42 @@
 # Copyright(C) 2020 Max-Planck-Society
 # Author: Philipp Arras
 
+from functools import reduce
+from operator import add
+
 import numpy as np
 
 import nifty7 as ift
 
 from .observation import Observation
 from .response import FullPolResponse, MfResponse, StokesIResponse
-from .util import my_assert_isinstance, my_asserteq, my_assert
+from .util import my_assert, my_assert_isinstance, my_asserteq
 
 
 def _get_mask(observation):
     # Only needed for variable covariance gaussian energy
     my_assert_isinstance(observation, Observation)
-
     vis = observation.vis
     flags = observation.flags
     if not np.any(flags):
         return ift.ScalingOperator(vis.domain, 1.0), vis, observation.weight
     mask = ift.MaskOperator(ift.makeField(vis.domain, flags))
     return mask, mask(vis), mask(observation.weight)
+
+
+def get_mask_multi_field(weight):
+    assert isinstance(weight, ift.MultiField)
+    op = []
+    for kk, ww in weight.items():
+        flags = ww.val == 0.0
+        if np.any(flags):
+            myop = ift.MaskOperator(ift.makeField(ww.domain, flags))
+        else:
+            myop = ift.ScalingOperator(ww.domain, 1.0)
+        op.append(myop.ducktape(kk).ducktape_left(kk))
+    op = reduce(add, op)
+    assert op.domain == weight.domain
+    return op
 
 
 def _Likelihood(operator, normalized_residual_operator):
@@ -91,7 +108,7 @@ def ImagingLikelihood(
 
     Parameters
     ----------
-    observation : Observation
+    observation : Observation or dict(Observation)
         Observation object from which observation.vis and potentially
         observation.weight is used for computing the likelihood.
 
@@ -109,11 +126,12 @@ def ImagingLikelihood(
     calibration_operator : Operator
         Optional. Target needs to be the same as observation.vis.
     """
-    my_assert_isinstance(observation, Observation)
     my_assert_isinstance(sky_operator, ift.Operator)
     sdom = sky_operator.target
 
-    if isinstance(sdom, ift.MultiDomain):
+    mosaicing = isinstance(observation, dict)
+
+    if isinstance(sdom, ift.MultiDomain) and not mosaicing:
         if len(sdom["I"].shape) == 3:
             raise NotImplementedError(
                 "Polarization and multi-frequency at the same time not supported yet."
@@ -121,14 +139,20 @@ def ImagingLikelihood(
         else:
             R = FullPolResponse(observation, sky_operator.target)
     else:
-        if len(sdom.shape) == 3:
+        if not mosaicing and len(sdom.shape) == 3:
             R = MfResponse(observation, sdom[0], sdom[1])
         else:
             R = StokesIResponse(observation, sdom)
     model_data = R @ sky_operator
-
     if inverse_covariance_operator is None:
-        return _build_gauss_lh_nres(model_data, observation.vis, observation.weight)
+        if mosaicing:
+            vis = ift.MultiField.from_dict({kk: o.vis for kk, o in observation.items()})
+            weight = ift.MultiField.from_dict(
+                {kk: o.weight for kk, o in observation.items()}
+            )
+        else:
+            vis, weight = observation.vis, observation.weight
+        return _build_gauss_lh_nres(model_data, vis, weight)
     return _varcov(observation, model_data, inverse_covariance_operator)
 
 

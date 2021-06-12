@@ -2,8 +2,9 @@
 # Copyright(C) 2020 Max-Planck-Society
 # Author: Philipp Arras
 
-import numpy as np
 from os.path import join
+
+import numpy as np
 import pytest
 
 import nifty7 as ift
@@ -310,4 +311,12 @@ def test_mf_response():
 def test_intop():
     dom = ift.RGSpace((12, 12))
     op = rve.WienerIntegrations(freqdomain, dom)
+    ift.extra.check_linear_operator(op)
+
+
+def test_prefixer():
+    op = rve.KeyPrefixer(
+        ift.MultiDomain.make({"a": ift.UnstructuredDomain(10), "b": ift.RGSpace(190)}),
+        "invcov_inp",
+    ).adjoint
     ift.extra.check_linear_operator(op)

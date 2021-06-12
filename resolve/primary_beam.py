@@ -3,10 +3,11 @@
 # Author: Philipp Arras
 
 import numpy as np
+import scipy.special as sc
 
 import nifty7 as ift
 
-from .constants import ARCMIN2RAD
+from .constants import ARCMIN2RAD, SPEEDOFLIGHT
 from .util import my_assert
 
 
@@ -176,3 +177,31 @@ def vla_beam(domain, freq):
     beam = rweight * upper + (1 - rweight) * lower
     beam[beam < 0] = 0
     return ift.makeOp(ift.makeField(dom, beam))
+
+
+def alma_beam_func(D, d, freq, x, use_cache=False):
+    assert isinstance(x, np.ndarray)
+    assert x.ndim < 3
+    assert np.max(np.abs(x)) < np.pi / np.sqrt(2)
+
+    if not use_cache:
+        return _compute_alma_beam(D, d, freq, x)
+
+    iden = "_".join([str(ll) for ll in [D, d, freq]] + [str(ll) for ll in x.shape])
+    fname = f".beamcache{iden}.npy"
+    try:
+        return np.load(fname)
+    except FileNotFoundError:
+        arr = _compute_alma_beam(D, d, freq, x)
+        np.save(fname, arr)
+
+
+def _compute_alma_beam(D, d, freq, x):
+    a = freq / SPEEDOFLIGHT
+    b = d / D
+    x = np.pi * a * D * x
+    mask = x == 0.0
+    x[mask] = 1
+    sol = 2 / (x * (1 - b ** 2)) * (sc.jn(1, x) - b * sc.jn(1, x * b))
+    sol[mask] = 1
+    return sol * sol

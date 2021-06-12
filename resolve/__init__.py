@@ -1,11 +1,12 @@
 from .antenna_positions import AntennaPositions
 from .calibration import calibration_distribution
 from .constants import *
-from .direction import Direction
-from .fits import field2fits
+from .direction import *
+from .fits import field2fits, fits2field
 from .global_config import *
 from .likelihood import *
 from .minimization import Minimization, MinimizationState, simple_minimize
+from .mosaicing import *
 from .mpi import onlymaster
 from .mpi_operators import *
 from .ms_import import ms2observations, ms_n_spectral_windows
@@ -15,11 +16,11 @@ from .multi_frequency.operators import (
     MfWeightingInterpolation,
     WienerIntegrations,
 )
-from .observation import Observation, tmin_tmax, unique_antennas, unique_times
+from .observation import *
 from .plotter import MfPlotter, Plotter
 from .points import PointInserter
 from .polarization import Polarization, polarization_matrix_exponential
-from .primary_beam import vla_beam
+from .primary_beam import *
 from .response import MfResponse, ResponseDistributor, StokesIResponse, SingleResponse
 from .simple_operators import *
 from .util import (

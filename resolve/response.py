@@ -2,11 +2,15 @@
 # Copyright(C) 2019-2020 Max-Planck-Society
 # Author: Philipp Arras
 
+from functools import reduce
+from operator import add
+
 import numpy as np
 from ducc0.wgridder.experimental import dirty2vis, vis2dirty
 
 import nifty7 as ift
 
+from .constants import SPEEDOFLIGHT
 from .global_config import epsilon, nthreads, wgridding
 from .multi_frequency.irg_space import IRGSpace
 from .observation import Observation
@@ -14,6 +18,14 @@ from .util import my_assert, my_assert_isinstance, my_asserteq
 
 
 def StokesIResponse(observation, domain):
+    if isinstance(observation, dict):
+        # TODO Possibly add subpixel offset here
+        d = ift.MultiDomain.make(domain)
+        res = (
+            StokesIResponse(o, d[kk]).ducktape(kk).ducktape_left(kk)
+            for kk, o in observation.items()
+        )
+        return reduce(add, res)
     my_assert_isinstance(observation, Observation)
     domain = ift.DomainTuple.make(domain)
     my_asserteq(len(domain), 1)
@@ -227,6 +239,7 @@ class SingleResponse(ift.LinearOperator):
         self._target_dtype = np.complex64 if single_precision else np.complex128
         self._domain_dtype = np.float32 if single_precision else np.float64
         self._verbt, self._verbadj = verbose, verbose
+        self._ofac = None
 
     def apply(self, x, mode):
         self._check_input(x, mode)
@@ -239,6 +252,9 @@ class SingleResponse(ift.LinearOperator):
             args1 = {"dirty": x}
             if self._verbt:
                 args1["verbosity"] = True
+                print(
+                    f"\nINFO: Oversampling factors in response: {self.oversampling_factors()}\n"
+                )
                 self._verbt = False
             f = dirty2vis
             # FIXME Use vis_out keyword of wgridder
@@ -252,6 +268,9 @@ class SingleResponse(ift.LinearOperator):
             }
             if self._verbadj:
                 args1["verbosity"] = True
+                print(
+                    f"\nINFO: Oversampling factors in response: {self.oversampling_factors()}\n"
+                )
                 self._verbadj = False
             f = vis2dirty
         res = ift.makeField(self._tgt(mode), f(**self._args, **args1) * self._vol)
@@ -259,3 +278,16 @@ class SingleResponse(ift.LinearOperator):
             res.dtype, self._target_dtype if mode == self.TIMES else self._domain_dtype
         )
         return res
+
+    def oversampling_factors(self):
+        if self._ofac is not None:
+            return self._ofac
+        maxuv = (
+            np.max(np.abs(self._args["uvw"][:, 0:2]), axis=0)
+            * np.max(self._args["freq"])
+            / SPEEDOFLIGHT
+        )
+        hspace = self._domain[0].get_default_codomain()
+        hvol = np.array(hspace.shape) * np.array(hspace.distances) / 2
+        self._ofac = hvol / maxuv
+        return self._ofac
