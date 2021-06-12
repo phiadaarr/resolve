@@ -24,4 +24,5 @@ language = None
 exclude_patterns = []
 add_module_names = False
 
-html_theme = "sphinx_rtd_theme"
+html_theme = "pydata_sphinx_theme"
+html_theme_options = {"gitlab_url": "https://gitlab.mpcdf.mpg.de/ift/resolve"}

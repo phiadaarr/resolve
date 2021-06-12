@@ -14,7 +14,7 @@ RUN apt-get install -qq python3-mpi4py
 # Testing dependencies
 RUN apt-get install -qq python3-pytest-cov
 # Documentation dependencies
-RUN apt-get install -qq python3-sphinx-rtd-theme
+RUN pip3 install pydata-sphinx-theme
 
 # Create user (openmpi does not like to be run as root)
 RUN useradd -ms /bin/bash testinguser
