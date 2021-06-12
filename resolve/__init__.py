@@ -19,8 +19,8 @@ from .observation import Observation, tmin_tmax, unique_antennas, unique_times
 from .plotter import MfPlotter, Plotter
 from .points import PointInserter
 from .polarization import Polarization, polarization_matrix_exponential
-from .primary_beam import vla_beam
 from .response import MfResponse, ResponseDistributor, StokesIResponse, SingleResponse
+from .primary_beam import meerkat_beam, mf_meerkat_beam, vla_beam
 from .simple_operators import *
 from .util import (
     Reshaper,
