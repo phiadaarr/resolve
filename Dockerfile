@@ -13,7 +13,8 @@ RUN pip3 install astropy
 RUN apt-get install -qq python3-mpi4py
 # Testing dependencies
 RUN apt-get install -qq python3-pytest-cov
-RUN pip3 install flake8
+# Documentation dependencies
+RUN apt-get install -qq python3-sphinx-rtd-theme
 
 # Create user (openmpi does not like to be run as root)
 RUN useradd -ms /bin/bash testinguser
