@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright(C) 2019-2020 Max-Planck-Society
+# Copyright(C) 2019-2021 Max-Planck-Society
 # Author: Philipp Arras
 
 from functools import reduce
 from operator import add
+from itertools import product
 
 import numpy as np
 from ducc0.wgridder.experimental import dirty2vis, vis2dirty
@@ -112,10 +113,12 @@ class MfResponse(ift.LinearOperator):
         Contains the the :class:`nifty7.RGSpace` for the positions.
     """
 
-    def __init__(self, observation, frequency_domain, position_domain, verbose=True):
+    def __init__(
+        self, observation, frequency_domain, position_domain, verbose=False,
+    ):
         my_assert_isinstance(observation, Observation)
         # FIXME Add polarization support
-        my_asserteq(observation.npol, 1)
+        my_assert(observation.npol in [1, 2])
         my_assert_isinstance(frequency_domain, IRGSpace)
         my_assert_isinstance(position_domain, ift.RGSpace)
 
@@ -127,7 +130,7 @@ class MfResponse(ift.LinearOperator):
         data_freq = observation.freq
         my_assert(np.all(np.diff(data_freq) > 0))
         sky_freq = np.array(frequency_domain.coordinates)
-        band_indices = [np.argmin(np.abs(ff - sky_freq)) for ff in data_freq]
+        band_indices = self.band_indices(sky_freq, data_freq)
         # Make sure that no index is wasted
         my_asserteq(len(set(band_indices)), frequency_domain.size)
         self._r = []
@@ -135,14 +138,20 @@ class MfResponse(ift.LinearOperator):
         mask = observation.mask
         for band_index in np.unique(band_indices):
             sel = band_indices == band_index
-            assert mask.shape[0] == 1
+            if mask.shape[0] == 1:
+                mymask = mask[0, :, sel]
+            elif mask.shape[0] == 2:
+                # FIXME In stokesi mode: mask everything possible in gridder, the rest afterwards.
+                mymask = np.any(mask[0, :, sel], axis=0)
+            else:
+                raise NotImplementedError
             r = SingleResponse(
                 position_domain,
                 observation.uvw,
                 observation.freq[sel],
-                mask[0, :, sel].T,
+                mymask.T,
                 sp,
-                verbose
+                verbose,
             )
             self._r.append((band_index, sel, r))
         # Double check that all channels are written to
@@ -160,14 +169,14 @@ class MfResponse(ift.LinearOperator):
                 foo = rr(ift.makeField(rr.domain, x[band_index]))
                 if res is None:
                     res = np.empty(self._tgt(mode).shape, foo.dtype)
-                res[0][..., sel] = foo.val
+                res[..., sel] = foo.val
         else:
             empty = np.zeros(self._domain.shape[0], bool)
             res = np.empty(self._tgt(mode).shape)
             for band_index, sel, rr in self._r:
                 assert x.shape[0] == 1
                 # FIXME Is ascontiguousarray really a good idea here?
-                inp = np.ascontiguousarray(x[0][..., sel])
+                inp = np.ascontiguousarray(np.sum(x[..., sel], axis=0))
                 res[band_index] = rr.adjoint(ift.makeField(rr.target, inp)).val
                 empty[band_index] = False
             for band_index in np.where(empty)[0]:
@@ -177,6 +186,10 @@ class MfResponse(ift.LinearOperator):
                 empty[band_index] = False
             my_assert(not np.any(empty))
         return ift.makeField(self._tgt(mode), res)
+
+    @staticmethod
+    def band_indices(sky_freq, data_freq):
+        return [np.argmin(np.abs(ff - sky_freq)) for ff in data_freq]
 
 
 class ResponseDistributor(ift.LinearOperator):
@@ -216,7 +229,13 @@ class FullResponse(ift.LinearOperator):
 
 
 class SingleResponse(ift.LinearOperator):
-    def __init__(self, domain, uvw, freq, mask, single_precision, verbose=True):
+    def __init__(
+        self, domain, uvw, freq, mask, single_precision, verbose=False, facets=(1, 1)
+    ):
+        my_assert_isinstance(facets, tuple)
+        for ii in range(1):
+            if domain.shape[0] % facets[0] != 0:
+                raise ValueError("nfacets needs to be divisor of npix.")
         # FIXME Currently only the response uses single_precision if possible.
         # Could be rolled out to the whole likelihood
         self._domain = ift.DomainTuple.make(domain)
@@ -237,43 +256,27 @@ class SingleResponse(ift.LinearOperator):
         }
         self._vol = self._domain[0].scalar_dvol
         self._target_dtype = np.complex64 if single_precision else np.complex128
-        self._domain_dtype = np.float32 if single_precision else np.float64
+        self._domain_dtype = np.float32  if single_precision else np.float64
         self._verbt, self._verbadj = verbose, verbose
         self._ofac = None
+        self._facets = facets
 
     def apply(self, x, mode):
         self._check_input(x, mode)
         # FIXME mtr Is the sky in single precision mode single or double?
+        # FIXME Make sure that vdot in Gaussian Energy is always in double
         # my_asserteq(x.dtype, self._domain_dtype if mode == self.TIMES else self._target_dtype)
         x = x.val.astype(
             self._domain_dtype if mode == self.TIMES else self._target_dtype
         )
+        std = self._facets == (1, 1)
         if mode == self.TIMES:
-            args1 = {"dirty": x}
-            if self._verbt:
-                args1["verbosity"] = True
-                print(
-                    f"\nINFO: Oversampling factors in response: {self.oversampling_factors()}\n"
-                )
-                self._verbt = False
-            f = dirty2vis
-            # FIXME Use vis_out keyword of wgridder
+            res = self._times(x) if std else self._facet_times(x)
+            self._verbt = False
         else:
-            # FIXME assert correct strides for visibilities
-            my_assert(x.flags["C_CONTIGUOUS"])
-            args1 = {
-                "vis": x,
-                "npix_x": self._domain[0].shape[0],
-                "npix_y": self._domain.shape[1],
-            }
-            if self._verbadj:
-                args1["verbosity"] = True
-                print(
-                    f"\nINFO: Oversampling factors in response: {self.oversampling_factors()}\n"
-                )
-                self._verbadj = False
-            f = vis2dirty
-        res = ift.makeField(self._tgt(mode), f(**self._args, **args1) * self._vol)
+            res = self._adjoint(x) if std else self._facet_adjoint(x)
+            self._verbadj = False
+        res = ift.makeField(self._tgt(mode), res * self._vol)
         my_asserteq(
             res.dtype, self._target_dtype if mode == self.TIMES else self._domain_dtype
         )
@@ -291,3 +294,64 @@ class SingleResponse(ift.LinearOperator):
         hvol = np.array(hspace.shape) * np.array(hspace.distances) / 2
         self._ofac = hvol / maxuv
         return self._ofac
+
+    def _times(self, x):
+        if self._verbt:
+            print(f"\nINFO: Oversampling factors in response: {self.oversampling_factors()}\n")
+        # FIXME Use vis_out keyword of wgridder
+        res = dirty2vis(dirty=x, verbosity=self._verbt, **self._args)
+        self._verbt = False
+        return res
+
+    def _adjoint(self, x):
+        my_assert(x.flags["C_CONTIGUOUS"])
+        nx, ny = self._domain.shape
+        if self._verbadj:
+            print(f"\nINFO: Oversampling factors in response: {self.oversampling_factors()}\n")
+        res = vis2dirty(vis=x, npix_x=nx, npix_y=ny, verbosity=self._verbadj, **self._args)
+        self._verbadj = False
+        return res
+
+    def _facet_times(self, x):
+        nfacets_x, nfacets_y = self._facets
+        npix_x, npix_y = self._domain.shape
+        nx = npix_x // nfacets_x
+        ny = npix_y // nfacets_y
+        vis = None
+        for xx, yy in product(range(nfacets_x), range(nfacets_y)):
+            cx = ((0.5 + xx) / nfacets_x - 0.5) * self._args["pixsize_x"] * npix_x
+            cy = ((0.5 + yy) / nfacets_y - 0.5) * self._args["pixsize_y"] * npix_y
+            facet = x[nx * xx : nx * (xx + 1), ny * yy : ny * (yy + 1)]
+            foo = dirty2vis(
+                dirty=facet,
+                center_x=cx,
+                center_y=cy,
+                verbosity=self._verbt,
+                **self._args
+            )
+            if vis is None:
+                vis = foo
+            else:
+                vis += foo
+        return vis
+
+    def _facet_adjoint(self, x):
+        nfacets_x, nfacets_y = self._facets
+        npix_x, npix_y = self._domain.shape
+        nx = npix_x // nfacets_x
+        ny = npix_y // nfacets_y
+        res = np.zeros((npix_x, npix_y), self._domain_dtype)
+        for xx, yy in product(range(nfacets_x), range(nfacets_y)):
+            cx = ((0.5 + xx) / nfacets_x - 0.5) * self._args["pixsize_x"] * npix_x
+            cy = ((0.5 + yy) / nfacets_y - 0.5) * self._args["pixsize_y"] * npix_y
+            im = vis2dirty(
+                vis=x,
+                npix_x=nx,
+                npix_y=ny,
+                center_x=cx,
+                center_y=cy,
+                verbosity=self._verbadj,
+                **self._args
+            )
+            res[nx * xx : nx * (xx + 1), ny * yy : ny * (yy + 1)] = im
+        return res

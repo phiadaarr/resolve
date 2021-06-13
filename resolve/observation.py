@@ -185,6 +185,30 @@ class Observation(_Observation):
         self._polarization = polarization
         self._freq = freq
         self._direction = direction
+        self._ndeff = None
+
+    def apply_flags(self, arr):
+        return arr[self._weight != 0.0]
+
+    @property
+    def flags(self):
+        return self._weight == 0.0
+
+    @property
+    def mask(self):
+        return self._weight > 0.0
+
+    def max_snr(self):
+        return np.max(np.abs(self.apply_flags(self._vis * np.sqrt(self._weight))))
+
+    def fraction_useful(self):
+        return self.n_data_effective / self._weight.size
+
+    @property
+    def n_data_effective(self):
+        if self._ndeff is None:
+            self._ndeff = self.apply_flags(self._weight).size
+        return self._ndeff
 
     @onlymaster
     def save(self, file_name, compress):
@@ -214,6 +238,7 @@ class Observation(_Observation):
         pol = Polarization.from_list(dct["polarization"])
         direction = Direction.from_list(dct["direction"])
         slc = slice(None) if lo_hi_index is None else slice(*lo_hi_index)
+        # FIXME Put barrier here that makes sure that only one full Observation is loaded at a time
         return Observation(
             AntennaPositions.from_list(antpos),
             dct["vis"][..., slc],
@@ -222,6 +247,34 @@ class Observation(_Observation):
             dct["freq"][slc],
             direction,
         )
+
+    @staticmethod
+    def load_mf(file_name, n_imaging_bands, comm=None):
+        if comm is not None:
+            my_assert(n_imaging_bands >= comm.Get_size())
+
+        # Compute frequency ranges in data space
+        global_freqs = np.load(file_name).get("freq")
+        assert np.all(np.diff(global_freqs) > 0)
+        my_assert(n_imaging_bands <= global_freqs.size)
+
+        if comm is None:
+            local_imaging_bands = range(n_imaging_bands)
+        else:
+            local_imaging_bands = range(
+                *ift.utilities.shareRange(
+                    n_imaging_bands, comm.Get_size(), comm.Get_rank()
+                )
+            )
+        full_obs = Observation.load(file_name)
+        obs_list = [
+            full_obs.get_freqs_by_slice(
+                slice(*ift.utilities.shareRange(len(global_freqs), n_imaging_bands, ii))
+            )
+            for ii in local_imaging_bands
+        ]
+        nu0 = global_freqs.mean()
+        return obs_list, nu0
 
     def __eq__(self, other):
         if not isinstance(other, Observation):
@@ -245,6 +298,40 @@ class Observation(_Observation):
             self._polarization,
             self._freq,
             self._direction,
+        )
+
+    def get_freqs(self, frequency_list):
+        """Return observation that contains a subset of the present frequencies
+
+        Parameters
+        ----------
+        frequency_list : list
+            List of indices that shall be returned
+        """
+        mask = np.zeros(self.nfreq, dtype=bool)
+        mask[frequency_list] = 1
+        return self.get_freqs_by_slice(mask)
+
+    def get_freqs_by_slice(self, slc):
+        return Observation(
+            self._antpos,
+            self._vis[..., slc],
+            self._weight[..., slc],
+            self._polarization,
+            self._freq[slc],
+            self._direction,
+        )
+
+    def average_stokesi(self):
+        my_asserteq(self._vis.shape[0], 2)
+        my_asserteq(self._polarization.restrict_to_stokes_i(), self._polarization)
+        vis = np.sum(self._weight * self._vis, axis=0)[None]
+        wgt = np.sum(self._weight, axis=0)[None]
+        invmask = wgt == 0.0
+        vis /= wgt + np.ones_like(wgt) * invmask
+        vis[invmask] = 0.0
+        return Observation(
+            self._antpos, vis, wgt, Polarization.trivial(), self._freq, self._direction
         )
 
     def move_time(self, t0):

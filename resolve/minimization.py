@@ -53,7 +53,7 @@ class Minimization:
 
 
 class MinimizationState:
-    def __init__(self, position, samples, mirror_samples=False):
+    def __init__(self, position, samples=[], mirror_samples=False):
         self._samples = list(samples)
         self._position = position
         if len(samples) > 0:
@@ -70,6 +70,14 @@ class MinimizationState:
         if self._mirror and key >= len(self) // 2:
             return self._position.unite(-self._samples[key])
         return self._position.unite(self._samples[key])
+
+    def all_samples(self):
+        if len(self._samples) == 0:
+            return None
+        lst = []
+        if self._mirror:
+            lst = [-ss for ss in self._samples]
+        return lst + self._samples
 
     def __len__(self):
         return (2 if self._mirror else 1) * len(self._samples)
