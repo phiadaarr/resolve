@@ -24,7 +24,6 @@ class AntennaPositions:
         time of measurement
     """
 
-    # FIXME Split this class into two. One for only imaging, one also for calibration
     def __init__(self, uvw, ant1=None, ant2=None, time=None):
         if ant1 is None:
             my_asserteq(ant2, time, None)

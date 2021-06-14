@@ -39,6 +39,7 @@ points = ift.InverseGammaOperator(
 sky = rve.vla_beam(dom, np.mean(OBS[0].freq)) @ (sky0 + inserter @ points)
 
 freqdomain = rve.IRGSpace(np.linspace(1000, 1050, num=10))
+FACETS = [(1, 1), (2, 2), (2, 1), (1, 4)]
 
 
 @pmp(
@@ -266,10 +267,27 @@ def test_response_distributor():
 
 
 @pmp("obs", OBS)
-def test_single_response(obs):
+@pmp("facets", FACETS)
+def test_single_response(obs, facets):
     mask = obs.mask
-    op = rve.response.SingleResponse(dom, obs.uvw, obs.freq, mask[0], False)
+    op = rve.response.SingleResponse(
+        dom, obs.uvw, obs.freq, mask[0], False, facets=facets
+    )
     ift.extra.check_linear_operator(op, np.float64, np.complex128, only_r_linear=True)
+
+
+def test_facet_consistency():
+    obs = OBS[0]
+    res0 = None
+    pos = ift.from_random(dom)
+    for facets in FACETS:
+        op = rve.response.SingleResponse(
+            dom, obs.uvw, obs.freq, obs.mask[0], False, facets=facets
+        )
+        res = op(pos)
+        if res0 is None:
+            res0 = res
+        ift.extra.assert_allclose(res0, res, atol=1e-4, rtol=1e-4)
 
 
 @rve.onlymaster

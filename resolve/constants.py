@@ -3,11 +3,12 @@
 # Author: Philipp Arras
 
 import numpy as np
+from scipy.constants import speed_of_light
 
 ARCMIN2RAD = np.pi / 60 / 180
 AS2RAD = ARCMIN2RAD / 60
 DEG2RAD = np.pi / 180
-SPEEDOFLIGHT = 299792458
+SPEEDOFLIGHT = speed_of_light
 
 
 def str2rad(s):

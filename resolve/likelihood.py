@@ -40,12 +40,12 @@ def get_mask_multi_field(weight):
     return op
 
 
-def _Likelihood(operator, normalized_residual_operator):
-    my_assert_isinstance(operator, ift.Operator)
+def _Likelihood(operator, data, metric_at_pos, model_data):
+    my_assert_isinstance(operator, model_data, ift.Operator)
     my_asserteq(operator.target, ift.DomainTuple.scalar_domain())
-    my_assert_isinstance(normalized_residual_operator, ift.Operator)
-
-    operator.normalized_residual = normalized_residual_operator
+    operator.data = data
+    operator.metric_at_pos = metric_at_pos
+    operator.model_data = model_data
     return operator
 
 
@@ -55,19 +55,7 @@ def _build_gauss_lh_nres(op, mean, invcov):
     my_asserteq(op.target, mean.domain, invcov.domain)
 
     lh = ift.GaussianEnergy(mean=mean, inverse_covariance=ift.makeOp(invcov)) @ op
-    nres = ift.makeOp(invcov.sqrt()) @ ift.Adder(mean, neg=True) @ op
-    return _Likelihood(lh, nres)
-
-
-def _build_varcov_gauss_lh_nres(residual, inverse_covariance, dtype):
-    my_assert_isinstance(residual, inverse_covariance, ift.Operator)
-    my_asserteq(residual.target, inverse_covariance.target)
-
-    s0, s1 = "residual", "inverse covariance"
-    op = residual.ducktape_left(s0) + inverse_covariance.ducktape_left(s1)
-    lh = ift.VariableCovarianceGaussianEnergy(residual.target, s0, s1, dtype) @ op
-    nres = residual * inverse_covariance.sqrt()
-    return _Likelihood(lh, nres)
+    return _Likelihood(lh, mean, lambda x: ift.makeOp(invcov), op)
 
 
 def _varcov(observation, Rs, inverse_covariance_operator):
@@ -77,7 +65,12 @@ def _varcov(observation, Rs, inverse_covariance_operator):
     residual = ift.Adder(vis, neg=True) @ mask @ Rs
     inverse_covariance_operator = mask @ inverse_covariance_operator
     dtype = observation.vis.dtype
-    return _build_varcov_gauss_lh_nres(residual, inverse_covariance_operator, dtype)
+    s0, s1 = "residual", "inverse covariance"
+    op = residual.ducktape_left(s0) + inverse_covariance_operator.ducktape_left(s1)
+    lh = ift.VariableCovarianceGaussianEnergy(residual.target, s0, s1, dtype) @ op
+    return _Likelihood(
+        lh, vis, lambda x: ift.makeOp(inverse_covariance_operator(x)), mask @ Rs
+    )
 
 
 def ImagingLikelihood(
@@ -146,13 +139,15 @@ def ImagingLikelihood(
     model_data = R @ sky_operator
     if inverse_covariance_operator is None:
         if mosaicing:
-            vis = ift.MultiField.from_dict({kk: o.vis for kk, o in observation.items()})
-            weight = ift.MultiField.from_dict(
-                {kk: o.weight for kk, o in observation.items()}
-            )
+            vis, weight, mask = {}, {}, {}
+            for kk, oo in observation.items():
+                mask[kk], vis[kk], weight[kk] = _get_mask(oo)
+            vis = ift.MultiField.from_dict(vis)
+            weight = ift.MultiField.from_dict(weight)
+            mask = ift.MultiField.from_dict(mask)
         else:
-            vis, weight = observation.vis, observation.weight
-        return _build_gauss_lh_nres(model_data, vis, weight)
+            mask, vis, weight = _get_mask(observation)
+        return _build_gauss_lh_nres(mask @ model_data, vis, weight)
     return _varcov(observation, model_data, inverse_covariance_operator)
 
 
@@ -196,6 +191,7 @@ def CalibrationLikelihood(
     my_assert_isinstance(calibration_operator, ift.Operator)
     model_data = ift.makeOp(model_visibilities) @ calibration_operator
     if inverse_covariance_operator is None:
-        return _build_gauss_lh_nres(model_data, observation.vis, observation.weight)
+        mask, vis, wgt = _get_mask(observation)
+        return _build_gauss_lh_nres(mask @ model_data, vis, wgt)
     my_assert_isinstance(inverse_covariance_operator, ift.Operator)
     return _varcov(observation, model_data, inverse_covariance_operator)

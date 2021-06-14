@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright(C) 2019-2020 Max-Planck-Society
+# Copyright(C) 2019-2021 Max-Planck-Society
 # Author: Philipp Arras
 
 import numpy as np
@@ -9,6 +9,54 @@ import nifty7 as ift
 
 from .constants import ARCMIN2RAD, SPEEDOFLIGHT
 from .util import my_assert
+from .meerkat_beam import JimBeam
+
+
+def _get_meshgrid(domain):
+    nx, ny = domain.shape
+    xf = domain.distances[0] * nx / 2
+    yf = domain.distances[1] * ny / 2
+    xs = np.linspace(-xf, xf, nx)
+    ys = np.linspace(-yf, yf, ny)
+    return np.meshgrid(xs, ys, indexing="ij")
+
+
+def meerkat_beam(domain, freq, mode):
+    """Return approximate version of MeerKAT beam
+
+    Parameters
+    ----------
+    domain : RGSpace
+        Domain on which the beam shall be defined.
+    frequency : float
+        Observing frequency in MHz.
+    mode : str
+        Either "L" (900 to 1650 MHz) or "UHF" (550 to 1050 MHz)
+    """
+    beam = JimBeam(f"MKAT-AA-{mode}-JIM-2020")
+    xx, yy = _get_meshgrid(domain)
+    res = beam.I(xx, yy, freq)
+    assert res.shape == domain.shape
+    return res
+
+
+def mf_meerkat_beam(frequency_domain, spatial_domain, mode):
+    """Return approximate version of MeerKAT beam
+
+    Parameters
+    ----------
+    frequency_domain : IRGSpace
+
+    spatial_domain : RGSpace
+
+    mode : str
+        Either "L" (900 to 1650 MHz) or "UHF" (550 to 1050 MHz)
+    """
+    freqs = frequency_domain.coordinates
+    res = np.empty((len(freqs),) + spatial_domain.shape)
+    for ii, freq in enumerate(freqs):
+        res[ii] = meerkat_beam(spatial_domain, freq, mode)
+    return res
 
 
 def vla_beam(domain, freq):
@@ -158,11 +206,7 @@ def vla_beam(domain, freq):
     cupper = poly[ind]
     rweight = (freq - flower) / (fupper - flower)
 
-    xf, xp = dom.distances[0] * dom.shape[0] / 2, dom.shape[0]
-    yf, yp = dom.distances[1] * dom.shape[1] / 2, dom.shape[1]
-    xx, yy = np.meshgrid(
-        np.linspace(-xf, xf, xp), np.linspace(-yf, yf, yp), indexing="ij"
-    )
+    xx, yy = _get_meshgrid(dom)
     r = np.sqrt(xx ** 2 + yy ** 2) / 1000 / ARCMIN2RAD  # Mhz->GHz, RAD->ARCMIN
 
     def _vla_eval_poly(coeffs, xs):

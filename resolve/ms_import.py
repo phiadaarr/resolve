@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright(C) 2019-2020 Max-Planck-Society
+# Copyright(C) 2019-2021 Max-Planck-Society
 
 from os.path import isdir, join, splitext
 
@@ -11,7 +11,10 @@ from .observation import Observation
 from .polarization import Polarization
 from .util import my_assert, my_asserteq, my_assert_isinstance
 
-_CASACORE_TABLE_CFG = {"readonly": True, "ack": False}
+
+def ms_table(path):
+    from casacore.tables import table
+    return table(path, readonly=True, ack=False)
 
 
 def ms2observations(
@@ -62,8 +65,6 @@ def ms2observations(
     because it is not guaranteed by the measurement set data structure that all
     baselines are present in all spectral windows.
     """
-    from casacore.tables import table
-
     if ms[-1] == "/":
         ms = ms[:-1]
     if not isdir(ms) or splitext(ms)[1].lower() != ".ms":
@@ -82,11 +83,11 @@ def ms2observations(
     my_assert_isinstance(spectral_window, int)
     my_assert(spectral_window >= 0)
     my_assert(spectral_window < ms_n_spectral_windows(ms))
-    with table(join(ms, "SPECTRAL_WINDOW"), **_CASACORE_TABLE_CFG) as t:
+    with ms_table(join(ms, "SPECTRAL_WINDOW")) as t:
         freq = t.getcol("CHAN_FREQ")[spectral_window]
 
     # Polarization
-    with table(join(ms, "POLARIZATION"), **_CASACORE_TABLE_CFG) as t:
+    with ms_table(join(ms, "POLARIZATION")) as t:
         pol = t.getcol("CORR_TYPE")
         my_asserteq(pol.ndim, 2)
         my_asserteq(pol.shape[0], 1)
@@ -107,7 +108,7 @@ def ms2observations(
             pol_summation = False
 
     # Field
-    with table(join(ms, "FIELD"), **_CASACORE_TABLE_CFG) as t:
+    with ms_table(join(ms, "FIELD")) as t:
         equinox = t.coldesc("REFERENCE_DIR")["desc"]["keywords"]["MEASINFO"]["Ref"]
         equinox = str(equinox)[1:]
         # FIXME Put proper support for equinox here
@@ -170,8 +171,6 @@ def read_ms_i(
     with_calib_info,
     channel_slice,
 ):
-    from casacore.tables import table
-
     freq = np.array(freq)
     my_asserteq(freq.ndim, 1)
     my_assert(len(freq) > 0)
@@ -182,7 +181,7 @@ def read_ms_i(
     if pol_summation:
         my_asserteq(len(pol_indices), 2)
 
-    with table(name, **_CASACORE_TABLE_CFG) as t:
+    with ms_table(name) as t:
         # FIXME Get rid of fullwgt
         fullwgt, weightcol = _determine_weighting(t)
         nrow = t.nrows()
@@ -192,7 +191,6 @@ def read_ms_i(
         active_rows = np.ones(nrow, dtype=np.bool)
         active_channels = np.zeros(nchan, dtype=np.bool)
         step = max(1, nrow // 100)  # how many rows to read in every step
-
 
         # Check if data column is available
         t.getcol(data_column, startrow=0, nrow=10)
@@ -324,8 +322,6 @@ def read_ms_i(
 
 
 def ms_n_spectral_windows(ms):
-    from casacore.tables import table
-
-    with table(join(ms, "SPECTRAL_WINDOW"), **_CASACORE_TABLE_CFG) as t:
+    with ms_table(join(ms, "SPECTRAL_WINDOW")) as t:
         freq = t.getcol("CHAN_FREQ")
     return freq.shape[0]
