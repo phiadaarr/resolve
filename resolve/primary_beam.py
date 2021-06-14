@@ -59,12 +59,9 @@ def mf_meerkat_beam(frequency_domain, spatial_domain, mode):
     return res
 
 
-def vla_beam(domain, freq):
+def vla_beam_func(freq, x):
     freq = 1e-6 * float(freq)  # freq in MHz
     # Values taken from EVLA memo 195
-    dom = ift.DomainTuple.make(domain)
-    my_assert(len(dom) == 1)
-    dom = dom[0]
     my_assert(freq < 14948, freq > 1040)
     coeffs = np.array(
         [
@@ -206,9 +203,6 @@ def vla_beam(domain, freq):
     cupper = poly[ind]
     rweight = (freq - flower) / (fupper - flower)
 
-    xx, yy = _get_meshgrid(dom)
-    r = np.sqrt(xx ** 2 + yy ** 2) / 1000 / ARCMIN2RAD  # Mhz->GHz, RAD->ARCMIN
-
     def _vla_eval_poly(coeffs, xs):
         my_assert(coeffs.shape == (3,))
         ys = np.ones_like(xs)
@@ -216,10 +210,19 @@ def vla_beam(domain, freq):
         ys += 1e-7 * coeffs[1] * xs ** 4
         return ys + 1e-10 * coeffs[2] * xs ** 6
 
-    lower = _vla_eval_poly(clower, flower * r)
-    upper = _vla_eval_poly(cupper, fupper * r)
+    lower = _vla_eval_poly(clower, flower*x/1000/ARCMIN2RAD)
+    upper = _vla_eval_poly(cupper, fupper*x/1000/ARCMIN2RAD)
     beam = rweight * upper + (1 - rweight) * lower
     beam[beam < 0] = 0
+    return beam
+
+
+def vla_beam(domain, freq):
+    dom = ift.DomainTuple.make(domain)
+    my_assert(len(dom) == 1)
+    dom = dom[0]
+    xx, yy = _get_meshgrid(dom)
+    beam = vla_beam_func(freq, np.sqrt(xx ** 2 + yy ** 2))
     return ift.makeOp(ift.makeField(dom, beam))
 
 
