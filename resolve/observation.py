@@ -372,8 +372,10 @@ class Observation(_Observation):
         return out
 
     def effective_uvwlen(self):
-        uvlen = np.linalg.norm(self.uvw, axis=1)
-        return np.outer(uvlen, self._freq / SPEEDOFLIGHT)
+        return np.outer(self.uvwlen(), self._freq / SPEEDOFLIGHT)
+
+    def uvwlen(self):
+        return np.linalg.norm(self.uvw, axis=1)
 
 
 def tmin_tmax(*args):

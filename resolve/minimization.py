@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright(C) 2020 Max-Planck-Society
+# Copyright(C) 2020-2021 Max-Planck-Society
 # Author: Philipp Arras
 
 import pickle
@@ -66,7 +66,9 @@ class MinimizationState:
         if not isinstance(key, int):
             raise TypeError
         if key >= len(self) or key < 0:
-            raise KeyError
+            raise IndexError
+        if key == 0 and len(self._samples) == 0:
+            return self._position
         if self._mirror and key >= len(self) // 2:
             return self._position.unite(-self._samples[key])
         return self._position.unite(self._samples[key])
@@ -80,6 +82,8 @@ class MinimizationState:
         return lst + self._samples
 
     def __len__(self):
+        if len(self._samples) == 0:
+            return 1
         return (2 if self._mirror else 1) * len(self._samples)
 
     def __eq__(self, other):
@@ -111,3 +115,19 @@ class MinimizationState:
         my_assert_isinstance(position, (ift.MultiField, ift.Field))
         my_assert_isinstance(mirror, bool)
         return MinimizationState(position, samples, mirror)
+
+
+    def operator_stats(self, operator):
+        """Return ift.StatCalculator for operator applied to all samples"""
+        sc = ift.StatCalculator()
+        for ss in self:
+            sc.add(operator.force(ss))
+        return sc
+
+
+    def operator_samples(self, operator):
+        """Return posterior samples for operator"""
+        res = []
+        for ss in self:
+            res.append(operator.force(ss))
+        return res
