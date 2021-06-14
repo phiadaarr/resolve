@@ -49,12 +49,13 @@ def _Likelihood(operator, data, metric_at_pos, model_data):
     return operator
 
 
-def _build_gauss_lh_nres(op, observation):
+def _build_gauss_lh_nres(op, mean, invcov):
     my_assert_isinstance(op, ift.Operator)
-    mask, vis, wgt = _get_mask(observation)
-    invcov = ift.makeOp(wgt)
-    lh = ift.GaussianEnergy(mean=vis, inverse_covariance=invcov) @ mask @ op
-    return _Likelihood(lh, vis, lambda x: invcov, mask @ op)
+    my_assert_isinstance(mean, invcov, (ift.Field, ift.MultiField))
+    my_asserteq(op.target, mean.domain, invcov.domain)
+
+    lh = ift.GaussianEnergy(mean=mean, inverse_covariance=ift.makeOp(invcov)) @ op
+    return _Likelihood(lh, mean, lambda x: ift.makeOp(invcov), op)
 
 
 def _varcov(observation, Rs, inverse_covariance_operator):
@@ -138,13 +139,15 @@ def ImagingLikelihood(
     model_data = R @ sky_operator
     if inverse_covariance_operator is None:
         if mosaicing:
-            vis = ift.MultiField.from_dict({kk: o.vis for kk, o in observation.items()})
-            weight = ift.MultiField.from_dict(
-                {kk: o.weight for kk, o in observation.items()}
-            )
+            vis, weight, mask = {}, {}, {}
+            for kk, oo in observation.items():
+                mask[kk], vis[kk], weight[kk] = _get_mask(oo)
+            vis = ift.MultiField.from_dict(vis)
+            weight = ift.MultiField.from_dict(weight)
+            mask = ift.MultiField.from_dict(mask)
         else:
-            vis, weight = observation.vis, observation.weight
-        return _build_gauss_lh_nres(model_data, vis, weight)
+            mask, vis, weight = _get_mask(observation)
+        return _build_gauss_lh_nres(mask @ model_data, vis, weight)
     return _varcov(observation, model_data, inverse_covariance_operator)
 
 
@@ -188,6 +191,7 @@ def CalibrationLikelihood(
     my_assert_isinstance(calibration_operator, ift.Operator)
     model_data = ift.makeOp(model_visibilities) @ calibration_operator
     if inverse_covariance_operator is None:
-        return _build_gauss_lh_nres(model_data, observation)
+        mask, vis, wgt = _get_mask(observation)
+        return _build_gauss_lh_nres(mask @ model_data, vis, wgt)
     my_assert_isinstance(inverse_covariance_operator, ift.Operator)
     return _varcov(observation, model_data, inverse_covariance_operator)
