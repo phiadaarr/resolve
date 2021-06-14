@@ -141,10 +141,11 @@ def ImagingLikelihood(
         if mosaicing:
             vis, weight, mask = {}, {}, {}
             for kk, oo in observation.items():
-                mask[kk], vis[kk], weight[kk] = _get_mask(oo)
+                vis[kk], weight[kk] = oo.vis, oo.weight
             vis = ift.MultiField.from_dict(vis)
             weight = ift.MultiField.from_dict(weight)
-            mask = ift.MultiField.from_dict(mask)
+            # FIXME Use mask here as well
+            mask = ift.ScalingOperator(vis.domain, 1.)
         else:
             mask, vis, weight = _get_mask(observation)
         return _build_gauss_lh_nres(mask @ model_data, vis, weight)
