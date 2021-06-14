@@ -334,6 +334,14 @@ class Observation(_Observation):
             self._antpos, vis, wgt, Polarization.trivial(), self._freq, self._direction
         )
 
+    def restrict_to_stokesi(self):
+        my_asserteq(self._vis.shape[0], 4)
+        ind = self._polarization.stokes_i_indices()
+        vis = self._vis[ind]
+        wgt = self._weight[ind]
+        pol = self._polarization.restrict_to_stokes_i()
+        return Observation(self._antpos, vis, wgt, pol, self._freq, self._direction)
+
     def move_time(self, t0):
         antpos = self._antpos.move_time(t0)
         return Observation(
