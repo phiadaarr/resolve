@@ -174,7 +174,9 @@ def ImagingLikelihood(
             vis = ift.MultiField.from_dict(vis)
             weight = ift.MultiField.from_dict(weight)
             # FIXME Use mask here as well
-            mask = ift.ScalingOperator(vis.domain, 1.)
+            mask = get_mask_multi_field(weight)
+            vis = mask(vis)
+            weight = mask(weight)
         else:
             mask, vis, weight = _get_mask(observation)
         return _build_gauss_lh_nres(mask @ model_data, vis, weight)
