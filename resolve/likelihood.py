@@ -43,6 +43,7 @@ def get_mask_multi_field(weight):
 def _Likelihood(operator, data, metric_at_pos, model_data):
     my_assert_isinstance(operator, model_data, ift.Operator)
     my_asserteq(operator.target, ift.DomainTuple.scalar_domain())
+    my_asserteq(model_data.target, data.domain)
     operator.data = data
     operator.metric_at_pos = metric_at_pos
     operator.model_data = model_data
@@ -59,6 +60,34 @@ def _build_gauss_lh_nres(op, mean, invcov):
 
 
 def _varcov(observation, Rs, inverse_covariance_operator):
+    from .simple_operators import KeyPrefixer
+    mosaicing = isinstance(observation, dict)
+    if mosaicing:
+        lhs = []
+        vis = {}
+        masks = []
+        for kk, oo in observation.items():
+            mask = ift.MaskOperator(ift.makeField(oo.vis.domain, ~oo.mask))
+            masks.append(mask.ducktape(kk).ducktape_left(kk))
+            tgt = mask.target
+            vis[kk] = mask(oo.vis)
+            dtype = oo.vis.dtype
+            s0, s1 = "residual", "inverse covariance"
+            a = ift.Adder(vis[kk], neg=True).ducktape_left(s0).ducktape("modeld" + kk)
+            b = ift.ScalingOperator(mask.target, 1.).ducktape_left(s1).ducktape("icov"+kk)
+            e = ift.VariableCovarianceGaussianEnergy(tgt, s0, s1, dtype)
+            lhs.append(e @ (a+b))
+        masks = reduce(add, masks)
+
+        a = KeyPrefixer(masks.target, "modeld") @ masks @ Rs
+        b = KeyPrefixer(masks.target, "icov") @ masks @ inverse_covariance_operator
+        lh = reduce(add, lhs) @ (a + b)
+
+        vis = ift.MultiField.from_dict(vis)
+        model_data = masks @ Rs
+        icov_at = lambda x: ift.makeOp((masks @ inverse_covariance_operator).force(x))
+        return _Likelihood(lh, vis, icov_at, model_data)
+
     my_assert_isinstance(inverse_covariance_operator, ift.Operator)
     my_asserteq(Rs.target, observation.vis.domain, inverse_covariance_operator.target)
     mask, vis, _ = _get_mask(observation)
