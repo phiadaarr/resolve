@@ -62,6 +62,7 @@ def _build_gauss_lh_nres(op, mean, invcov):
 def _varcov(observation, Rs, inverse_covariance_operator):
     from .simple_operators import KeyPrefixer
     mosaicing = isinstance(observation, dict)
+    s0, s1 = "residual", "inverse covariance"
     if mosaicing:
         lhs = []
         vis = {}
@@ -72,7 +73,6 @@ def _varcov(observation, Rs, inverse_covariance_operator):
             tgt = mask.target
             vis[kk] = mask(oo.vis)
             dtype = oo.vis.dtype
-            s0, s1 = "residual", "inverse covariance"
             a = ift.Adder(vis[kk], neg=True).ducktape_left(s0).ducktape("modeld" + kk)
             b = ift.ScalingOperator(mask.target, 1.).ducktape_left(s1).ducktape("icov"+kk)
             e = ift.VariableCovarianceGaussianEnergy(tgt, s0, s1, dtype)
@@ -86,20 +86,18 @@ def _varcov(observation, Rs, inverse_covariance_operator):
         vis = ift.MultiField.from_dict(vis)
         model_data = masks @ Rs
         icov_at = lambda x: ift.makeOp((masks @ inverse_covariance_operator).force(x))
-        return _Likelihood(lh, vis, icov_at, model_data)
-
-    my_assert_isinstance(inverse_covariance_operator, ift.Operator)
-    my_asserteq(Rs.target, observation.vis.domain, inverse_covariance_operator.target)
-    mask, vis, _ = _get_mask(observation)
-    residual = ift.Adder(vis, neg=True) @ mask @ Rs
-    inverse_covariance_operator = mask @ inverse_covariance_operator
-    dtype = observation.vis.dtype
-    s0, s1 = "residual", "inverse covariance"
-    op = residual.ducktape_left(s0) + inverse_covariance_operator.ducktape_left(s1)
-    lh = ift.VariableCovarianceGaussianEnergy(residual.target, s0, s1, dtype) @ op
-    return _Likelihood(
-        lh, vis, lambda x: ift.makeOp(inverse_covariance_operator(x)), mask @ Rs
-    )
+    else:
+        my_assert_isinstance(inverse_covariance_operator, ift.Operator)
+        my_asserteq(Rs.target, observation.vis.domain, inverse_covariance_operator.target)
+        mask, vis, _ = _get_mask(observation)
+        residual = ift.Adder(vis, neg=True) @ mask @ Rs
+        inverse_covariance_operator = mask @ inverse_covariance_operator
+        dtype = observation.vis.dtype
+        op = residual.ducktape_left(s0) + inverse_covariance_operator.ducktape_left(s1)
+        lh = ift.VariableCovarianceGaussianEnergy(residual.target, s0, s1, dtype) @ op
+        model_data = mask @ Rs
+        icov_at = lambda x: ift.makeOp(inverse_covariance_operator.force(x))
+    return _Likelihood(lh, vis, icov_at, model_data)
 
 
 def ImagingLikelihood(
