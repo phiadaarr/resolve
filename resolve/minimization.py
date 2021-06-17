@@ -47,7 +47,8 @@ class Minimization:
         position = ift.MultiField.union([self._position, self._e.position])
         if self._n == 0:
             return MinimizationState(position, [])
-        samples = list(self._e.samples)
+        zeros = ift.full(position.domain, 0.)
+        samples = [ss.unite(zeros) for ss in self._e.samples]
         my_asserteq(len(samples), 2 * self._n if self._m else self._n)
         return MinimizationState(position, samples, self._m)
 
