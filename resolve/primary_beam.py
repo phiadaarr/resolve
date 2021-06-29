@@ -1,21 +1,67 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright(C) 2019-2020 Max-Planck-Society
+# Copyright(C) 2019-2021 Max-Planck-Society
 # Author: Philipp Arras
 
 import numpy as np
+import scipy.special as sc
 
 import nifty7 as ift
 
-from .constants import ARCMIN2RAD
+from .constants import ARCMIN2RAD, SPEEDOFLIGHT
 from .util import my_assert
+from .meerkat_beam import JimBeam
 
 
-def vla_beam(domain, freq):
+def _get_meshgrid(domain):
+    nx, ny = domain.shape
+    xf = domain.distances[0] * nx / 2
+    yf = domain.distances[1] * ny / 2
+    xs = np.linspace(-xf, xf, nx)
+    ys = np.linspace(-yf, yf, ny)
+    return np.meshgrid(xs, ys, indexing="ij")
+
+
+def meerkat_beam(domain, freq, mode):
+    """Return approximate version of MeerKAT beam
+
+    Parameters
+    ----------
+    domain : RGSpace
+        Domain on which the beam shall be defined.
+    frequency : float
+        Observing frequency in MHz.
+    mode : str
+        Either "L" (900 to 1650 MHz) or "UHF" (550 to 1050 MHz)
+    """
+    beam = JimBeam(f"MKAT-AA-{mode}-JIM-2020")
+    xx, yy = _get_meshgrid(domain)
+    res = beam.I(xx, yy, freq)
+    assert res.shape == domain.shape
+    return res
+
+
+def mf_meerkat_beam(frequency_domain, spatial_domain, mode):
+    """Return approximate version of MeerKAT beam
+
+    Parameters
+    ----------
+    frequency_domain : IRGSpace
+
+    spatial_domain : RGSpace
+
+    mode : str
+        Either "L" (900 to 1650 MHz) or "UHF" (550 to 1050 MHz)
+    """
+    freqs = frequency_domain.coordinates
+    res = np.empty((len(freqs),) + spatial_domain.shape)
+    for ii, freq in enumerate(freqs):
+        res[ii] = meerkat_beam(spatial_domain, freq, mode)
+    return res
+
+
+def vla_beam_func(freq, x):
     freq = 1e-6 * float(freq)  # freq in MHz
     # Values taken from EVLA memo 195
-    dom = ift.DomainTuple.make(domain)
-    my_assert(len(dom) == 1)
-    dom = dom[0]
     my_assert(freq < 14948, freq > 1040)
     coeffs = np.array(
         [
@@ -157,13 +203,6 @@ def vla_beam(domain, freq):
     cupper = poly[ind]
     rweight = (freq - flower) / (fupper - flower)
 
-    xf, xp = dom.distances[0] * dom.shape[0] / 2, dom.shape[0]
-    yf, yp = dom.distances[1] * dom.shape[1] / 2, dom.shape[1]
-    xx, yy = np.meshgrid(
-        np.linspace(-xf, xf, xp), np.linspace(-yf, yf, yp), indexing="ij"
-    )
-    r = np.sqrt(xx ** 2 + yy ** 2) / 1000 / ARCMIN2RAD  # Mhz->GHz, RAD->ARCMIN
-
     def _vla_eval_poly(coeffs, xs):
         my_assert(coeffs.shape == (3,))
         ys = np.ones_like(xs)
@@ -171,8 +210,45 @@ def vla_beam(domain, freq):
         ys += 1e-7 * coeffs[1] * xs ** 4
         return ys + 1e-10 * coeffs[2] * xs ** 6
 
-    lower = _vla_eval_poly(clower, flower * r)
-    upper = _vla_eval_poly(cupper, fupper * r)
+    lower = _vla_eval_poly(clower, flower*x/1000/ARCMIN2RAD)
+    upper = _vla_eval_poly(cupper, fupper*x/1000/ARCMIN2RAD)
     beam = rweight * upper + (1 - rweight) * lower
     beam[beam < 0] = 0
+    return beam
+
+
+def vla_beam(domain, freq):
+    dom = ift.DomainTuple.make(domain)
+    my_assert(len(dom) == 1)
+    dom = dom[0]
+    xx, yy = _get_meshgrid(dom)
+    beam = vla_beam_func(freq, np.sqrt(xx ** 2 + yy ** 2))
     return ift.makeOp(ift.makeField(dom, beam))
+
+
+def alma_beam_func(D, d, freq, x, use_cache=False):
+    assert isinstance(x, np.ndarray)
+    assert x.ndim < 3
+    assert np.max(np.abs(x)) < np.pi / np.sqrt(2)
+
+    if not use_cache:
+        return _compute_alma_beam(D, d, freq, x)
+
+    iden = "_".join([str(ll) for ll in [D, d, freq]] + [str(ll) for ll in x.shape])
+    fname = f".beamcache{iden}.npy"
+    try:
+        return np.load(fname)
+    except FileNotFoundError:
+        arr = _compute_alma_beam(D, d, freq, x)
+        np.save(fname, arr)
+
+
+def _compute_alma_beam(D, d, freq, x):
+    a = freq / SPEEDOFLIGHT
+    b = d / D
+    x = np.pi * a * D * x
+    mask = x == 0.0
+    x[mask] = 1
+    sol = 2 / (x * (1 - b ** 2)) * (sc.jn(1, x) - b * sc.jn(1, x * b))
+    sol[mask] = 1
+    return sol * sol

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright(C) 2020 Max-Planck-Society
+# Copyright(C) 2020-2021 Max-Planck-Society
 # Author: Philipp Arras
 
 import pickle
@@ -40,7 +40,7 @@ class Minimization:
                 "comm": comm,
                 "nanisinf": True,
             }
-            self._e = ift.MetricGaussianKL.make(**dct)
+            self._e = ift.MetricGaussianKL(**dct)
             self._n, self._m = dct["n_samples"], dct["mirror_samples"]
 
     def minimize(self, minimizer):
@@ -48,13 +48,14 @@ class Minimization:
         position = ift.MultiField.union([self._position, self._e.position])
         if self._n == 0:
             return MinimizationState(position, [])
-        samples = list(self._e.samples)
+        zeros = ift.full(position.domain, 0.)
+        samples = [ss.unite(zeros) for ss in self._e.samples]
         my_asserteq(len(samples), 2 * self._n if self._m else self._n)
         return MinimizationState(position, samples, self._m)
 
 
 class MinimizationState:
-    def __init__(self, position, samples, mirror_samples=False):
+    def __init__(self, position, samples=[], mirror_samples=False):
         self._samples = list(samples)
         self._position = position
         if len(samples) > 0:
@@ -67,12 +68,24 @@ class MinimizationState:
         if not isinstance(key, int):
             raise TypeError
         if key >= len(self) or key < 0:
-            raise KeyError
+            raise IndexError
+        if key == 0 and len(self._samples) == 0:
+            return self._position
         if self._mirror and key >= len(self) // 2:
             return self._position.unite(-self._samples[key])
         return self._position.unite(self._samples[key])
 
+    def all_samples(self):
+        if len(self._samples) == 0:
+            return None
+        lst = []
+        if self._mirror:
+            lst = [-ss for ss in self._samples]
+        return lst + self._samples
+
     def __len__(self):
+        if len(self._samples) == 0:
+            return 1
         return (2 if self._mirror else 1) * len(self._samples)
 
     def __eq__(self, other):
@@ -104,3 +117,19 @@ class MinimizationState:
         my_assert_isinstance(position, (ift.MultiField, ift.Field))
         my_assert_isinstance(mirror, bool)
         return MinimizationState(position, samples, mirror)
+
+
+    def operator_stats(self, operator):
+        """Return ift.StatCalculator for operator applied to all samples"""
+        sc = ift.StatCalculator()
+        for ss in self:
+            sc.add(operator.force(ss))
+        return sc
+
+
+    def operator_samples(self, operator):
+        """Return posterior samples for operator"""
+        res = []
+        for ss in self:
+            res.append(operator.force(ss))
+        return res

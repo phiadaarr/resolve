@@ -2,6 +2,7 @@
 # Copyright(C) 2020 Max-Planck-Society
 # Author: Philipp Arras
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 import nifty7 as ift
@@ -66,3 +67,9 @@ def divide_where_possible(a, b):
         raise TypeError
     arr = np.divide(a, b, out=np.ones(dom.shape), where=b != 0)
     return ift.makeField(dom, arr)
+
+
+def imshow(arr, ax=None, **kwargs):
+    if ax is None:
+        ax = plt.gca()
+    return ax.imshow(arr.T, origin="lower", **kwargs)

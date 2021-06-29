@@ -108,7 +108,9 @@ class SliceSumLinear(ift.LinearOperator):
                 self._comm,
             )
         else:
-            arr = _allgather([op.adjoint(x).val for op in self._oplist], self._comm, self._nwork)
+            arr = array_allgather(
+                [op.adjoint(x).val for op in self._oplist], self._comm, self._nwork
+            )
             return ift.makeField(self.domain, arr)
 
 
@@ -128,7 +130,7 @@ class SliceLinear(ift.EndomorphicOperator):
 
     def apply(self, x, mode):
         self._check_input(x, mode)
-        res = _allgather(
+        res = array_allgather(
             [
                 op.apply(ift.makeField(op.domain, x.val[self._lo + ii]), mode).val
                 for ii, op in enumerate(self._oplist)
@@ -144,7 +146,7 @@ class SliceLinear(ift.EndomorphicOperator):
         for ii, op in enumerate(self._oplist):
             with ift.random.Context(sseq[self._lo + ii]):
                 local_samples.append(op.draw_sample(from_inverse).val)
-        res = _allgather(local_samples, self._comm, self._nwork)
+        res = array_allgather(local_samples, self._comm, self._nwork)
         return ift.makeField(self._domain, res)
 
 
@@ -190,7 +192,7 @@ def _get_global_unique(lst, f, comm):
     return cap
 
 
-def _allgather(arrs, comm, nwork):
+def array_allgather(arrs, comm, nwork):
     if comm is None:
         full_lst = np.array(arrs)
     else:

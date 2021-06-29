@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright(C) 2019-2020 Max-Planck-Society
+# Copyright(C) 2019-2021 Max-Planck-Society
 # Author: Philipp Arras
 
 import time
@@ -7,6 +7,9 @@ from os.path import splitext
 
 import numpy as np
 
+import nifty7 as ift
+
+from .constants import DEG2RAD
 from .mpi import onlymaster
 
 
@@ -41,35 +44,68 @@ def field2fits(field, file_name, overwrite, direction=None):
     base, ext = splitext(file_name)
     hdulist.writeto(base + ext, overwrite=overwrite)
 
-    # @staticmethod
-    # def make_from_file(file_name):
-    #     with pyfits.open(file_name) as hdu_list:
-    #         lst = hdu_list[0]
-    #         pcx = lst.header['CRVAL1']/180*np.pi
-    #         pcy = lst.header['CRVAL2']/180*np.pi
-    #         equ = lst.header['EQUINOX']
-    #     return FitsWriter([pcx, pcy], equ)
 
-    # @staticmethod
-    # def fits2field(file_name, ignore_units=False, from_wsclean=False):
-    #     with pyfits.open(file_name) as hdu_list:
-    #         image_data = np.squeeze(hdu_list[0].data).astype(np.float64)
-    #         head = hdu_list[0].header
-    #         dstx = abs(head['CDELT1']*np.pi/180)
-    #         dsty = abs(head['CDELT2']*np.pi/180)
-    #         if not ignore_units:
-    #             if head['BUNIT'] == 'JY/BEAM':
-    #                 fac = np.pi/4/np.log(2)
-    #                 scale = fac*head['BMAJ']*head['BMIN']*(np.pi/180)**2
-    #             elif head['BUNIT'] == 'JY/PIXEL':
-    #                 scale = dstx*dsty
-    #             else:
-    #                 scale = 1
-    #             image_data /= scale
-    #     if from_wsclean:
-    #         image_data = image_data[::-1].T[:, :-1]
-    #         image_data = np.pad(image_data, ((0, 0), (1, 0)), mode='constant')
-    #     else:
-    #         image_data = image_data.T[:, ::-1]
-    #     dom = ift.RGSpace(image_data.shape, (dstx, dsty))
-    #     return ift.makeField(dom, image_data)
+def fits2field(file_name, ignore_units=False, from_wsclean=False):
+    import astropy.io.fits as pyfits
+
+    with pyfits.open(file_name) as hdu_list:
+        image_data = hdu_list[0].data.astype(np.float64)
+        assert image_data.shape[0] == 1  # Only one Stokes component
+        image_data = image_data[0]
+        head = hdu_list[0].header
+        assert head["CUNIT1"].strip() == "deg"
+        assert head["CUNIT2"].strip() == "deg"
+        assert head["CUNIT3"].strip() == "Hz"
+        refs = []
+        refs.append([float(head["CRVAL3"]), int(head["CRPIX3"]), head["CDELT3"]])
+        refs.append(
+            [
+                float(head["CRVAL2"]) * DEG2RAD,
+                int(head["CRPIX2"]),
+                head["CDELT2"] * DEG2RAD,
+            ]
+        )
+        refs.append(
+            [
+                float(head["CRVAL1"]) * DEG2RAD,
+                int(head["CRPIX1"]),
+                head["CDELT1"] * DEG2RAD,
+            ]
+        )
+
+        if not ignore_units:
+            if head["BUNIT"].upper() == "JY/BEAM":
+                fac = np.pi / 4 / np.log(2)
+                scale = fac * head["BMAJ"] * head["BMIN"] * (np.pi / 180) ** 2
+            elif head["BUNIT"].upper() == "JY/PIXEL":
+                scale = abs(refs[0][2] * refs[1][2])
+            else:
+                scale = 1
+            image_data /= scale
+
+    # Convert CASA conventions to resolve conventions
+    inds = 0, 2, 1
+    image_data = np.transpose(image_data, inds)
+    refs = [refs[ii] for ii in inds]
+    refs[1][2] *= -1
+
+    for ii, (_, mypx, mydst) in enumerate(refs):
+        if mydst == 0.0:
+            raise RuntimeError
+        if mydst > 0:
+            continue
+        image_data = np.flip(image_data, ii)
+        refs[ii][2] *= -1
+        # FIXME Assume pixel counting start at 0. Maybe also 1?
+        refs[ii][1] = image_data.shape[ii] - mypx
+
+    refval = tuple(refs[ii][0] for ii in range(3))
+    refpx = tuple(refs[ii][1] for ii in range(3))
+    dsts = tuple(refs[ii][2] for ii in range(3))
+    dom = (
+        ift.RGSpace(image_data.shape[0], dsts[0]),
+        ift.RGSpace(image_data.shape[1:], dsts[1:]),
+    )
+    refval = tuple(refval[ii] - refpx[ii] * dsts[ii] for ii in range(3))
+    del refpx
+    return ift.makeField(dom, image_data), refval

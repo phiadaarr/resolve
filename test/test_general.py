@@ -2,8 +2,9 @@
 # Copyright(C) 2020 Max-Planck-Society
 # Author: Philipp Arras
 
-import numpy as np
 from os.path import join
+
+import numpy as np
 import pytest
 
 import nifty7 as ift
@@ -38,6 +39,7 @@ points = ift.InverseGammaOperator(
 sky = rve.vla_beam(dom, np.mean(OBS[0].freq)) @ (sky0 + inserter @ points)
 
 freqdomain = rve.IRGSpace(np.linspace(1000, 1050, num=10))
+FACETS = [(1, 1), (2, 2), (2, 1), (1, 4)]
 
 
 @pmp(
@@ -154,20 +156,20 @@ def test_calibration_likelihood(time_mode):
     ]
     if time_mode:
         reshaper = rve.Reshaper([ift.UnstructuredDomain(total_N), time_domain], dom)
-        dct = {"offset_mean": 0, "offset_std": (1, 0.5), "prefix": "calibration_phases"}
+        dct = {"offset_mean": 0, "offset_std": (1, 0.5)}
         dct1 = {
             "fluctuations": (2.0, 1.0),
             "loglogavgslope": (-4.0, 1),
             "flexibility": (5, 2.0),
             "asperity": None,
         }
-        cfm = ift.CorrelatedFieldMaker.make(**dct, total_N=total_N)
+        cfm = ift.CorrelatedFieldMaker("calibration_phases", total_N=total_N)
         cfm.add_fluctuations(time_domain, **dct1)
+        cfm.set_amplitude_total_offset(**dct)
         phase = reshaper @ cfm.finalize(0)
         dct = {
             "offset_mean": 0,
             "offset_std": (1e-3, 1e-6),
-            "prefix": "calibration_logamplitudes",
         }
         dct1 = {
             "fluctuations": (2.0, 1.0),
@@ -175,8 +177,9 @@ def test_calibration_likelihood(time_mode):
             "flexibility": (5, 2.0),
             "asperity": None,
         }
-        cfm = ift.CorrelatedFieldMaker.make(**dct, total_N=total_N)
+        cfm = ift.CorrelatedFieldMaker("calibration_logamplitudes", total_N=total_N)
         cfm.add_fluctuations(time_domain, **dct1)
+        cfm.set_amplitude_total_offset(**dct)
         logampl = reshaper @ cfm.finalize(0)
     lh, constantshape = None, (obs[0].vis.shape[0], obs[0].vis.shape[2])
     for ii, oo in enumerate(obs):
@@ -264,10 +267,27 @@ def test_response_distributor():
 
 
 @pmp("obs", OBS)
-def test_single_response(obs):
+@pmp("facets", FACETS)
+def test_single_response(obs, facets):
     mask = obs.mask
-    op = rve.response.SingleResponse(dom, obs.uvw, obs.freq, mask[0], False)
+    op = rve.response.SingleResponse(
+        dom, obs.uvw, obs.freq, mask[0], False, facets=facets
+    )
     ift.extra.check_linear_operator(op, np.float64, np.complex128, only_r_linear=True)
+
+
+def test_facet_consistency():
+    obs = OBS[0]
+    res0 = None
+    pos = ift.from_random(dom)
+    for facets in FACETS:
+        op = rve.response.SingleResponse(
+            dom, obs.uvw, obs.freq, obs.mask[0], False, facets=facets
+        )
+        res = op(pos)
+        if res0 is None:
+            res0 = res
+        ift.extra.assert_allclose(res0, res, atol=1e-4, rtol=1e-4)
 
 
 @rve.onlymaster
@@ -309,4 +329,12 @@ def test_mf_response():
 def test_intop():
     dom = ift.RGSpace((12, 12))
     op = rve.WienerIntegrations(freqdomain, dom)
+    ift.extra.check_linear_operator(op)
+
+
+def test_prefixer():
+    op = rve.KeyPrefixer(
+        ift.MultiDomain.make({"a": ift.UnstructuredDomain(10), "b": ift.RGSpace(190)}),
+        "invcov_inp",
+    ).adjoint
     ift.extra.check_linear_operator(op)

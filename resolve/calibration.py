@@ -21,8 +21,6 @@ def calibration_distribution(
     ap = observation.antenna_positions
     cop1 = CalibrationDistributor(dom, tgt, ap.ant1, ap.time, antenna_dct, time_dct)
     cop2 = CalibrationDistributor(dom, tgt, ap.ant2, ap.time, antenna_dct, time_dct)
-    my_asserteq(cop1.domain, cop2.domain)
-    my_asserteq(cop1.target, cop2.target)
     res0 = (cop1 + cop2).real @ logamplitude_operator
     res1 = (1j * (cop1 - cop2).real) @ phase_operator
     return (res0 + res1).exp()
