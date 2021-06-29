@@ -58,7 +58,7 @@ class SliceSum(ift.Operator):
     def apply(self, x):
         self._check_input(x)
         if not ift.is_linearization(x):
-            # FIXME: with x.val[self._lo + ii] we only support slicing along the first dimension
+            #TOASK: with x.val[self._lo + ii] we only support slicing along the first dimension of the array. Either document that or extend it to support different axis.
             opx = [
                 op(ift.makeField(op.domain, x.val[self._lo + ii]))
                 for ii, op in enumerate(self._oplist)
@@ -124,7 +124,6 @@ class SliceLinear(ift.EndomorphicOperator):
         self._comm = comm
         self._lo = index_low
         local_nwork = [len(oplist)] if comm is None else comm.allgather(len(oplist))
-        size, rank, _ = ift.utilities.get_MPI_params_from_comm(comm) # TODO: Check if this line can be removed
         self._nwork = sum(local_nwork)
 
     def apply(self, x, mode):
@@ -196,11 +195,10 @@ def _allgather(arrs, comm, nwork):
         full_lst = np.array(arrs)
     else:
         from mpi4py import MPI
-        # FIXME: Like in SliceSum() we currently assume slicing along the first dimension
+        # TOASK: Like in SliceSum() we slice along the first dimension
         # TODO: clean up implementation
         size = comm.Get_size()
         send_buf = np.array(arrs)
-
         recv_buffer_shape = (nwork,) + send_buf.shape[1:]
 
         full_lst = np.empty(recv_buffer_shape)
@@ -218,6 +216,4 @@ def _allgather(arrs, comm, nwork):
                 displacement.append(send_count_per_rank + displacement[rank])
 
         comm.Allgatherv([send_buf, MPI.DOUBLE], [full_lst, tuple(send_count), tuple(displacement), MPI.DOUBLE])
-        # full_lst = comm.allgather(arrs)
-        # print(f"working gather looks like should look like: {np.array(full_lst).shape}")
     return full_lst

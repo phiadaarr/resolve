@@ -122,6 +122,7 @@ def ImagingLikelihood(
             R = FullPolResponse(observation, sky_operator.target)
     else:
         if len(sdom.shape) == 3:
+            #TOASK: Add possibility to use this flag with ImagingLikelihood
             R = MfResponse(observation, sdom[0], sdom[1], verbose=False)
         else:
             R = StokesIResponse(observation, sdom)
