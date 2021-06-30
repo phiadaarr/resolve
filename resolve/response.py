@@ -12,7 +12,7 @@ from ducc0.wgridder.experimental import dirty2vis, vis2dirty
 import nifty7 as ift
 
 from .constants import SPEEDOFLIGHT
-from .global_config import epsilon, nthreads, wgridding
+from .global_config import epsilon, nthreads, wgridding, verbosity
 from .multi_frequency.irg_space import IRGSpace
 from .observation import Observation
 from .util import my_assert, my_assert_isinstance, my_asserteq
@@ -33,15 +33,14 @@ def StokesIResponse(observation, domain):
     my_assert_isinstance(domain[0], ift.RGSpace)
     npol = observation.npol
     my_assert(npol in [1, 2])
-    sp = observation.vis.dtype == np.complex64
     mask = observation.mask
-    sr0 = SingleResponse(domain, observation.uvw, observation.freq, mask[0], sp)
+    sr0 = SingleResponse(domain, observation.uvw, observation.freq, mask[0])
     # FIXME Get rid of npol==2 support here
     if npol == 1 or (npol == 2 and np.all(mask[0] == mask[1])):
         contr = ift.ContractionOperator(observation.vis.domain, 0)
         return contr.adjoint @ sr0
     elif npol == 2:
-        sr1 = SingleResponse(domain, observation.uvw, observation.freq, mask[1], sp)
+        sr1 = SingleResponse(domain, observation.uvw, observation.freq, mask[1])
         return ResponseDistributor(sr0, sr1)
     raise RuntimeError
 
@@ -63,10 +62,9 @@ class FullPolResponse(ift.LinearOperator):
         my_asserteq(dd for dd in domain)
         npol = observation.npol
         my_asserteq(npol, 4)
-        sp = observation.vis.dtype == np.complex64
         domain = domain["I"]
         mask = np.all(observation.mask, axis=0)
-        self._sr = SingleResponse(domain, observation.uvw, observation.freq, mask, sp)
+        self._sr = SingleResponse(domain, observation.uvw, observation.freq, mask)
         self._capability = self.TIMES | self.ADJOINT_TIMES
 
     def apply(self, x, mode):
@@ -113,9 +111,7 @@ class MfResponse(ift.LinearOperator):
         Contains the the :class:`nifty7.RGSpace` for the positions.
     """
 
-    def __init__(
-        self, observation, frequency_domain, position_domain, verbose=False,
-    ):
+    def __init__( self, observation, frequency_domain, position_domain):
         my_assert_isinstance(observation, Observation)
         # FIXME Add polarization support
         my_assert(observation.npol in [1, 2])
@@ -150,8 +146,6 @@ class MfResponse(ift.LinearOperator):
                 observation.uvw,
                 observation.freq[sel],
                 mymask.T,
-                sp,
-                verbose,
             )
             self._r.append((band_index, sel, r))
         # Double check that all channels are written to
@@ -229,15 +223,11 @@ class FullResponse(ift.LinearOperator):
 
 
 class SingleResponse(ift.LinearOperator):
-    def __init__(
-        self, domain, uvw, freq, mask, single_precision, verbose=False, facets=(1, 1)
-    ):
+    def __init__(self, domain, uvw, freq, mask, facets=(1, 1)):
         my_assert_isinstance(facets, tuple)
         for ii in range(1):
             if domain.shape[0] % facets[0] != 0:
                 raise ValueError("nfacets needs to be divisor of npix.")
-        # FIXME Currently only the response uses single_precision if possible.
-        # Could be rolled out to the whole likelihood
         self._domain = ift.DomainTuple.make(domain)
         self._target = ift.makeDomain(
             ift.UnstructuredDomain(ss) for ss in (uvw.shape[0], freq.size)
@@ -255,31 +245,35 @@ class SingleResponse(ift.LinearOperator):
             "flip_v": True,
         }
         self._vol = self._domain[0].scalar_dvol
-        self._target_dtype = np.complex64 if single_precision else np.complex128
-        self._domain_dtype = np.float32  if single_precision else np.float64
-        self._verbt, self._verbadj = verbose, verbose
+        self._target_dtype = np.complex64
+        self._domain_dtype = np.float32
         self._ofac = None
         self._facets = facets
 
     def apply(self, x, mode):
         self._check_input(x, mode)
-        # FIXME mtr Is the sky in single precision mode single or double?
-        # FIXME Make sure that vdot in Gaussian Energy is always in double
-        # my_asserteq(x.dtype, self._domain_dtype if mode == self.TIMES else self._target_dtype)
-        x = x.val.astype(
-            self._domain_dtype if mode == self.TIMES else self._target_dtype
-        )
-        std = self._facets == (1, 1)
+        one_facet = self._facets == (1, 1)
+        x = x.val
         if mode == self.TIMES:
-            res = self._times(x) if std else self._facet_times(x)
-            self._verbt = False
+            # Convention: Sky is in double precision, visibilities and
+            # calibration solutions are in single precision
+            x = x.astype(self._domain_dtype)
+            if one_facet:
+                res = self._times(x)
+            else:
+                res = self._facet_times(x)
         else:
-            res = self._adjoint(x) if std else self._facet_adjoint(x)
-            self._verbadj = False
+            # my_asserteq(x.dtype, self._target_dtype)
+            if x.dtype != self._target_dtype:
+                # FIXME Proper dtype support in NIFTy and resolve
+                x = x.astype(self._target_dtype)
+            if one_facet:
+                res = self._adjoint(x)
+            else:
+                res = self._facet_adjoint(x)
         res = ift.makeField(self._tgt(mode), res * self._vol)
-        my_asserteq(
-            res.dtype, self._target_dtype if mode == self.TIMES else self._domain_dtype
-        )
+        my_asserteq(res.dtype,
+              self._target_dtype if mode == self.TIMES else self._domain_dtype)
         return res
 
     def oversampling_factors(self):
@@ -296,21 +290,16 @@ class SingleResponse(ift.LinearOperator):
         return self._ofac
 
     def _times(self, x):
-        if self._verbt:
+        if verbosity():
             print(f"\nINFO: Oversampling factors in response: {self.oversampling_factors()}\n")
-        # FIXME Use vis_out keyword of wgridder
-        res = dirty2vis(dirty=x, verbosity=self._verbt, **self._args)
-        self._verbt = False
-        return res
+        return dirty2vis(dirty=x, verbosity=verbosity(), **self._args)
 
     def _adjoint(self, x):
         my_assert(x.flags["C_CONTIGUOUS"])
         nx, ny = self._domain.shape
-        if self._verbadj:
+        if verbosity():
             print(f"\nINFO: Oversampling factors in response: {self.oversampling_factors()}\n")
-        res = vis2dirty(vis=x, npix_x=nx, npix_y=ny, verbosity=self._verbadj, **self._args)
-        self._verbadj = False
-        return res
+        return vis2dirty(vis=x, npix_x=nx, npix_y=ny, verbosity=verbosity(), **self._args)
 
     def _facet_times(self, x):
         nfacets_x, nfacets_y = self._facets
@@ -326,7 +315,7 @@ class SingleResponse(ift.LinearOperator):
                 dirty=facet,
                 center_x=cx,
                 center_y=cy,
-                verbosity=self._verbt,
+                verbosity=verbosity(),
                 **self._args
             )
             if vis is None:
@@ -350,7 +339,7 @@ class SingleResponse(ift.LinearOperator):
                 npix_y=ny,
                 center_x=cx,
                 center_y=cy,
-                verbosity=self._verbadj,
+                verbosity=verbosity(),
                 **self._args
             )
             res[nx * xx : nx * (xx + 1), ny * yy : ny * (yy + 1)] = im
