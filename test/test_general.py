@@ -108,7 +108,7 @@ def test_weighting_methods(obs, noisemodel):
     baseline_distributor = ift.LinearInterpolator(dom, efflen.T)
     pol_freq_copy = ift.ContractionOperator(obs.vis.domain, (0, 2)).adjoint
     cf = ift.SimpleCorrelatedField(
-        dom, 0, (2, 2), (2, 2), (1.2, 0.4), (0.5, 0.2), (-2, 0.5), "invcov"
+        dom, 0, (1, 1), (1, 1), (1.2, 0.4), (0.5, 0.2), (-3, 0.5), "invcov"
     ).exp()
     correction = pol_freq_copy @ baseline_distributor @ cf
     if noisemodel == 0:  # Multiplicative noise model
@@ -270,10 +270,10 @@ def test_response_distributor():
 @pmp("facets", FACETS)
 def test_single_response(obs, facets):
     mask = obs.mask
-    op = rve.response.SingleResponse(
-        dom, obs.uvw, obs.freq, mask[0], False, facets=facets
-    )
-    ift.extra.check_linear_operator(op, np.float64, np.complex128, only_r_linear=True)
+    op = rve.response.SingleResponse(dom, obs.uvw, obs.freq, mask[0],
+                                     facets=facets)
+    ift.extra.check_linear_operator(op, np.float64, np.complex64,
+                                    only_r_linear=True, rtol=1e-6, atol=1e-6)
 
 
 def test_facet_consistency():
@@ -281,9 +281,8 @@ def test_facet_consistency():
     res0 = None
     pos = ift.from_random(dom)
     for facets in FACETS:
-        op = rve.response.SingleResponse(
-            dom, obs.uvw, obs.freq, obs.mask[0], False, facets=facets
-        )
+        op = rve.response.SingleResponse(dom, obs.uvw, obs.freq, obs.mask[0],
+                                         facets=facets)
         res = op(pos)
         if res0 is None:
             res0 = res
