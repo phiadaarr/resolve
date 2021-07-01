@@ -12,7 +12,7 @@ from ducc0.wgridder.experimental import dirty2vis, vis2dirty
 import nifty7 as ift
 
 from .constants import SPEEDOFLIGHT
-from .global_config import epsilon, nthreads, wgridding
+from .global_config import epsilon, nthreads, wgridding, verbose
 from .multi_frequency.irg_space import IRGSpace
 from .observation import Observation
 from .util import my_assert, my_assert_isinstance, my_asserteq
@@ -114,7 +114,7 @@ class MfResponse(ift.LinearOperator):
     """
 
     def __init__(
-        self, observation, frequency_domain, position_domain, verbose=False,
+        self, observation, frequency_domain, position_domain,
     ):
         my_assert_isinstance(observation, Observation)
         # FIXME Add polarization support
@@ -152,7 +152,6 @@ class MfResponse(ift.LinearOperator):
                 observation.freq[sel],
                 mymask.T,
                 sp,
-                verbose,
             )
             self._r.append((band_index, sel, r))
         # Double check that all channels are written to
@@ -231,7 +230,7 @@ class FullResponse(ift.LinearOperator):
 
 class SingleResponse(ift.LinearOperator):
     def __init__(
-        self, domain, uvw, freq, mask, single_precision, verbose=False, facets=(1, 1)
+        self, domain, uvw, freq, mask, single_precision, facets=(1, 1)
     ):
         my_assert_isinstance(facets, tuple)
         for ii in range(1):
@@ -258,7 +257,7 @@ class SingleResponse(ift.LinearOperator):
         self._vol = self._domain[0].scalar_dvol
         self._target_dtype = np.complex64 if single_precision else np.complex128
         self._domain_dtype = np.float32  if single_precision else np.float64
-        self._verbt, self._verbadj = verbose, verbose
+        self._verbt, self._verbadj = verbose(), verbose()
         self._ofac = None
         self._facets = facets
 

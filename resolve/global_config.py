@@ -7,6 +7,7 @@ import nifty7 as ift
 _wgridding = None
 _epsilon = None
 _nthreads = 1
+_verbose = False
 
 
 def wgridding():
@@ -42,3 +43,13 @@ def set_nthreads(val):
     _nthreads = int(val)
     ift.fft.set_nthreads(int(val))
     print(f"Set nthreads to {nthreads()}")
+
+
+def verbose():
+    return _verbose
+
+
+def set_verbose(val):
+    global _verbose
+    _verbose = bool(val)
+    print(f"Set verbose to {verbose()}")

@@ -271,7 +271,7 @@ def test_response_distributor():
 def test_single_response(obs, facets):
     mask = obs.mask
     op = rve.response.SingleResponse(
-        dom, obs.uvw, obs.freq, mask[0], False, facets=facets
+        dom, obs.uvw, obs.freq, mask[0], facets=facets
     )
     ift.extra.check_linear_operator(op, np.float64, np.complex128, only_r_linear=True)
 
@@ -282,7 +282,7 @@ def test_facet_consistency():
     pos = ift.from_random(dom)
     for facets in FACETS:
         op = rve.response.SingleResponse(
-            dom, obs.uvw, obs.freq, obs.mask[0], False, facets=facets
+            dom, obs.uvw, obs.freq, obs.mask[0], facets=facets
         )
         res = op(pos)
         if res0 is None:

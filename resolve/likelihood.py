@@ -160,7 +160,7 @@ def ImagingLikelihood(
             R = FullPolResponse(observation, sky_operator.target)
     else:
         if not mosaicing and len(sdom.shape) == 3:
-            R = MfResponse(observation, sdom[0], sdom[1], verbose=False)
+            R = MfResponse(observation, sdom[0], sdom[1])
         else:
             R = StokesIResponse(observation, sdom)
     model_data = R @ sky_operator
