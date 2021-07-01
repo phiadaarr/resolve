@@ -130,7 +130,6 @@ class MfResponse(ift.LinearOperator):
         # Make sure that no index is wasted
         my_asserteq(len(set(band_indices)), frequency_domain.size)
         self._r = []
-        sp = observation.vis.dtype == np.complex64
         mask = observation.mask
         for band_index in np.unique(band_indices):
             sel = band_indices == band_index
