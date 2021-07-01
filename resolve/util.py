@@ -60,12 +60,16 @@ def divide_where_possible(a, b):
     if isinstance(a, ift.Field):
         dom = a.domain
         a = a.val
+        dtype = a.dtype
+        if isinstance(b, ift.Field):
+            my_asserteq(b.dtype, a.dtype)
     elif isinstance(b, ift.Field):
         dom = b.domain
         b = b.val
+        dtype = b.dtype
     else:
         raise TypeError
-    arr = np.divide(a, b, out=np.ones(dom.shape), where=b != 0)
+    arr = np.divide(a, b, out=np.ones(dom.shape, dtype=dtype), where=b != 0)
     return ift.makeField(dom, arr)
 
 

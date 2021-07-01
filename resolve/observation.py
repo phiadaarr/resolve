@@ -172,6 +172,8 @@ class Observation(_Observation):
         my_asserteq(weight.shape, vis.shape)
         my_asserteq(vis.shape, (len(polarization), nrows, len(freq)))
         my_asserteq(nrows, vis.shape[1])
+        my_asserteq(vis.dtype, np.complex64)
+        my_asserteq(weight.dtype, np.float32)
         my_assert(np.all(weight >= 0.0))
         my_assert(np.all(np.isfinite(vis)))
         my_assert(np.all(np.isfinite(weight)))
