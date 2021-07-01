@@ -39,6 +39,9 @@ class AllreduceSum(ift.Operator):
 
 
 class SliceSum(ift.Operator):
+    """
+    Sum Operator that slices along the first axis of the input array and computes the sum in parallel using MPI.
+    """
     def __init__(self, oplist, index_low, parallel_space, comm):
         # FIXME if oplist contains only linear operators instantiate
         # SliceSumLinear instead
@@ -58,7 +61,6 @@ class SliceSum(ift.Operator):
     def apply(self, x):
         self._check_input(x)
         if not ift.is_linearization(x):
-            #TOASK: with x.val[self._lo + ii] we only support slicing along the first dimension of the array. Either document that or extend it to support different axis.
             opx = [
                 op(ift.makeField(op.domain, x.val[self._lo + ii]))
                 for ii, op in enumerate(self._oplist)
@@ -197,8 +199,6 @@ def array_allgather(arrs, comm, nwork):
         full_lst = np.array(arrs)
     else:
         from mpi4py import MPI
-        # TOASK: Like in SliceSum() we slice along the first dimension
-        # TODO: clean up implementation
         size = comm.Get_size()
         send_buf = np.array(arrs)
         recv_buffer_shape = (nwork,) + send_buf.shape[1:]
