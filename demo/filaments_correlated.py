@@ -139,10 +139,12 @@ def main():
     filaments = get_filament_prior(dom)
     sky = filaments + points
 
+    '''
     ### load the state
     state = rve.MinimizationState.load("filaments6")
     ift.single_plot(sky(state.mean))
     exit()
+    '''
 
     p = ift.Plot()
     for ii in range(9):
