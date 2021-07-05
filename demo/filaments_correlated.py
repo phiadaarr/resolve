@@ -26,9 +26,7 @@ def get_filament_prior(domain):
     # HarmonicTransformOperator is actually Hartley transform, only take real value
     HT = ift.HarmonicTransformOperator(harmonic_space, normalized_domain)
     # FFTOperator(real FFT) produce complex number, we need to take real number(by .real)
-    ifft = ift.FFTOperator(
-        harmonic_space, normalized_domain
-    )  # from k-space to position space
+    ifft = ift.FFTOperator(harmonic_space, normalized_domain)  # from k-space to position space
     fft = ifft.inverse
 
     ### 1.Generate c0 and phi0 by correlated field model
@@ -38,26 +36,27 @@ def get_filament_prior(domain):
 
 
     # c0 by correlated field model, initial density (rho0) = exp(c0)
-    cfmaker_c0 = ift.CorrelatedFieldMaker('')
+    cfmaker_c0 = ift.CorrelatedFieldMaker('c0')
     # add fluctuations, flexibility, asperity, loglogavgslope
-    cfmaker_c0.add_fluctuations(normalized_domain, (5.0, 1.0), (2.4, 0.8), None, (-4., 1.0), 'c0')
+    cfmaker_c0.add_fluctuations(normalized_domain, (4.0, 1.0), (1.2, 0.4), None, (-4., 1.0), 'c0')
     cfmaker_c0.set_amplitude_total_offset(21., (1.0, 0.1))
     Correlated_field_c0 = cfmaker_c0.finalize()
     C0 = Correlated_field_c0
 
 
     # phi0 by correlated field model
-    cfmaker_phi0 = ift.CorrelatedFieldMaker('')
+    cfmaker_phi0 = ift.CorrelatedFieldMaker('phi0')
     # add fluctuations, flexibility, asperity, loglogavgslope
-    cfmaker_phi0.add_fluctuations(normalized_domain, (0.1, 0.05), (1.0, 0.2), None, (-6., 1.0), 'phi0')
+    cfmaker_phi0.add_fluctuations(normalized_domain, (2.0, 0.5), (0.6, 0.2), None, (-5., 1.0), 'phi0')
     cfmaker_phi0.set_amplitude_total_offset(0., (1.0, 0.1))
     Correlated_field_phi0 = cfmaker_phi0.finalize()
-    Phi0 = Correlated_field_phi0
+    Phi0_ = Correlated_field_phi0
+    Phi0 = -1 * ift.exp(Phi0_)
 
     ### 2.Calculate initial wave function operator Psi_0
 
     hbar = 5 * 10 ** -3
-    a = 0.30
+    a = 0.05
     # time scale
     Half_operator_ = ift.ScalingOperator(C0.target, 0.5)
     Hbar_operator = ift.ScalingOperator(Phi0.target, -1j / hbar)
@@ -65,7 +64,7 @@ def get_filament_prior(domain):
     Phase_operator = Hbar_operator @ Complexifier
 
     Half_operator = Half_operator_ @ Complexifier
-    Psi_0 = ift.exp(Half_operator(C0) - Phase_operator(Phi0))
+    Psi_0 = ift.exp(Half_operator(C0) + Phase_operator(Phi0))
     # psi_0 = np.exp(c0 / 2 - 1j * phi0 / hbar)
     Psi_0h = fft(Psi_0)
 
@@ -116,14 +115,14 @@ def main():
     rve.set_wgridding(False)
 
     # Load data
-    obs = rve.Observation.load("CYG-ALL-13360-8MHZfield0.npz")
+    obs = rve.Observation.load("2052-2MHz_with_learned_weights.npz")
     rve.set_epsilon(1e-6)
-    rve.set_nthreads(8)
+    rve.set_nthreads(4)
 
 
     xfov = yfov = "250as"
     #npix = 4000
-    npix = 2000
+    npix = 3000
     #npix = 30
 
     fov = np.array([rve.str2rad(xfov), rve.str2rad(yfov)])
@@ -140,6 +139,10 @@ def main():
     filaments = get_filament_prior(dom)
     sky = filaments + points
 
+    ### load the state
+    state = rve.MinimizationState.load("filaments6")
+    ift.single_plot(sky(state.mean))
+    exit()
 
     p = ift.Plot()
     for ii in range(9):
