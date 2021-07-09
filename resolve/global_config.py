@@ -41,7 +41,7 @@ def nthreads():
 def set_nthreads(val):
     global _nthreads
     _nthreads = int(val)
-    ift.fft.set_nthreads(int(val))
+    ift.set_nthreads(int(val))
     print(f"Set nthreads to {nthreads()}")
 
 
