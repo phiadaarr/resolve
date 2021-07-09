@@ -7,7 +7,7 @@ from os.path import splitext
 
 import numpy as np
 
-import nifty7 as ift
+import nifty8 as ift
 
 from .constants import DEG2RAD
 from .mpi import onlymaster

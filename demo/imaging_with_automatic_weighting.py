@@ -6,7 +6,7 @@ import argparse
 
 import numpy as np
 
-import nifty7 as ift
+import nifty8 as ift
 import resolve as rve
 from os.path import isfile, splitext
 

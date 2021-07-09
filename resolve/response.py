@@ -9,7 +9,7 @@ from itertools import product
 import numpy as np
 from ducc0.wgridder.experimental import dirty2vis, vis2dirty
 
-import nifty7 as ift
+import nifty8 as ift
 
 from .constants import SPEEDOFLIGHT
 from .global_config import epsilon, nthreads, wgridding, verbosity
@@ -107,8 +107,8 @@ class MfResponse(ift.LinearOperator):
         Instance of the :class:`Observation` that represents the measured data.
     frequency_domain : IRGSpace
         Contains the :class:`IRGSpace` for the frequencies.
-    position_domain : nifty7.RGSpace
-        Contains the the :class:`nifty7.RGSpace` for the positions.
+    position_domain : nifty8.RGSpace
+        Contains the the :class:`nifty8.RGSpace` for the positions.
     """
 
     def __init__( self, observation, frequency_domain, position_domain):

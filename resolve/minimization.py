@@ -4,7 +4,7 @@
 
 import pickle
 
-import nifty7 as ift
+import nifty8 as ift
 
 from .mpi import comm, onlymaster
 from .util import compare_attributes, my_assert, my_assert_isinstance, my_asserteq

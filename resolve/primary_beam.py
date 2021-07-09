@@ -5,7 +5,7 @@
 import numpy as np
 import scipy.special as sc
 
-import nifty7 as ift
+import nifty8 as ift
 
 from .constants import ARCMIN2RAD, SPEEDOFLIGHT
 from .util import my_assert

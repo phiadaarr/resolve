@@ -2,7 +2,7 @@
 # Copyright(C) 2019-2020 Max-Planck-Society
 # Author: Philipp Arras
 
-import nifty7 as ift
+import nifty8 as ift
 
 _wgridding = None
 _epsilon = None

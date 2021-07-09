@@ -11,7 +11,7 @@ Resolve is in beta stage: You are more than welcome to test it and help to make 
 In the likely case that you encounter bugs, please contact me via [email](mailto:parras@mpg-garching.mpg.de).
 
 ## Installation
-- Install nifty7, ducc0, matplotlib, scipy (see [Dockerfile](https://gitlab.mpcdf.mpg.de/ift/resolve/-/blob/master/Dockerfile))
+- Install nifty8, ducc0, matplotlib, scipy (see [Dockerfile](https://gitlab.mpcdf.mpg.de/ift/resolve/-/blob/master/Dockerfile))
 - Optional dependencies are:
     - For reading [measurement sets](https://casa.nrao.edu/Memos/229.html), install [python-casacore](https://github.com/casacore/python-casacore).
     - For reading and writing FITS files: astropy.

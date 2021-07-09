@@ -7,7 +7,7 @@ from os.path import join
 import numpy as np
 from ducc0.fft import good_size
 
-import nifty7 as ift
+import nifty8 as ift
 import resolve as rve
 
 
