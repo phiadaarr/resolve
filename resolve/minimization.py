@@ -62,20 +62,24 @@ class MinimizationState:
             my_assert(set(samples[0].domain.keys()) <= set(position.domain.keys()))
         self._mirror = bool(mirror_samples)
 
+    @property
+    def has_samples(self):
+        return len(self._samples) > 0
+
     def __getitem__(self, key):
         # FIXME Add MPI support
         if not isinstance(key, int):
             raise TypeError
         if key >= len(self) or key < 0:
             raise IndexError
-        if key == 0 and len(self._samples) == 0:
+        if key == 0 and not self.has_samples:
             return self._position
         if self._mirror and key >= len(self) // 2:
             return self._position.unite(-self._samples[key])
         return self._position.unite(self._samples[key])
 
     def all_samples(self):
-        if len(self._samples) == 0:
+        if not self.has_samples:
             return None
         lst = []
         if self._mirror:
@@ -83,7 +87,7 @@ class MinimizationState:
         return lst + self._samples
 
     def __len__(self):
-        if len(self._samples) == 0:
+        if not self.has_samples:
             return 1
         return (2 if self._mirror else 1) * len(self._samples)
 
