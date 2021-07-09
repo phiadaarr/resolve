@@ -15,7 +15,7 @@ np.seterr(all="raise")
 
 direc = "/data/"
 nthreads = 1
-ift.fft.set_nthreads(nthreads)
+ift.set_nthreads(nthreads)
 rve.set_nthreads(nthreads)
 rve.set_epsilon(1e-4)
 rve.set_wgridding(False)
