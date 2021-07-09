@@ -364,13 +364,8 @@ class Observation(_Observation):
         return self._antpos
 
     def effective_uvw(self):
-        out = np.einsum("ij,k->ijk", self.uvw, self._freq / SPEEDOFLIGHT)
-        my_asserteq(out.shape, (self.nrow, 3, self.nfreq))
-        return out
-
-    def effective_uv(self):
-        out = np.einsum("ij,k->ijk", self.uvw[:, 0:2], self._freq / SPEEDOFLIGHT)
-        my_asserteq(out.shape, (self.nrow, 2, self.nfreq))
+        out = np.einsum("ij,k->jik", self.uvw, self._freq / SPEEDOFLIGHT)
+        my_asserteq(out.shape, (3, self.nrow, self.nfreq))
         return out
 
     def effective_uvwlen(self):

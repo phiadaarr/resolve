@@ -64,7 +64,7 @@ def main():
         sky = diffuse
     # TODO Add mode with independent noise learning
     npix = 2500
-    effuv = np.linalg.norm(obs.effective_uv().T, axis=1)
+    effuv = obs.effective_uvwlen()
     assert obs.nfreq == obs.npol == 1
     dom = ift.RGSpace(npix, 2 * np.max(effuv) / npix)
     logwgt = ift.SimpleCorrelatedField(
