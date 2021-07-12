@@ -54,10 +54,13 @@ class _Observation:
 
     @property
     def flags(self):
+        """np.ndarray : True for bad visibilities. May be used together with
+        `ift.MaskOperator`."""
         return self._weight == 0.0
 
     @property
     def mask(self):
+        """np.ndarray : True for good visibilities."""
         return self._weight > 0.0
 
     def max_snr(self):
