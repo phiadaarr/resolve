@@ -1,5 +1,6 @@
 from .antenna_positions import AntennaPositions
 from .calibration import calibration_distribution
+from .calibrator_library import *
 from .constants import *
 from .direction import *
 from .fits import field2fits, fits2field
