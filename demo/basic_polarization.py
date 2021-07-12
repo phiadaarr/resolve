@@ -66,8 +66,9 @@ def main():
         ) ** (-2)
     else:
         assert obs.nfreq == 1
-        cfm = ift.CorrelatedFieldMaker.make(0, (2, 2), "invcov", 4)
+        cfm = ift.CorrelatedFieldMaker("invcov", 4)
         cfm.add_fluctuations(dom, (2, 2), (1.2, 0.4), (0.5, 0.2), (-2, 0.5))
+        cfm.set_amplitude_total_offset(0., (2, 2))
         logwgt = cfm.finalize(0)
         li = rve.LinearOperatorOverAxis(
             ift.LinearInterpolator(dom, effuv), logwgt.target

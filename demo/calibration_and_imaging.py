@@ -19,7 +19,7 @@ def main():
     )
     t0, _ = rve.tmin_tmax(*obs)
     obs = [oo.move_time(-t0) for oo in obs]
-    ocalib1, ocalib2, oscience = obs
+    _, ocalib2, oscience = obs
     rve.set_epsilon(min(1 / 10 / oo.max_snr() for oo in obs))
 
     uantennas = rve.unique_antennas(*obs)
@@ -42,20 +42,20 @@ def main():
             ift.UnstructuredDomain(nfreq),
         ],
     )
-    dct = {"offset_mean": 0, "offset_std": (1, 0.5), "prefix": "calibration_phases"}
+    dct = {"offset_mean": 0, "offset_std": (1, 0.5)}
     dct1 = {
         "fluctuations": (2.0, 1.0),
         "loglogavgslope": (-4.0, 1),
         "flexibility": (5, 2.0),
         "asperity": None,
     }
-    cfmph = ift.CorrelatedFieldMaker.make(**dct, total_N=total_N)
+    cfmph = ift.CorrelatedFieldMaker("calibration_phases", total_N=total_N)
     cfmph.add_fluctuations(time_domain, **dct1)
+    cfmph.set_amplitude_total_offset(**dct)
     phase = reshaper @ cfmph.finalize(0)
     dct = {
         "offset_mean": 0,
         "offset_std": (1e-3, 1e-6),
-        "prefix": "calibration_logamplitudes",
     }
     dct1 = {
         "fluctuations": (2.0, 1.0),
@@ -63,8 +63,9 @@ def main():
         "flexibility": (5, 2.0),
         "asperity": None,
     }
-    cfmampl = ift.CorrelatedFieldMaker.make(**dct, total_N=total_N)
+    cfmampl = ift.CorrelatedFieldMaker("calibration_logamplitudes", total_N=total_N)
     cfmampl.add_fluctuations(time_domain, **dct1)
+    cfmampl.set_amplitude_total_offset(**dct)
     logampl = reshaper @ cfmampl.finalize(0)
 
     fov = np.array([2, 2]) * rve.DEG2RAD
