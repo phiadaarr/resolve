@@ -19,9 +19,9 @@ def _get_mask(observation):
     my_assert_isinstance(observation, Observation)
     vis = observation.vis
     flags = observation.flags
-    if not np.any(flags):
+    if not np.any(flags.val):
         return ift.ScalingOperator(vis.domain, 1.0), vis, observation.weight
-    mask = ift.MaskOperator(ift.makeField(vis.domain, flags))
+    mask = observation.mask_operator
     return mask, mask(vis), mask(observation.weight)
 
 
@@ -68,7 +68,7 @@ def _varcov(observation, Rs, inverse_covariance_operator):
         vis = {}
         masks = []
         for kk, oo in observation.items():
-            mask = ift.MaskOperator(ift.makeField(oo.vis.domain, ~oo.mask))
+            mask = oo.mask_operator
             masks.append(mask.ducktape(kk).ducktape_left(kk))
             tgt = mask.target
             vis[kk] = mask(oo.vis)

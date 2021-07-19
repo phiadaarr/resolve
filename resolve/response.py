@@ -33,7 +33,7 @@ def StokesIResponse(observation, domain):
     my_assert_isinstance(domain[0], ift.RGSpace)
     npol = observation.npol
     my_assert(npol in [1, 2])
-    mask = observation.mask
+    mask = observation.mask.val
     sr0 = SingleResponse(domain, observation.uvw, observation.freq, mask[0])
     # FIXME Get rid of npol==2 support here
     if npol == 1 or (npol == 2 and np.all(mask[0] == mask[1])):
@@ -63,7 +63,7 @@ class FullPolResponse(ift.LinearOperator):
         npol = observation.npol
         my_asserteq(npol, 4)
         domain = domain["I"]
-        mask = np.all(observation.mask, axis=0)
+        mask = np.all(observation.mask.val, axis=0)
         self._sr = SingleResponse(domain, observation.uvw, observation.freq, mask)
         self._capability = self.TIMES | self.ADJOINT_TIMES
 
@@ -130,7 +130,7 @@ class MfResponse(ift.LinearOperator):
         # Make sure that no index is wasted
         my_asserteq(len(set(band_indices)), frequency_domain.size)
         self._r = []
-        mask = observation.mask
+        mask = observation.mask.val
         for band_index in np.unique(band_indices):
             sel = band_indices == band_index
             if mask.shape[0] == 1:

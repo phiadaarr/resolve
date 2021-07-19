@@ -66,16 +66,17 @@ class _Observation:
         return ift.makeField(self._dom, self._weight > 0.0)
 
     @property
+    def mask_operator(self):
+        return ift.MaskOperator(self.flags)
+
     def max_snr(self):
         snr = (self.vis * self.weight.sqrt()).abs()
         snr = self.apply_flags(snr)
         return np.max(snr.val)
 
-    @property
     def fraction_useful(self):
-        return self.n_data_effectivee / self._dom.size
+        return self.n_data_effective() / self._dom.size
 
-    @property
     def n_data_effective(self):
         return self.mask.s_sum()
 

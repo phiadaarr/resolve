@@ -269,7 +269,7 @@ def test_response_distributor():
 @pmp("obs", OBS)
 @pmp("facets", FACETS)
 def test_single_response(obs, facets):
-    mask = obs.mask
+    mask = obs.mask.val
     op = rve.response.SingleResponse(dom, obs.uvw, obs.freq, mask[0],
                                      facets=facets)
     ift.extra.check_linear_operator(op, np.float64, np.complex64,
