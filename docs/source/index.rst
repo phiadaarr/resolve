@@ -1,17 +1,11 @@
-Resolve
-=======
+Resolve Manual
+==============
 
-Resolve is a Bayesian radio imaging algorithm.
-
-References
-----------
-
-FIXME
-
-Contents
-........
+Welcome to the resolve documentation!
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
-   Package Documentation <mod/resolve>
+   User Guide <user/index>
+   API reference <mod/resolve>
+   Development <dev/index>
