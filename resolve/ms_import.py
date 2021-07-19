@@ -25,8 +25,7 @@ def ms2observations(
     polarizations="all",
     channel_slice=slice(None),
 ):
-    """
-    Reads and converts a given measurement set into an array of :class:`Observation`
+    """Read and convert a given measurement set into an array of :class:`Observation`
 
     If WEIGHT_SPECTRUM is available this column is used for weighting.
     Otherwise fall back to WEIGHT.
@@ -46,10 +45,8 @@ def ms2observations(
     polarizations
         "all":     All polarizations are imported.
         "stokesi": Only LL/RR or XX/YY polarizations are imported.
-        "stokesiavg": Only LL/RR or XX/YY polarizations are imported and averaged
-                   on the fly.
-        List of strings: Strings can be "XX", "YY", "XY", "YX", "LL", "LR",
-                   "RL", "RR". The respective polarizations are loaded.
+        "stokesiavg": Only LL/RR or XX/YY polarizations are imported and averaged on the fly.
+        List of strings: Strings can be "XX", "YY", "XY", "YX", "LL", "LR", "RL", "RR". The respective polarizations are loaded.
     channel_slice : slice
         Slice of selected channels. Default: select all channels
         FIXME Select channels by indices
