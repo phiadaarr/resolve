@@ -16,14 +16,16 @@ from .util import compare_attributes, my_assert, my_assert_isinstance, my_assert
 
 class _Observation:
     @property
+    def _dom(self):
+        return ift.makeDomain([ift.UnstructuredDomain(ss) for ss in self._vis.shape])
+
+    @property
     def vis(self):
-        dom = [ift.UnstructuredDomain(ss) for ss in self._vis.shape]
-        return ift.makeField(dom, self._vis)
+        return ift.makeField(self._dom, self._vis)
 
     @property
     def weight(self):
-        dom = [ift.UnstructuredDomain(ss) for ss in self._weight.shape]
-        return ift.makeField(dom, self._weight)
+        return ift.makeField(self._dom, self._weight)
 
     @property
     def freq(self):
@@ -49,25 +51,43 @@ class _Observation:
     def nfreq(self):
         return self._vis.shape[2]
 
-    def apply_flags(self, arr):
-        return arr[self._weight != 0.0]
+    def apply_flags(self, fld):
+        return ift.MaskOperator(self.flags)(fld)
 
     @property
     def flags(self):
         """np.ndarray : True for bad visibilities. May be used together with
         `ift.MaskOperator`."""
-        return self._weight == 0.0
+        return ift.makeField(self._dom, self._weight == 0.0)
 
     @property
     def mask(self):
         """np.ndarray : True for good visibilities."""
-        return self._weight > 0.0
+        return ift.makeField(self._dom, self._weight > 0.0)
 
+    @property
     def max_snr(self):
-        return np.max(np.abs(self.apply_flags(self._vis * np.sqrt(self._weight))))
+        snr = (self.vis * self.weight.sqrt()).abs()
+        snr = self.apply_flags(snr)
+        return np.max(snr.val)
 
+    @property
     def fraction_useful(self):
-        return self.apply_flags(self._weight).size / self._weight.size
+        return self.n_data_effectivee / self._dom.size
+
+    @property
+    def n_data_effective(self):
+        return self.mask.s_sum()
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        if (
+            self._vis.dtype != other._vis.dtype
+            or self._weight.dtype != other._weight.dtype
+        ):
+            return False
+        return compare_attributes(self, other, self._eq_attributes)
 
 
 class SingleDishObservation(_Observation):
@@ -93,6 +113,8 @@ class SingleDishObservation(_Observation):
         self._polarization = polarization
         self._freq = freq
 
+        self._eq_attributes = "_polarization", "_freq", "_pointings", "_vis", "_weight"
+
     @onlymaster
     def save(self, file_name, compress):
         p = self._pointings.to_list()
@@ -114,18 +136,6 @@ class SingleDishObservation(_Observation):
         pointings = Directions.from_list([dct["pointings0"], dct["pointings1"]])
         return SingleDishObservation(
             pointings, dct["vis"], dct["weight"], pol, dct["freq"]
-        )
-
-    def __eq__(self, other):
-        if not isinstance(other, Observation):
-            return False
-        if (
-            self._vis.dtype != other._vis.dtype
-            or self._weight.dtype != other._weight.dtype
-        ):
-            return False
-        return compare_attributes(
-            self, other, ("_polarization", "_freq", "_pointings", "_vis", "_weight")
         )
 
     def __getitem__(self, slc):
@@ -196,30 +206,9 @@ class Observation(_Observation):
         self._polarization = polarization
         self._freq = freq
         self._direction = direction
-        self._ndeff = None
 
-    def apply_flags(self, arr):
-        return arr[self._weight != 0.0]
+        self._eq_attributes = "_direction", "_polarization", "_freq", "_antpos", "_vis", "_weight"
 
-    @property
-    def flags(self):
-        return self._weight == 0.0
-
-    @property
-    def mask(self):
-        return self._weight > 0.0
-
-    def max_snr(self):
-        return np.max(np.abs(self.apply_flags(self._vis * np.sqrt(self._weight))))
-
-    def fraction_useful(self):
-        return self.n_data_effective / self._weight.size
-
-    @property
-    def n_data_effective(self):
-        if self._ndeff is None:
-            self._ndeff = self.apply_flags(self._weight).size
-        return self._ndeff
 
     @onlymaster
     def save(self, file_name, compress):
@@ -286,20 +275,6 @@ class Observation(_Observation):
         ]
         nu0 = global_freqs.mean()
         return obs_list, nu0
-
-    def __eq__(self, other):
-        if not isinstance(other, Observation):
-            return False
-        if (
-            self._vis.dtype != other._vis.dtype
-            or self._weight.dtype != other._weight.dtype
-        ):
-            return False
-        return compare_attributes(
-            self,
-            other,
-            ("_direction", "_polarization", "_freq", "_antpos", "_vis", "_weight"),
-        )
 
     def __getitem__(self, slc):
         return Observation(
