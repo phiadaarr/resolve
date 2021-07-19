@@ -281,7 +281,7 @@ def test_facet_consistency():
     res0 = None
     pos = ift.from_random(dom)
     for facets in FACETS:
-        op = rve.response.SingleResponse(dom, obs.uvw, obs.freq, obs.mask[0],
+        op = rve.response.SingleResponse(dom, obs.uvw, obs.freq, obs.mask.val[0],
                                          facets=facets)
         res = op(pos)
         if res0 is None:
