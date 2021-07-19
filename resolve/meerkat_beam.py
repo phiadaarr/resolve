@@ -74,6 +74,7 @@ def _pattern(x, y, squint_x, squint_y, fwhm_x, fwhm_y):
 
 class JimBeam(object):
     """MeerKAT simplified primary beam models for L and UHF bands.
+
     A cosine aperture taper (Essential Radio Astronomy, Condon & Ransom, 2016,
     page 83, link_) is used as a simplified model of the co-polarisation primary beams.
     While the sidelobe level accuracy may be coincidental, the model attains a good fit
@@ -85,6 +86,12 @@ class JimBeam(object):
     the aperture plane using standard phase fitting techniques, while the FWHM
     values are measured in the beam plane along axis-aligned cuts through the beam
     centers.
+
+    Parameters
+    ----------
+    name : str
+        Name of model, must be either 'MKAT-AA-L-JIM-2020' or 'MKAT-AA-UHF-JIM-2020'
+
     Notes
     -----
     a) This model is a simplification.
@@ -96,44 +103,45 @@ class JimBeam(object):
     d) Depending on the usecase it may be necessary to do reference pointing (or
        use another technique) to remove the antenna pointing errors during the
        observation in order to use a beam model successfully.
-    Parameters
-    ----------
-    name : str
-        Name of model, must be either 'MKAT-AA-L-JIM-2020' or 'MKAT-AA-UHF-JIM-2020'
+
     Raises
     ------
     ValueError
         If `name` is an unknown model
+
     Request
     -------
     As a user, please email the author (mattieu@ska.ac.za) with details about
     your usecase requirements. This may influence future releases. A general
     description, what extent of the beams are needed, pixelation, frequency
     resolution, and accuracy requirements are of interest.
-    Example usage
-    -------------
-    .. code:: python
-      import matplotlib.pylab as plt
-      from katbeam import JimBeam
-      def showbeam(beam,freqMHz=1000,pol='H',beamextent=10.):
-          margin=np.linspace(-beamextent/2.,beamextent/2.,128)
-          x,y=np.meshgrid(margin,margin)
-          if pol=='H':
-              beampixels=beam.HH(x,y,freqMHz)
-          elif pol=='V':
-              beampixels=beam.VV(x,y,freqMHz)
-          else:
-              beampixels=beam.I(x,y,freqMHz)
-              pol='I'
-          plt.clf()
-          plt.imshow(beampixels,extent=[-beamextent/2,beamextent/2,-beamextent/2,beamextent/2])
-          plt.title('%s pol beam\nfor %s at %dMHz'%(pol,beam.name,freqMHz))
-          plt.xlabel('deg')
-          plt.ylabel('deg')
-      uhfbeam=JimBeam('MKAT-AA-UHF-JIM-2020')
-      showbeam(uhfbeam,800,'H',10)
+
+
     .. _link: https://books.google.co.za/books?id=Jg6hCwAAQBAJ
     """
+
+    # Example usage
+    # -------------
+    # .. code:: python
+    #   import matplotlib.pylab as plt
+    #   from katbeam import JimBeam
+    #   def showbeam(beam,freqMHz=1000,pol='H',beamextent=10.):
+    #       margin=np.linspace(-beamextent/2.,beamextent/2.,128)
+    #       x,y=np.meshgrid(margin,margin)
+    #       if pol=='H':
+    #           beampixels=beam.HH(x,y,freqMHz)
+    #       elif pol=='V':
+    #           beampixels=beam.VV(x,y,freqMHz)
+    #       else:
+    #           beampixels=beam.I(x,y,freqMHz)
+    #           pol='I'
+    #       plt.clf()
+    #       plt.imshow(beampixels,extent=[-beamextent/2,beamextent/2,-beamextent/2,beamextent/2])
+    #       plt.title('%s pol beam\nfor %s at %dMHz'%(pol,beam.name,freqMHz))
+    #       plt.xlabel('deg')
+    #       plt.ylabel('deg')
+    #   uhfbeam=JimBeam('MKAT-AA-UHF-JIM-2020')
+    #   showbeam(uhfbeam,800,'H',10)
 
     def __init__(self, name='MKAT-AA-L-JIM-2020'):
         self.name = name
