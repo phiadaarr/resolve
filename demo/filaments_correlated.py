@@ -32,7 +32,7 @@ def get_filament_prior(domain):
     ### 1.Generate c0 and phi0 by correlated field model
 
     # random seed
-    ift.random.push_sseq_from_seed(92)  # 91
+    ift.random.push_sseq_from_seed(68)
 
 
     # c0 by correlated field model, initial density (rho0) = exp(c0)
@@ -47,9 +47,10 @@ def get_filament_prior(domain):
     # phi0 by correlated field model
     cfmaker_phi0 = ift.CorrelatedFieldMaker('phi0')
     # add fluctuations, flexibility, asperity, loglogavgslope
-    cfmaker_phi0.add_fluctuations(normalized_domain, (2.0, 0.5), (0.6, 0.2), None, (-5., 1.0), 'phi0')
+    cfmaker_phi0.add_fluctuations(normalized_domain, (0.5, 0.25), (0.6, 0.2), None, (-5., 1.0), 'phi0')
     cfmaker_phi0.set_amplitude_total_offset(0., (1.0, 0.1))
     Correlated_field_phi0 = cfmaker_phi0.finalize()
+    # minus lognormal field phi0
     Phi0_ = Correlated_field_phi0
     Phi0 = -1 * ift.exp(Phi0_)
 
@@ -57,6 +58,8 @@ def get_filament_prior(domain):
 
     hbar = 5 * 10 ** -3
     a = 0.05
+
+
     # time scale
     Half_operator_ = ift.ScalingOperator(C0.target, 0.5)
     Hbar_operator = ift.ScalingOperator(Phi0.target, -1j / hbar)
@@ -76,10 +79,7 @@ def get_filament_prior(domain):
 
     # length of k vector for each pixel
     k_values = harmonic_space.get_k_length_array()
-
-    propagator_h = ift.exp(
-        -1j * hbar * a / 2 * (k_values) ** 2
-    )  # to put noise, use k_values_n instead of k_values
+    propagator_h = ift.exp(-1j * hbar * a / 2 * (k_values) ** 2)
 
     # propagator operator in harmonic space
     Propagator_h = ift.makeOp(propagator_h)
@@ -186,8 +186,8 @@ def main():
         #ift.single_plot(sky.log10()(state.mean), name=f"sky{ii}.png")
 
         plot = ift.Plot()
-        plot.add(sky.log10()(state.mean), title="sky{:02d}(logscale) a=0.3".format(ii), fontsize=20)
-        plot.output(ny=1, nx=1, xsize=20, ysize=20, name="sky{:02d}_logscale.png".format(ii))
+        plot.add(sky.log10()(state.mean), title="sky{:02d}(logscale) a=0.05".format(ii), fontsize=20)
+        plot.output(ny=1, nx=1, xsize=20, ysize=20, name="sky{:02d}_logscale_weights.png".format(ii))
 
         R = rve.StokesIResponse(obs, dom)
         print((R @ sky)(state.mean))
