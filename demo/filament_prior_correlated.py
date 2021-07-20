@@ -35,11 +35,11 @@ def main():
         a = float(sys.argv[1])
 
     else:
-        a = 0.1
+        a = 0.05
 
 
     # Define 2d position space
-    N_pixels = 2000
+    N_pixels = 3000
     position_space = ift.RGSpace([N_pixels, N_pixels], distances=1 / N_pixels)
 
 
@@ -65,21 +65,21 @@ def main():
     ### 1.Generate c0 and phi0 by correlated field model
 
     # random seed
-    ift.random.push_sseq_from_seed(80) # 100
+    ift.random.push_sseq_from_seed(68)
 
 
     # c0 by correlated field model, initial density (rho0) = exp(c0)
-    cfmaker_c0 = ift.CorrelatedFieldMaker('')
+    cfmaker_c0 = ift.CorrelatedFieldMaker('c0')
     # add fluctuations, flexibility, asperity, loglogavgslope
-    cfmaker_c0.add_fluctuations(position_space, (5.0, 1.0), (2.4, 0.8), None, (-4., 1.0), 'c0')
-    cfmaker_c0.set_amplitude_total_offset(21., (1, 0.1))
+    cfmaker_c0.add_fluctuations(position_space, (4.0, 1.0), (1.2, 0.4), None, (-4., 1.0), 'c0')
+    cfmaker_c0.set_amplitude_total_offset(21., (1.0, 0.1))
     Correlated_field_c0 = cfmaker_c0.finalize()
     C0 = Correlated_field_c0
 
     # phi0 by correlated field model
-    cfmaker_phi0 = ift.CorrelatedFieldMaker('')
+    cfmaker_phi0 = ift.CorrelatedFieldMaker('phi0')
     # add fluctuations, flexibility, asperity, loglogavgslope
-    cfmaker_phi0.add_fluctuations(position_space, (0.1, 0.05), (1.0, 0.2), None, (-6., 1.0), 'phi0')
+    cfmaker_phi0.add_fluctuations(position_space, (0.5, 0.25), (0.6, 0.2), None, (-5., 1.0), 'phi0')
     cfmaker_phi0.set_amplitude_total_offset(0., (1.0, 0.1))
     Correlated_field_phi0 = cfmaker_phi0.finalize()
     Phi0 = Correlated_field_phi0
@@ -87,14 +87,14 @@ def main():
     ### 2.Calculate initial wave function operator Psi_0
 
     hbar = 5 * 10 ** -3
-    # a = 1.0 # time scale
+    # a = 0.05 # time scale
     Half_operator_ = ift.ScalingOperator(C0.target, 0.5)
     Hbar_operator = ift.ScalingOperator(Phi0.target, -1j / hbar)
     Complexifier = ift.Realizer(Phi0.target).adjoint
     Phase_operator = Hbar_operator @ Complexifier
 
     Half_operator = Half_operator_ @ Complexifier
-    Psi_0 = ift.exp(Half_operator(C0) - Phase_operator(Phi0))
+    Psi_0 = ift.exp(Half_operator(C0) + Phase_operator(Phi0))
     # psi_0 = np.exp(c0 / 2 - 1j * phi0 / hbar)
     Psi_0h = fft(Psi_0)
 
@@ -106,17 +106,7 @@ def main():
 
     # length of k vector for each pixel
     k_values = harmonic_space.get_k_length_array()
-
-    ### use gaussian distribution for k_values
-    # Define meshgrid
-    # N : Number of pixels
-    N_ = N_pixels
-    x_ = np.linspace(0, N_, N_, endpoint=False)
-    y_ = np.linspace(0, N_, N_, endpoint=False)
-    # Produce 2d array
-    [X_, Y_] = np.meshgrid(x_, y_)
-
-    propagator_h = ift.exp(-1j * hbar * a / 2 * (k_values) ** 2)  # to put noise, use k_values_n instead of k_values
+    propagator_h = ift.exp(-1j * hbar * a / 2 * (k_values) ** 2)
 
     # propagator operator in harmonic space
     Propagator_h = ift.makeOp(propagator_h)
