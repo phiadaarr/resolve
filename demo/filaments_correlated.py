@@ -57,10 +57,7 @@ def get_filament_prior(domain):
     ### 2.Calculate initial wave function operator Psi_0
 
     hbar = 5 * 10 ** -3
-    a = 0.05
-
-
-    # time scale
+    a = 0.05 # time scale
     Half_operator_ = ift.ScalingOperator(C0.target, 0.5)
     Hbar_operator = ift.ScalingOperator(Phi0.target, -1j / hbar)
     Complexifier = ift.Realizer(Phi0.target).adjoint
