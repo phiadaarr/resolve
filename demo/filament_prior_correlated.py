@@ -82,7 +82,9 @@ def main():
     cfmaker_phi0.add_fluctuations(position_space, (0.5, 0.25), (0.6, 0.2), None, (-5., 1.0), 'phi0')
     cfmaker_phi0.set_amplitude_total_offset(0., (1.0, 0.1))
     Correlated_field_phi0 = cfmaker_phi0.finalize()
-    Phi0 = Correlated_field_phi0
+    # minus lognormal field phi0
+    Phi0_ = Correlated_field_phi0
+    Phi0 = -1 * ift.exp(Phi0_)
 
     ### 2.Calculate initial wave function operator Psi_0
 
