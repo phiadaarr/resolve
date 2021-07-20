@@ -61,6 +61,9 @@ def main():
     y = np.linspace(0, N * T, N, endpoint=False)
     # Produce 2d array
     [X, Y] = np.meshgrid(x, y)
+    X_30 = X[::30, ::30]
+    Y_30 = Y[::30, ::30]
+
 
     ### 1.Generate c0 and phi0 by correlated field model
 
@@ -136,28 +139,41 @@ def main():
     phi0 = Phi0.force(mock_position)
     rho1 = Rho1.force(mock_position)
 
+    # Calculate Initial velocity(vel0 = - grad(phi0))
+    [minus_vely0, minus_velx0] = np.gradient(phi0.val)  # in numpy, axis=0 is rows
+    vely0 = -1 * minus_vely0 * 1 / T  # sample spacing = T = 1/N
+    velx0 = -1 * minus_velx0 * 1 / T
+    vely0_30 = vely0[::30, ::30]
+    velx0_30 = velx0[::30, ::30]
+
 
 
     ### Plotting
     filename = "filament_prior_correlated_log_scale_a_{}_N_{}.png".format(a, N_pixels)
-    fig, ((ax1, ax3, ax2)) = plt.subplots(1, 3, figsize=(15,5))
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(20, 20))
 
     #density0 = ax1.pcolormesh(X, Y, rho0.val, cmap=cm.inferno)  # linear scale
     density0 = ax1.pcolormesh(X, Y, rho0.val, norm=colors.LogNorm(vmin=rho0.val.min(), vmax=rho0.val.max()), cmap=cm.inferno) # log scale
     ax1.set_aspect('equal')
-    ax1.set_title('Initial Density', fontsize=15)
+    ax1.set_title('Initial Density(rho0)', fontsize=20)
     fig.colorbar(density0, ax=ax1)
 
     #density1 = ax2.pcolormesh(X, Y, rho1.val, cmap=cm.inferno)  # linear scale
     density1 = ax2.pcolormesh(X, Y, rho1.val, norm=colors.LogNorm(vmin=rho1.val.min(), vmax=rho1.val.max()), cmap=cm.inferno) # log scale
     ax2.set_aspect('equal')
-    ax2.set_title('Filament Density, a = {}'.format(a), fontsize=15)
+    ax2.set_title('Filament Density(rho1), a = {}'.format(a), fontsize=20)
     fig.colorbar(density1, ax=ax2)
 
     phase = ax3.pcolormesh(X, Y, phi0.val, cmap=cm.gray)
     ax3.set_aspect('equal')
-    ax3.set_title('Initial Phase', fontsize=15)
+    ax3.set_title('Initial Phase(phi0)', fontsize=20)
     fig.colorbar(phase, ax=ax3)
+
+    abs_vel = np.sqrt(velx0_30 ** 2 + vely0_30 ** 2)
+    q0 = ax4.quiver(Y_30, X_30, vely0_30, velx0_30, abs_vel, cmap=cm.viridis)
+    ax4.set_aspect('equal')
+    ax4.set_title('Initial Velocity(v=-grad(phi0))', fontsize=20)
+    fig.colorbar(q0, ax=ax4)
 
     plt.savefig(filename)
     print("Saved results as {}.".format(filename))
