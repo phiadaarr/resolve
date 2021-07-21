@@ -1,4 +1,5 @@
 # custom
+*.png
 *stage*
 *.mp4
 *.state

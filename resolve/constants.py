@@ -35,7 +35,6 @@ def str2rad(s):
     for kk in reversed(keys):
         nn = -len(kk)
         unit = s[nn:]
-        print(unit, kk)
         if unit == kk:
             return float(s[:nn]) * c[kk]
     raise RuntimeError("Unit not understood")
