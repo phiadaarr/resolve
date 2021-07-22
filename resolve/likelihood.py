@@ -9,7 +9,7 @@ import numpy as np
 
 import nifty8 as ift
 
-from .observation import Observation
+from .data.observation import Observation
 from .response import FullPolResponse, MfResponse, StokesIResponse
 from .util import my_assert, my_assert_isinstance, my_asserteq
 

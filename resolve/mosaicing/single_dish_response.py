@@ -6,7 +6,7 @@ import numpy as np
 
 import nifty8 as ift
 
-from ..observation import SingleDishObservation
+from ..data.observation import SingleDishObservation
 
 
 def SingleDishResponse(

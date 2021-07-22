@@ -4,7 +4,7 @@
 
 import numpy as np
 
-from .util import compare_attributes, my_assert, my_asserteq
+from ..util import compare_attributes, my_assert, my_asserteq
 
 
 class AntennaPositions:

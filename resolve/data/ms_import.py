@@ -9,7 +9,7 @@ from .antenna_positions import AntennaPositions
 from .direction import Direction
 from .observation import Observation
 from .polarization import Polarization
-from .util import my_assert, my_asserteq, my_assert_isinstance
+from ..util import my_assert, my_asserteq, my_assert_isinstance
 
 
 def ms_table(path):

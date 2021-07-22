@@ -14,7 +14,7 @@ import nifty8 as ift
 from .constants import SPEEDOFLIGHT
 from .global_config import epsilon, nthreads, wgridding, verbosity
 from .multi_frequency.irg_space import IRGSpace
-from .observation import Observation
+from .data.observation import Observation
 from .util import my_assert, my_assert_isinstance, my_asserteq
 
 

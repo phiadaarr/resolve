@@ -7,8 +7,8 @@ import scipy.special as sc
 
 import nifty8 as ift
 
-from .constants import ARCMIN2RAD, SPEEDOFLIGHT
-from .util import my_assert
+from ..constants import ARCMIN2RAD, SPEEDOFLIGHT
+from ..util import my_assert
 from .meerkat_beam import JimBeam
 
 

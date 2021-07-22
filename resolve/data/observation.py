@@ -7,11 +7,11 @@ import numpy as np
 import nifty8 as ift
 
 from .antenna_positions import AntennaPositions
-from .constants import SPEEDOFLIGHT
+from ..constants import SPEEDOFLIGHT
 from .direction import Direction, Directions
-from .mpi import onlymaster
+from ..mpi import onlymaster
 from .polarization import Polarization
-from .util import compare_attributes, my_assert, my_assert_isinstance, my_asserteq
+from ..util import compare_attributes, my_assert, my_assert_isinstance, my_asserteq
 
 
 class BaseObservation:
@@ -84,7 +84,7 @@ class BaseObservation:
         nifty8.Field
             Flagged field defined on a one-dimensional
             `nifty8.UnstructuredDomain`."""
-        return ift.MaskOperator(self.flags)(fld)
+        return ift.MaskOperator(self.flags)(field)
 
     @property
     def flags(self):
