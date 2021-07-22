@@ -454,7 +454,7 @@ class Observation(BaseObservation):
 
 
 def tmin_tmax(*args):
-    """
+    """Compute beginning and end time of list of observations.
 
     Parameters
     ----------
@@ -464,7 +464,6 @@ def tmin_tmax(*args):
     -------
     mi, ma : tuple of float
         first and last measurement time point
-
     """
     my_assert_isinstance(*args, Observation)
     mi = min([np.min(aa.antenna_positions.time) for aa in args])
@@ -473,6 +472,17 @@ def tmin_tmax(*args):
 
 
 def unique_antennas(*args):
+    """Compute set of antennas of list of observations
+
+    Parameters
+    ----------
+    args : Observation or list of Observation
+
+    Returns
+    -------
+    set
+        Set of antennas
+    """
     my_assert_isinstance(*args, Observation)
     antennas = set()
     for oo in args:
@@ -481,6 +491,17 @@ def unique_antennas(*args):
 
 
 def unique_times(*args):
+    """Compute set of time stamps of list of observations
+
+    Parameters
+    ----------
+    args : Observation or list of Observation
+
+    Returns
+    -------
+    set
+        Set of time stamps
+    """
     my_assert_isinstance(*args, Observation)
     times = set()
     for oo in args:
