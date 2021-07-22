@@ -14,71 +14,144 @@ from .polarization import Polarization
 from .util import compare_attributes, my_assert, my_assert_isinstance, my_asserteq
 
 
-class _Observation:
+class BaseObservation:
     @property
     def _dom(self):
-        return ift.makeDomain([ift.UnstructuredDomain(ss) for ss in self._vis.shape])
+        dom = [ift.UnstructuredDomain(ss) for ss in self._vis.shape]
+        return ift.makeDomain(dom)
 
     @property
     def vis(self):
+        """nifty8.Field : Field that contains all data points including
+        potentially flagged ones.  Shape: `(npol, nrow, nchan)`, dtype: `numpy.complexfloating`."""
         return ift.makeField(self._dom, self._vis)
 
     @property
     def weight(self):
+        """nifty8.Field : Field that contains all weights, i.e. the diagonal of
+        the inverse covariance. Shape: `(npol, nrow, nchan)`, dtype: `numpy.floating`.
+
+        Note
+        ----
+        If an entry equals 0, this means that the corresponding data point is
+        supposed to be ignored.
+        """
         return ift.makeField(self._dom, self._weight)
 
     @property
     def freq(self):
+        """numpy.ndarray: One-dimensional array that contains the observing
+        frequencies. Shape: `(nchan,), dtype: `np.float64`."""
         return self._freq
 
     @property
     def polarization(self):
+        """Polarization: Object that contains polarization information on the
+        data set."""
         return self._polarization
 
     @property
     def direction(self):
+        """Direction: Object that contains direction information on the data
+        set."""
         return self._direction
 
     @property
     def npol(self):
+        """int: Number of polarizations present in the data set."""
         return self._vis.shape[0]
 
     @property
     def nrow(self):
+        """int: Number of rows in the data set."""
         return self._vis.shape[1]
 
     @property
     def nfreq(self):
+        """int: Number of observing frequencies."""
         return self._vis.shape[2]
 
-    def apply_flags(self, fld):
+    def apply_flags(self, field):
+        """Apply flags to a given field.
+
+        Parameters
+        ----------
+        field: nifty8.Field
+            The field that is supposed to be flagged.
+
+        Returns
+        -------
+        nifty8.Field
+            Flagged field defined on a one-dimensional
+            `nifty8.UnstructuredDomain`."""
         return ift.MaskOperator(self.flags)(fld)
 
     @property
     def flags(self):
-        """np.ndarray : True for bad visibilities. May be used together with
+        """nifty8.Field: True for bad visibilities. May be used together with
         `ift.MaskOperator`."""
         return ift.makeField(self._dom, self._weight == 0.0)
 
     @property
     def mask(self):
-        """np.ndarray : True for good visibilities."""
+        """nifty8.Field: True for good visibilities."""
         return ift.makeField(self._dom, self._weight > 0.0)
 
     @property
     def mask_operator(self):
+        """nifty8.MaskOperator: Nifty operator that can be used to extract all
+        non-flagged data points from a field defined on `self.vis.domain`."""
         return ift.MaskOperator(self.flags)
 
     def max_snr(self):
+        """float: Maximum signal-to-noise ratio."""
         snr = (self.vis * self.weight.sqrt()).abs()
         snr = self.apply_flags(snr)
         return np.max(snr.val)
 
     def fraction_useful(self):
+        """float: Fraction of non-flagged data points."""
         return self.n_data_effective() / self._dom.size
 
     def n_data_effective(self):
+        """int: Number of effective (i.e. non-flagged) data points."""
         return self.mask.s_sum()
+
+    @onlymaster
+    def save(self, file_name, compress):
+        """Save observation object to disk
+
+        Counterpart to :meth:`load`.
+
+        Parameters
+        ----------
+        file_name : str
+            File name of output file
+        compress : bool
+            Determine if output file shall be compressed or not. The compression
+            algorithm built into numpy is used for this.
+
+        Note
+        ----
+        If MPI is enabled, this function is only executed on the master task.
+        """
+        return NotImplementedError
+
+    @staticmethod
+    def load(file_name):
+        """Load observation object from disk
+
+        Counterpart to :meth:`save`.
+
+        Parameters
+        ----------
+        file_name : str
+            File name of the input file
+        """
+        return NotImplementedError
+
+    def __getitem__(self, slc):
+        return NotImplementedError
 
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
@@ -91,7 +164,25 @@ class _Observation:
         return compare_attributes(self, other, self._eq_attributes)
 
 
-class SingleDishObservation(_Observation):
+class SingleDishObservation(BaseObservation):
+    """Provide an interface to single-dish observation.
+
+    Parameters
+    ----------
+    pointings: Directions
+        Contains all information on the observing directions.
+    data: numpy.ndarray
+        Contains the measured intensities. Shape (n_polarizations, n_rows,
+        n_channels).
+    weight : numpy.ndarray
+        Contains the information from the WEIGHT or SPECTRUM_WEIGHT column.
+        This is in many cases the inverse of the thermal noise covariance.
+        Shape same as `data`.
+    polarization : Polarization
+        Polarization information of the data set.
+    freq : numpy.ndarray
+        Contains the measured frequencies. Shape (n_channels)
+    """
     def __init__(self, pointings, data, weight, polarization, freq):
         my_assert_isinstance(pointings, Directions)
         my_assert_isinstance(polarization, Polarization)
@@ -153,8 +244,8 @@ class SingleDishObservation(_Observation):
         return self._pointings
 
 
-class Observation(_Observation):
-    """Observation data
+class Observation(BaseObservation):
+    """Provide an interface to an interferometric observation.
 
     This class contains all the data and information about an observation.
     It supports a single field (phase center) and a single spectral window.
@@ -162,20 +253,22 @@ class Observation(_Observation):
     Parameters
     ----------
     antenna_positions : AntennaPositions
-        Instance of the :class:`AntennaPositions` that contains all information on antennas and baselines.
+        Contains all information on antennas and baselines.
     vis : numpy.ndarray
         Contains the measured visibilities. Shape (n_polarizations, n_rows, n_channels)
     weight : numpy.ndarray
         Contains the information from the WEIGHT or SPECTRUM_WEIGHT column.
         This is in many cases the inverse of the thermal noise covariance. Shape same as vis.
     polarization : Polarization
+        Polarization information of the data set.
     freq : numpy.ndarray
         Contains the measured frequencies. Shape (n_channels)
     direction : Direction
+        Direction information of the data set.
 
     Note
     ----
-    vis and weight must have the same dimensions
+    vis and weight must have the same shape.
     """
 
     def __init__(self, antenna_positions, vis, weight, polarization, freq, direction):
