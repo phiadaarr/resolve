@@ -224,13 +224,12 @@ class FullResponse(ift.LinearOperator):
 class SingleResponse(ift.LinearOperator):
     def __init__(self, domain, uvw, freq, mask, facets=(1, 1)):
         my_assert_isinstance(facets, tuple)
-        for ii in range(1):
-            if domain.shape[0] % facets[0] != 0:
+        for ii in range(2):
+            if domain.shape[ii] % facets[ii] != 0:
                 raise ValueError("nfacets needs to be divisor of npix.")
         self._domain = ift.DomainTuple.make(domain)
-        self._target = ift.makeDomain(
-            ift.UnstructuredDomain(ss) for ss in (uvw.shape[0], freq.size)
-        )
+        tgt = ift.UnstructuredDomain(uvw.shape[0]), ift.UnstructuredDomain(freq.size)
+        self._target = ift.makeDomain(tgt)
         self._capability = self.TIMES | self.ADJOINT_TIMES
         self._args = {
             "uvw": uvw,
