@@ -4,7 +4,8 @@
 
 import numpy as np
 
-from ..util import compare_attributes, my_assert, my_asserteq
+from ..util import (compare_attributes, my_assert, my_assert_isinstance,
+                    my_asserteq)
 
 
 class AntennaPositions:
@@ -96,3 +97,50 @@ class AntennaPositions:
     @property
     def ant2(self):
         return self._ant2
+
+    def extract_baselines(self, antenna1, antenna2, data):
+        """Extract data that belongs to a given baseline.
+
+        Parameters
+        ----------
+        antenna1: int
+            Antenna index of the first antenna that is selected.
+        antenna2: int
+            Antenna index of the second antenna that is selected.
+        data: numpy.ndarray
+            Data array. Shape `(n_pol, n_row, n_freq)`. `n_row` must equal
+            `len(self)`.
+
+        Returns
+        -------
+        numpy.ndarray: Entries of `data` that correspond to the selected
+        baseline. Shape `(n_pol, n_time, n_freq)`.
+        """
+        if np.any(self.ant1 > self.ant2):
+            raise RuntimeError("This algorithm assumes ant1<ant2.")
+        ut = np.sort(np.array(list(self.unique_times())))
+
+        npol, nrow, nfreq = data.shape
+        my_asserteq(nrow, len(self))
+        my_assert_isinstance(data, np.ndarray)
+        my_assert_isinstance(antenna1, antenna2, int)
+
+        # Select by antenna labels
+        ind = np.logical_and(self.ant1 == antenna1,
+                             self.ant2 == antenna2)
+        data = data[:, ind]
+        tt = self.time[ind]
+
+        # Sort by time
+        ind2 = np.argsort(tt)
+        data = data[:, ind2]
+        tt = tt[ind2]
+
+        if tt.size != ut.size:
+            out = np.empty((npol, ut.size, nfreq), dtype=data.dtype)
+            out[:] = np.nan
+            out[:, np.searchsorted(ut, tt)] = data
+            return out
+        if np.array_equal(tt, ut):
+            return data
+        raise RuntimeError
