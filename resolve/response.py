@@ -12,7 +12,7 @@ from ducc0.wgridder.experimental import dirty2vis, vis2dirty
 import nifty8 as ift
 
 from .constants import SPEEDOFLIGHT
-from .global_config import epsilon, nthreads, wgridding, verbosity
+from .global_config import epsilon, nthreads, wgridding, verbosity, np_dtype
 from .multi_frequency.irg_space import IRGSpace
 from .data.observation import Observation
 from .util import my_assert, my_assert_isinstance, my_asserteq
@@ -244,8 +244,8 @@ class SingleResponse(ift.LinearOperator):
             "flip_v": True,
         }
         self._vol = self._domain[0].scalar_dvol
-        self._target_dtype = np.complex64
-        self._domain_dtype = np.float32
+        self._target_dtype = np_dtype(True)
+        self._domain_dtype = np_dtype(False)
         self._ofac = None
         self._facets = facets
 
@@ -254,25 +254,22 @@ class SingleResponse(ift.LinearOperator):
         one_facet = self._facets == (1, 1)
         x = x.val
         if mode == self.TIMES:
-            # Convention: Sky is in double precision, visibilities and
-            # calibration solutions are in single precision
-            x = x.astype(self._domain_dtype)
+            x = x.astype(self._domain_dtype, copy=False)
             if one_facet:
                 res = self._times(x)
             else:
                 res = self._facet_times(x)
         else:
-            # my_asserteq(x.dtype, self._target_dtype)
-            if x.dtype != self._target_dtype:
-                # FIXME Proper dtype support in NIFTy and resolve
-                x = x.astype(self._target_dtype)
+            x = x.astype(self._target_dtype, copy=False)
             if one_facet:
                 res = self._adjoint(x)
             else:
                 res = self._facet_adjoint(x)
         res = ift.makeField(self._tgt(mode), res * self._vol)
-        my_asserteq(res.dtype,
-              self._target_dtype if mode == self.TIMES else self._domain_dtype)
+
+        expected_dtype = self._target_dtype if mode == self.TIMES else self._domain_dtype
+        my_asserteq(res.dtype, expected_dtype)
+
         return res
 
     def oversampling_factors(self):
