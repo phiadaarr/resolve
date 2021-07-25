@@ -113,8 +113,9 @@ class AntennaPositions:
 
         Returns
         -------
-        numpy.ndarray: Entries of `data` that correspond to the selected
-        baseline. Shape `(n_pol, n_time, n_freq)`.
+        numpy.ndarray
+            Entries of `data` that correspond to the selected baseline. Shape
+            `(n_pol, n_time, n_freq)`.
         """
         if np.any(self.ant1 > self.ant2):
             raise RuntimeError("This algorithm assumes ant1<ant2.")

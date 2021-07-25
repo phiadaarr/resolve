@@ -21,7 +21,8 @@ def calibrator_spectrum(nu, src):
 
     Returns
     -------
-    float or np.ndarray : calibrator spectrum
+    float or np.ndarray
+        calibrator spectrum
 
     Note
     ----
