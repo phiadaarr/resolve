@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright(C) 2020 Max-Planck-Society
+# Copyright(C) 2020-2021 Max-Planck-Society
 # Author: Philipp Arras
 
 import matplotlib.pyplot as plt
