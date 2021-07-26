@@ -291,7 +291,7 @@ class Observation(BaseObservation):
         my_asserteq(vis.dtype, np.complex64)
         my_asserteq(weight.dtype, np.float32)
         my_assert(np.all(weight >= 0.0))
-        my_assert(np.all(np.isfinite(vis)))
+        my_assert(np.all(np.isfinite(vis[weight > 0.])))
         my_assert(np.all(np.isfinite(weight)))
 
         vis.flags.writeable = False
@@ -349,10 +349,8 @@ class Observation(BaseObservation):
         if self.fraction_useful == 1.:
             return self
         vis = self._vis.copy()
-        weight = self._weight.copy()
         vis[self.flags.val] = np.nan
-        weight[self.flags.val] = np.nan
-        return Observation(self._antpos, vis, weight, self._pol, self._freq,
+        return Observation(self._antpos, vis, self._weight, self._polarization, self._freq,
                            self._direction)
 
     @staticmethod
