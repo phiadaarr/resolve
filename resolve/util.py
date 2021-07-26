@@ -77,3 +77,14 @@ def imshow(arr, ax=None, **kwargs):
     if ax is None:
         ax = plt.gca()
     return ax.imshow(arr.T, origin="lower", **kwargs)
+
+
+def rows_to_baselines(antenna_positions, data_field):
+    ua = antenna_positions.unique_antennas()
+    my_assert(np.all(antenna_positions.ant1 < antenna_positions.ant2))
+
+    res = {}
+    for iant1 in range(len(ua)):
+        for iant2 in range(iant1+1, len(ua)):
+            res[f"{iant1}-{iant2}"] = antenna_positions.extract_baseline(iant1, iant2, data_field)
+    return res

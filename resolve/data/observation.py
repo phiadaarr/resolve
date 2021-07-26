@@ -103,6 +103,9 @@ class BaseObservation:
         non-flagged data points from a field defined on `self.vis.domain`."""
         return ift.MaskOperator(self.flags)
 
+    def flags_to_nan(self):
+        raise NotImplementedError
+
     def max_snr(self):
         """float: Maximum signal-to-noise ratio."""
         snr = (self.vis * self.weight.sqrt()).abs()
@@ -341,6 +344,16 @@ class Observation(BaseObservation):
             dct["freq"][slc],
             direction,
         )
+
+    def flags_to_nan(self):
+        if self.fraction_useful == 1.:
+            return self
+        vis = self._vis.copy()
+        weight = self._weight.copy()
+        vis[self.flags.val] = np.nan
+        weight[self.flags.val] = np.nan
+        return Observation(self._antpos, vis, weight, self._pol, self._freq,
+                           self._direction)
 
     @staticmethod
     def load_mf(file_name, n_imaging_bands, comm=None):
