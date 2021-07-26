@@ -88,3 +88,13 @@ def rows_to_baselines(antenna_positions, data_field):
         for iant2 in range(iant1+1, len(ua)):
             res[f"{iant1}-{iant2}"] = antenna_positions.extract_baseline(iant1, iant2, data_field)
     return res
+
+
+class DomainChanger(ift.LinearOperator):
+    def __init__(self, domain, target):
+        self._domain = ift.makeDomain(domain)
+        self._target = ift.makeDomain(target)
+        self._capability = self.TIMES | self.ADJOINT_TIMES
+
+    def apply(self, x, mode):
+        return ift.makeField(self._tgt(mode), x.val)
