@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright(C) 2019-2020 Max-Planck-Society
+# Copyright(C) 2019-2021 Max-Planck-Society
 # Author: Philipp Arras
 
 import numpy as np
@@ -98,7 +98,7 @@ class AntennaPositions:
     def ant2(self):
         return self._ant2
 
-    def extract_baselines(self, antenna1, antenna2, data):
+    def extract_baseline(self, antenna1, antenna2, data):
         """Extract data that belongs to a given baseline.
 
         Parameters
