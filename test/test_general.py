@@ -102,7 +102,7 @@ def test_varcov_imaging_likelihood(obs):
 @pmp("obs", OBS)
 @pmp("noisemodel", range(2))
 def test_weighting_methods(obs, noisemodel):
-    efflen = obs.effective_uvwlen()
+    efflen = obs.effective_uvwlen().val[0]
     npix = 2500
     dom = ift.RGSpace(npix, 2 * max(efflen) / npix)
     baseline_distributor = ift.LinearInterpolator(dom, efflen.T)

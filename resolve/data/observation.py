@@ -458,7 +458,9 @@ class Observation(BaseObservation):
         return out
 
     def effective_uvwlen(self):
-        return np.outer(self.uvwlen(), self._freq / SPEEDOFLIGHT)
+        arr = np.outer(self.uvwlen(), self._freq / SPEEDOFLIGHT)
+        arr = np.broadcast_to(arr[None], self._dom.shape)
+        return ift.makeField(self._dom, arr)
 
     def uvwlen(self):
         return np.linalg.norm(self.uvw, axis=1)

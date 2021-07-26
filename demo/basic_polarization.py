@@ -53,7 +53,7 @@ def main():
     polmode = obs.polarization.has_crosshanded()
 
     # TODO Add mode with independent noise learning
-    effuv = obs.effective_uvwlen()
+    effuv = obs.effective_uvwlen().val[0]
     dom = ift.RGSpace((npix_wgts := 2500), 2 * np.max(effuv) / npix_wgts)
     if not polmode:
         assert obs.nfreq == obs.npol == 1
