@@ -81,16 +81,16 @@ class _FancyBroadcast(ift.LinearOperator):
 class MfWeightingInterpolation(ift.LinearOperator):
     def __init__(self, eff_uvw, domain):
         domain = ift.DomainTuple.make(domain)
-        my_asserteq(domain.shape[0], eff_uvw.shape[1])  # freqaxis
+        my_asserteq(domain.shape[0], eff_uvw.shape[2])  # freqaxis
         self._domain = domain
-        nrow, nfreq = eff_uvw.shape
+        nrow, nfreq = eff_uvw.shape[1:]
         tgt = [ift.UnstructuredDomain(aa) for aa in [1, nrow, nfreq]]
         self._target = ift.DomainTuple.make(tgt)
         self._capability = self.TIMES | self.ADJOINT_TIMES
         # FIXME Try to unify all those operators which loop over freq dimension
         self._ops = []
         for ii in range(nfreq):
-            op = ift.LinearInterpolator(domain[1], eff_uvw[:, ii][None])
+            op = ift.LinearInterpolator(domain[1], eff_uvw[:, :, ii])
             self._ops.append(op)
         my_asserteq(self.target.shape[0], 1)
 
