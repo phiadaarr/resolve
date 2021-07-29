@@ -36,6 +36,7 @@ def test_slice_sum():
     op = rve.SliceSum(oplist, lo, parallel_space, rve.mpi.comm)
     ift.extra.check_operator(op, ift.from_random(op.domain))
 
-    oplist = [ift.GaussianEnergy(domain=dom["a"]) @ Extract(dom, "a") @ ift.ScalingOperator(dom, 2.).exp() for ii in range(hi-lo)]
+    oplist = [ift.GaussianEnergy(domain=dom["a"], sampling_dtype=np.float64) @ Extract(dom, "a") @ ift.ScalingOperator(dom, 2.).exp() for ii in range(hi-lo)]
     op = rve.SliceSum(oplist, lo, parallel_space, rve.mpi.comm)
     ift.extra.check_operator(op, ift.from_random(op.domain))
+    op(ift.Linearization.make_var(ift.from_random(op.domain), True)).metric.draw_sample()
