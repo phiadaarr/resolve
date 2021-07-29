@@ -39,8 +39,8 @@ class AllreduceSum(ift.Operator):
 
 
 class SliceSum(ift.Operator):
-    """
-    Sum Operator that slices along the first axis of the input array and computes the sum in parallel using MPI.
+    """Sum Operator that slices along the first axis of the input field and
+    computes the sum in parallel using MPI.
     """
     def __init__(self, oplist, index_low, parallel_space, comm):
         # FIXME if oplist contains only linear operators instantiate
@@ -53,29 +53,39 @@ class SliceSum(ift.Operator):
         else:
             assert index_low == parallel_space.shape[0]
         doms = _get_global_unique(oplist, lambda op: op.domain, comm)
-        self._domain = ift.makeDomain((parallel_space,) + tuple(dd for dd in doms))
-        self._target = ift.makeDomain(
-            _get_global_unique(oplist, lambda op: op.target, comm)
-        )
+
+        if isinstance(doms, ift.MultiDomain):
+            dom = {}
+            for kk in doms.keys():
+                dom[kk] = (parallel_space,) + tuple(dd for dd in doms[kk])
+        else:
+            dom = (parallel_space,) + tuple(dd for dd in doms)
+        self._domain = ift.makeDomain(dom)
+        tgt = _get_global_unique(oplist, lambda op: op.target, comm)
+        self._target = ift.makeDomain(tgt)
+        self._paraspace = parallel_space
 
     def apply(self, x):
         self._check_input(x)
         if not ift.is_linearization(x):
-            opx = [
-                op(ift.makeField(op.domain, x.val[self._lo + ii]))
-                for ii, op in enumerate(self._oplist)
-            ]
+            opx = []
+            for ii, op in enumerate(self._oplist):
+                if isinstance(x, ift.MultiField):
+                    foo = {kk: vv.val[self._lo + ii] for kk, vv in x.items()}
+                else:
+                    foo = x.val[self._lo + ii]
+                opx.append(op(ift.makeField(op.domain, foo)))
             return ift.utilities.allreduce_sum(opx, self._comm)
-        oplin = [
-            op(
-                ift.Linearization.make_var(
-                    ift.makeField(op.domain, x.val.val[self._lo + ii]), x.want_metric
-                )
-            )
-            for ii, op in enumerate(self._oplist)
-        ]
+        oplin = []
+        for ii, op in enumerate(self._oplist):
+            if isinstance(x.domain, ift.MultiDomain):
+                foo = {kk: vv.val[self._lo + ii] for kk, vv in x.val.items()}
+            else:
+                foo = x.val.val[self._lo + ii]
+            foo = ift.makeField(op.domain, foo)
+            oplin.append(op(ift.Linearization.make_var(foo, x.want_metric)))
         val = ift.utilities.allreduce_sum([lin.val for lin in oplin], self._comm)
-        args = self._lo, self.domain[0], self._comm
+        args = self._lo, self._paraspace, self._comm
         jac = SliceSumLinear([lin.jac for lin in oplin], *args)
         if _get_global_unique(oplin, lambda op: op.metric is None, self._comm):
             return x.new(val, jac)
@@ -87,10 +97,15 @@ class SliceSumLinear(ift.LinearOperator):
     def __init__(self, oplist, index_low, parallel_space, comm):
         assert all(isinstance(oo, ift.LinearOperator) for oo in oplist)
         doms = _get_global_unique(oplist, lambda op: op.domain, comm)
-        self._domain = ift.makeDomain((parallel_space,) + tuple(dd for dd in doms))
-        self._target = ift.makeDomain(
-            _get_global_unique(oplist, lambda op: op.target, comm)
-        )
+        if isinstance(doms, ift.MultiDomain):
+            dom = {}
+            for kk in doms.keys():
+                dom[kk] = (parallel_space,) + tuple(dd for dd in doms[kk])
+        else:
+            dom = (parallel_space,) + tuple(dd for dd in doms)
+        self._domain = ift.makeDomain(dom)
+        tgt = _get_global_unique(oplist, lambda op: op.target, comm)
+        self._target = ift.makeDomain(tgt)
         cap = _get_global_unique(oplist, lambda op: op._capability, comm)
         self._capability = (self.TIMES | self.ADJOINT_TIMES) & cap
         self._oplist = oplist
@@ -102,18 +117,24 @@ class SliceSumLinear(ift.LinearOperator):
     def apply(self, x, mode):
         self._check_input(x, mode)
         if mode == self.TIMES:
-            return ift.utilities.allreduce_sum(
-                [
-                    op(ift.makeField(op.domain, x.val[self._lo + ii]))
-                    for ii, op in enumerate(self._oplist)
-                ],
-                self._comm,
-            )
+            opx = []
+            for ii, op in enumerate(self._oplist):
+                if isinstance(x, ift.MultiField):
+                    foo = {kk: vv.val[self._lo + ii] for kk, vv in x.items()}
+                else:
+                    foo = x.val[self._lo + ii]
+                opx.append(op(ift.makeField(op.domain, foo)))
+            return ift.utilities.allreduce_sum(opx, self._comm)
         else:
-            arr = array_allgather(
-                [op.adjoint(x).val for op in self._oplist], self._comm, self._nwork
-            )
-            return ift.makeField(self.domain, arr)
+            if isinstance(self.domain, ift.MultiDomain):
+                res = {}
+                lst = [op.adjoint(x).val for op in self._oplist]
+                for kk in self.domain.keys():
+                    res[kk] = array_allgather([xx[kk] for xx in lst], self._comm, self._nwork)
+            else:
+                lst = [op.adjoint(x).val for op in self._oplist]
+                res = array_allgather(lst, self._comm, self._nwork)
+            return ift.makeField(self.domain, res)
 
 
 class SliceLinear(ift.EndomorphicOperator):
