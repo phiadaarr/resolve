@@ -38,7 +38,7 @@ def get_filament_prior(domain):
     # c0 by correlated field model, initial density (rho0) = exp(c0)
     cfmaker_c0 = ift.CorrelatedFieldMaker('c0')
     # add fluctuations, flexibility, asperity, loglogavgslope
-    cfmaker_c0.add_fluctuations(normalized_domain, (4.0, 1.0), (1.2, 0.4), None, (-4., 1.0), 'c0')
+    cfmaker_c0.add_fluctuations(normalized_domain, (4.0, 1.0), (0.6, 0.2), None, (-4., 1.0), 'c0')
     cfmaker_c0.set_amplitude_total_offset(21., (1.0, 0.1))
     Correlated_field_c0 = cfmaker_c0.finalize()
     C0 = Correlated_field_c0
@@ -47,7 +47,7 @@ def get_filament_prior(domain):
     # phi0 by correlated field model
     cfmaker_phi0 = ift.CorrelatedFieldMaker('phi0')
     # add fluctuations, flexibility, asperity, loglogavgslope
-    cfmaker_phi0.add_fluctuations(normalized_domain, (0.5, 0.25), (0.6, 0.2), None, (-5., 1.0), 'phi0')
+    cfmaker_phi0.add_fluctuations(normalized_domain, (0.2, 0.1), (0.6, 0.2), None, (-5., 1.0), 'phi0')
     cfmaker_phi0.set_amplitude_total_offset(0., (1.0, 0.1))
     Correlated_field_phi0 = cfmaker_phi0.finalize()
     # minus lognormal field phi0
@@ -161,12 +161,12 @@ def main():
     # ) ** (-2)
 
 
-    mini = ift.NewtonCG(ift.GradientNormController(name="newton", iteration_limit=5))
+    mini = ift.NewtonCG(ift.GradientNormController(name="newton", iteration_limit=15))
     # Fit point source only
     state = rve.MinimizationState(0.1 * ift.from_random(sky.domain), [])
     lh = rve.ImagingLikelihood(obs, sky)
     ham = ift.StandardHamiltonian(
-        lh, ift.AbsDeltaEnergyController(0.5, iteration_limit=100)
+        lh, ift.AbsDeltaEnergyController(0.5, iteration_limit=500)
     )
     cst = filaments.domain.keys()
     state = rve.simple_minimize(
@@ -176,7 +176,7 @@ def main():
 
     # Fit diffuse + points
     for ii in range(20):
-        state = rve.simple_minimize(ham, state.mean, 0, mini)
+        state = rve.simple_minimize(ham, state.mean, 2, mini)
         if ii >= 19:
             state.save(f"filaments{ii}")
 
