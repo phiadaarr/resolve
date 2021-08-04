@@ -117,7 +117,7 @@ def main():
                 prefix=f"log{kk}",
             )
         logop = reduce(add, [vv.ducktape_left(kk) for kk, vv in opdct.items()])
-        mexp = rve.polarization_matrix_exponential(logop.target, args.with_v)
+        mexp = rve.polarization_matrix_exponential(logop["i"].target, args.with_v)
         # ift.extra.check_operator(mexp, ift.from_random(mexp.domain)*0.1, ntries=5)
         sky = mexp @ logop
         duckI = ift.ducktape(None, sky.target, "I")

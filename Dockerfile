@@ -15,6 +15,7 @@ RUN apt-get install -qq python3-mpi4py
 RUN apt-get install -qq python3-pytest-cov
 # Documentation dependencies
 RUN pip3 install pydata-sphinx-theme
+RUN pip3 install jax jaxlib
 
 # Create user (openmpi does not like to be run as root)
 RUN useradd -ms /bin/bash testinguser

@@ -15,6 +15,7 @@ In the likely case that you encounter bugs, please contact me via [email](mailto
 - Optional dependencies are:
     - For reading [measurement sets](https://casa.nrao.edu/Memos/229.html), install [python-casacore](https://github.com/casacore/python-casacore).
     - For reading and writing FITS files: astropy.
+    - Some operators support [jax](https://github.com/google/jax).
 
 ## Related publications
 
