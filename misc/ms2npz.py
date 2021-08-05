@@ -18,6 +18,7 @@ if __name__ == "__main__":
     parser.add_argument("--ch-begin", type=int)
     parser.add_argument("--ch-end", type=int)
     parser.add_argument("--ch-jump", type=int)
+    parser.add_argument("--ignore-flags", action="store_true")
     parser.add_argument("ms")
     parser.add_argument(
         "polarization_mode",
@@ -35,6 +36,7 @@ if __name__ == "__main__":
         args.spectral_window,
         args.polarization_mode,
         slice(args.ch_begin, args.ch_end, args.ch_jump),
+        args.ignore_flags
     )
     for ifield, oo in enumerate(obs):
         fname = join(args.output_folder, f"{name}field{ifield}.npz")

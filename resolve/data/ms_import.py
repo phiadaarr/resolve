@@ -24,6 +24,7 @@ def ms2observations(
     spectral_window,
     polarizations="all",
     channel_slice=slice(None),
+    ignore_flags=False,
 ):
     """Read and convert a given measurement set into an array of :class:`Observation`
 
@@ -50,6 +51,9 @@ def ms2observations(
     channel_slice : slice
         Slice of selected channels. Default: select all channels
         FIXME Select channels by indices
+    ignore_flags : bool
+        If True, the whole measurement set is imported irrespective of the
+        flags. Default is false.
 
     Returns
     -------
@@ -131,6 +135,7 @@ def ms2observations(
             pol_summation,
             with_calib_info,
             channel_slice,
+            ignore_flags,
         )
         vis[wgt == 0] = 0.0
         vis = _ms2resolve_transpose(vis)
@@ -167,6 +172,7 @@ def read_ms_i(
     pol_summation,
     with_calib_info,
     channel_slice,
+    ignore_flags,
 ):
     freq = np.array(freq)
     my_asserteq(freq.ndim, 1)
@@ -197,9 +203,7 @@ def read_ms_i(
         while start < nrow:
             print("First pass:", f"{(start/nrow*100):.1f}%", end="\r")
             stop = min(nrow, start + step)
-            tflags = t.getcol("FLAG", startrow=start, nrow=stop - start)[
-                ..., pol_indices
-            ]
+            tflags = _conditional_flags(t, start, stop, pol_indices, ignore_flags)
             twgt = t.getcol(weightcol, startrow=start, nrow=stop - start)[
                 ..., pol_indices
             ]
@@ -273,16 +277,15 @@ def read_ms_i(
                     tvis = tvis[active_rows[start:stop]]
                 tvis = tvis[:, active_channels]
 
-                tflags = t.getcol("FLAG", startrow=start, nrow=stop - start)[
-                    ..., pol_indices
-                ]
+                tflags = _conditional_flags(t, start, stop, pol_indices, ignore_flags)
                 if not allrows:
                     tflags = tflags[active_rows[start:stop]]
                 tflags = tflags[:, active_channels]
 
                 assert twgt.ndim == tflags.ndim == 3
                 assert tflags.dtype == np.bool
-                twgt = twgt * (~tflags)
+                if not ignore_flags:
+                    twgt = twgt * (~tflags)
                 if pol_summation:
                     assert twgt.shape[2] == 2
                     # Noise-weighted average
@@ -322,3 +325,10 @@ def ms_n_spectral_windows(ms):
     with ms_table(join(ms, "SPECTRAL_WINDOW")) as t:
         freq = t.getcol("CHAN_FREQ")
     return freq.shape[0]
+
+
+def _conditional_flags(table, start, stop, pol_indices, ignore):
+    tflags = table.getcol("FLAG", startrow=start, nrow=stop - start)[..., pol_indices]
+    if ignore:
+        tflags = np.zeros_like(tflags)
+    return tflags
