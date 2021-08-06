@@ -19,6 +19,7 @@ if __name__ == "__main__":
     parser.add_argument("--ch-end", type=int)
     parser.add_argument("--ch-jump", type=int)
     parser.add_argument("--ignore-flags", action="store_true")
+    parser.add_argument("--autocorrelations-only", action="store_true")
     parser.add_argument("ms")
     parser.add_argument(
         "polarization_mode",
@@ -39,6 +40,13 @@ if __name__ == "__main__":
         args.ignore_flags
     )
     for ifield, oo in enumerate(obs):
-        fname = join(args.output_folder, f"{name}field{ifield}.npz")
+        if args.autocorrelations_only:
+            oo = oo.restrict_to_autocorrelations()
+            auto = "autocorrelationsonly"
+        else:
+            auto = ""
+        fname = join(args.output_folder, f"{name}field{ifield}{args.data_column}{auto}.npz")
         print(f"Save {fname}")
         oo.save(fname, args.compress)
+        if oo.vis.size == 0:
+            print(f"WARNING: {fname} is empty")

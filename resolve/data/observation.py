@@ -433,6 +433,10 @@ class Observation(BaseObservation):
         pol = self._polarization.restrict_to_stokes_i()
         return Observation(self._antpos, vis, wgt, pol, self._freq, self._direction)
 
+    def restrict_to_autocorrelations(self):
+        slc = self._antpos.ant1 == self._antpos.ant2
+        return self[slc]
+
     def move_time(self, t0):
         antpos = self._antpos.move_time(t0)
         return Observation(
