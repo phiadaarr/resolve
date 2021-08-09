@@ -78,7 +78,7 @@ def get_filament_prior(domain):
 
     # infer time a
     # A_operator in harmonic space
-    A_operator_scalar = ift.LognormalTransform(0.05, 0.025, 'time_a', 0).ducktape('time_a')
+    A_operator_scalar = ift.LognormalTransform(0.05, 0.025, 'time_a', 0)
     ContractionOp_adj = ift.ContractionOperator(harmonic_space, None).adjoint
     A_operator = ContractionOp_adj(A_operator_scalar)
 
@@ -96,7 +96,7 @@ def get_filament_prior(domain):
 
     Propagator_h = K_values_squared_exp(Hbar_half_operator_exp)
 
-    Psi_1h = Propagator_h(Psi_0h)
+    Psi_1h = Propagator_h * Psi_0h
     Psi_1 = ifft(Psi_1h)
 
     '''
