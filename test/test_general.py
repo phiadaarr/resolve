@@ -309,9 +309,11 @@ def test_randomonmaster():
 def test_mfweighting():
     nrow = 100
     nchan = 4
-    effuv = ift.random.current_rng().random((nrow, nchan))
-    dom = ift.UnstructuredDomain(nchan), ift.RGSpace(npix, 2 * np.max(effuv) / npix)
-    op = rve.MfWeightingInterpolation(effuv[None], dom)
+    npol = 1
+    effuv = ift.random.current_rng().random((npol, nrow, nchan))
+    effuv = ift.makeField([ift.UnstructuredDomain(ii) for ii in effuv.shape], effuv)
+    dom = ift.UnstructuredDomain(nchan), ift.RGSpace(npix, 2 * np.max(effuv.val) / npix)
+    op = rve.MfWeightingInterpolation(effuv, dom)
     ift.extra.check_linear_operator(op)
 
 

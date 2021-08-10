@@ -97,7 +97,7 @@ class MfWeightingInterpolation(ift.LinearOperator):
         # FIXME Try to unify all those operators which loop over freq dimension
         self._ops = []
         for ii in range(nfreq):
-            op = ift.LinearInterpolator(domain[1], eff_uvw[:, :, ii])
+            op = ift.LinearInterpolator(domain[1], eff_uvw.val[:, :, ii])
             self._ops.append(op)
         my_asserteq(self.target.shape[0], 1)
 
