@@ -1,29 +1,36 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright(C) 2013-2020 Max-Planck-Society
+# Copyright(C) 2013-2021 Max-Planck-Society
 # Authors: Philipp Frank, Philipp Arras, Philipp Haim
 
 import numpy as np
 
 import nifty8 as ift
 
-from ..util import my_asserteq
+from ..util import my_assert, my_assert_isinstance, my_asserteq
+from .irg_space import IRGSpace
 
 
 class WienerIntegrations(ift.LinearOperator):
-    def __init__(self, freqdomain, imagedomain):
-        # FIXME Write interface checks
-        self._target = ift.makeDomain((freqdomain, imagedomain))
-        dom = list(self._target)
-        dom = ift.UnstructuredDomain((2, freqdomain.size - 1)), imagedomain
+    """Operator that performs the integrations necessary for an integrated
+    Wiener process.
+
+    Parameters
+    ----------
+    time_domain : IRGSpace
+        Domain that contains the temporal information of the process.
+
+    remaining_domain : DomainTuple or Domain
+        All integrations are handled independently for this domain.
+    """
+    def __init__(self, time_domain, remaining_domain):
+        my_assert_isinstance(time_domain, IRGSpace)
+        self._target = ift.makeDomain((time_domain, remaining_domain))
+        dom = ift.UnstructuredDomain((2, time_domain.size - 1)), remaining_domain
         self._domain = ift.makeDomain(dom)
-        self._volumes = freqdomain.dvol[:, None, None]
+        self._volumes = time_domain.dvol[:, None, None]
         self._capability = self.TIMES | self.ADJOINT_TIMES
 
     def apply(self, x, mode):
-        # FIXME If it turns out that this operator is a performance
-        # bottleneck we can try implement it in parallel in C++. But
-        # it may be hard to achieve good scaling because I think it
-        # becomes memory bound quickly.
         self._check_input(x, mode)
         first, second = (0,), (1,)
         from_second = (slice(1, None),)
@@ -50,7 +57,7 @@ class WienerIntegrations(ift.LinearOperator):
 
 def IntWProcessInitialConditions(a0, b0, wfop):
     for op in [a0, b0, wfop]:
-        ift.is_operator(op)
+        my_assert(ift.is_operator(op))
     my_asserteq(a0.target, b0.target, ift.makeDomain(wfop.target[1]))
     bc = _FancyBroadcast(wfop.target)
     factors = ift.full(wfop.target[0], 0)
