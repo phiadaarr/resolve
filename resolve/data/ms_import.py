@@ -123,9 +123,17 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window,
 
     auxtables = {}
     with ms_table(join(ms, "ANTENNA")) as t:
-        keys = ["NAME", "STATION", "TYPE", "MOUNT", "POSITION", "OFFSET",
-                "DISH_DIAMETER"]
+        keys = ["NAME", "STATION", "TYPE", "MOUNT", "POSITION", "OFFSET", "DISH_DIAMETER"]
         auxtables["ANTENNA"] = AuxiliaryTable({kk: t.getcol(kk) for kk in keys})
+    with ms_table(join(ms, "FIELD")) as t:
+        keys = ["NAME", "CODE", "TIME", "NUM_POLY", "DELAY_DIR", "PHASE_DIR", "REFERENCE_DIR",
+                "SOURCE_ID"]
+        auxtables["FIELD"] = AuxiliaryTable({kk: t.getcol(kk) for kk in keys})
+    with ms_table(join(ms, "SPECTRAL_WINDOW")) as t:
+        keys = ["NAME", "REF_FREQUENCY", "CHAN_FREQ", "CHAN_WIDTH", "MEAS_FREQ_REF", "EFFECTIVE_BW",
+                "RESOLUTION", "TOTAL_BANDWIDTH", "NET_SIDEBAND", "IF_CONV_CHAIN", "FREQ_GROUP",
+                "FREQ_GROUP_NAME"]
+        auxtables["SPECTRAL_WINDOW"] = AuxiliaryTable({kk: t.getcol(kk) for kk in keys})
 
     # FIXME Determine which observation is calibration observation
     # FIXME Import name of source
