@@ -63,7 +63,11 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window,
     """
     if ms[-1] == "/":
         ms = ms[:-1]
-    if not isdir(ms) or splitext(ms)[1].lower() != ".ms":
+    if not isdir(ms):
+        raise RuntimeError
+    if ms == ".":
+        ms = os.getcwd()
+    if splitext(ms)[1].lower() != ".ms":
         raise RuntimeError
     if isinstance(polarizations, str):
         polarizations = [polarizations]
