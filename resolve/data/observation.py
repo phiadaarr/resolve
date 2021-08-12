@@ -487,6 +487,9 @@ class Observation(BaseObservation):
     def antenna_positions(self):
         return self._antpos
 
+    def auxiliary_table(name):
+        return self._auxiliary_tables[name]
+
     def effective_uvw(self):
         out = np.einsum("ij,k->jik", self.uvw, self._freq / SPEEDOFLIGHT)
         my_asserteq(out.shape, (3, self.nrow, self.nfreq))
