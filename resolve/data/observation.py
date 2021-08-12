@@ -2,16 +2,17 @@
 # Copyright(C) 2019-2021 Max-Planck-Society
 # Author: Philipp Arras
 
+import nifty8 as ift
 import numpy as np
 
-import nifty8 as ift
-
-from .antenna_positions import AntennaPositions
 from ..constants import SPEEDOFLIGHT
-from .direction import Direction, Directions
 from ..mpi import onlymaster
+from ..util import (compare_attributes, my_assert, my_assert_isinstance,
+                    my_asserteq)
+from .antenna_positions import AntennaPositions
+from .auxiliary_table import AuxiliaryTable
+from .direction import Direction, Directions
 from .polarization import Polarization
-from ..util import compare_attributes, my_assert, my_assert_isinstance, my_asserteq
 
 
 class BaseObservation:
@@ -157,7 +158,7 @@ class BaseObservation:
         return NotImplementedError
 
     def __eq__(self, other):
-        if not isinstance(other, self.__class__):
+        if not isinstance(other, type(self)):
             return False
         if (
             self._vis.dtype != other._vis.dtype
@@ -268,13 +269,15 @@ class Observation(BaseObservation):
         Contains the measured frequencies. Shape (n_channels)
     direction : Direction
         Direction information of the data set.
+    auxiliary_tables : dict
+        Dictionary of auxiliary tables. Default: None.
 
     Note
     ----
     vis and weight must have the same shape.
     """
 
-    def __init__(self, antenna_positions, vis, weight, polarization, freq, direction):
+    def __init__(self, antenna_positions, vis, weight, polarization, freq, direction, auxiliary_tables=None):
         nrows = len(antenna_positions)
         my_assert_isinstance(direction, Direction)
         my_assert_isinstance(polarization, Polarization)
@@ -304,8 +307,15 @@ class Observation(BaseObservation):
         self._freq = freq
         self._direction = direction
 
-        self._eq_attributes = "_direction", "_polarization", "_freq", "_antpos", "_vis", "_weight"
+        if auxiliary_tables is not None:
+            my_assert_isinstance(auxiliary_tables, dict)
+            for kk, vv in auxiliary_tables.items():
+                my_assert_isinstance(vv, AuxiliaryTable)
+                my_assert_isinstance(kk, str)
+        self._auxiliary_tables = auxiliary_tables
 
+        self._eq_attributes = ("_direction", "_polarization", "_freq",
+                               "_antpos", "_vis", "_weight", "_auxiliary_tables")
 
     @onlymaster
     def save(self, file_name, compress):
@@ -320,6 +330,10 @@ class Observation(BaseObservation):
             if vv is None:
                 vv = np.array([])
             dct[f"antpos{ii}"] = vv
+        if self._auxiliary_tables is not None:
+            for kk, auxtable in self._auxiliary_tables.items():
+                for ii, elem in enumerate(auxtable.to_list()):
+                    dct[f"auxtable_{kk}_{ii}"] = elem
         f = np.savez_compressed if compress else np.savez
         f(file_name, **dct)
 
@@ -332,6 +346,22 @@ class Observation(BaseObservation):
             if val.size == 0:
                 val = None
             antpos.append(val)
+
+        # Load auxtables
+        keys = set(kk.split("_")[1] for kk in dct.keys() if kk[:8] == "auxtable")
+        if len(keys) == 0:
+            auxtables = None
+        else:
+            auxtables = {}
+            for kk in keys:
+                ii = 0
+                inp = []
+                while f"auxtable_{kk}_{ii}" in dct.keys():
+                    inp.append(dct[f"auxtable_{kk}_{ii}"])
+                    ii += 1
+                auxtables[kk] = AuxiliaryTable.from_list(inp)
+        # /Load auxtables
+
         pol = Polarization.from_list(dct["polarization"])
         direction = Direction.from_list(dct["direction"])
         slc = slice(None) if lo_hi_index is None else slice(*lo_hi_index)
@@ -343,6 +373,7 @@ class Observation(BaseObservation):
             pol,
             dct["freq"][slc],
             direction,
+            auxtables
         )
 
     def flags_to_nan(self):

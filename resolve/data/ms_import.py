@@ -8,6 +8,7 @@ import numpy as np
 
 from ..util import my_assert, my_assert_isinstance, my_asserteq
 from .antenna_positions import AntennaPositions
+from .auxiliary_table import AuxiliaryTable
 from .direction import Direction
 from .observation import Observation
 from .polarization import Polarization
@@ -120,6 +121,12 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window,
             dirs.append(Direction(pc[0], equinox))
         dirs = tuple(dirs)
 
+    auxtables = {}
+    with ms_table(join(ms, "ANTENNA")) as t:
+        keys = ["NAME", "STATION", "TYPE", "MOUNT", "POSITION", "OFFSET",
+                "DISH_DIAMETER"]
+        auxtables["ANTENNA"] = AuxiliaryTable({kk: t.getcol(kk) for kk in keys})
+
     # FIXME Determine which observation is calibration observation
     # FIXME Import name of source
     observations = []
@@ -140,7 +147,9 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window,
         vis = _ms2resolve_transpose(vis)
         wgt = _ms2resolve_transpose(wgt)
         antpos = AntennaPositions(uvw, ant1, ant2, time)
-        observations.append(Observation(antpos, vis, wgt, polobj, freq_out, direction))
+        obs = Observation(antpos, vis, wgt, polobj, freq_out, direction,
+                          auxiliary_tables=auxtables)
+        observations.append(obs)
     return observations
 
 
