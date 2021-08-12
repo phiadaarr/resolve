@@ -20,7 +20,9 @@ if __name__ == "__main__":
     parser.add_argument("--ch-end", type=int)
     parser.add_argument("--ch-jump", type=int)
     parser.add_argument("--ignore-flags", action="store_true")
-    parser.add_argument("--autocorrelations-only", action="store_true")
+    parser.add_argument("--autocorrelations-only", action="store_true",
+            help=("If this flag is set, all autocorrelations are imported "
+                "irrespective of whether they are flagged or not."))
     parser.add_argument("ms")
     parser.add_argument(
         "polarization_mode",
