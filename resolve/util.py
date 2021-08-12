@@ -28,20 +28,46 @@ def my_assert_isinstance(*args):
 
 
 def compare_attributes(obj0, obj1, attribute_list):
-    for a in attribute_list:
-        compare = getattr(obj0, a) != getattr(obj1, a)
-        if type(compare) is bool:
-            if compare:
-                return False
-            continue
-        if isinstance(compare, ift.MultiField):
-            for vv in compare.val.values():
-                if vv.any():
-                    return False
-            continue
-        if compare.any():
-            return False
-    return True
+    return all(_fancy_equal(getattr(obj0, a), getattr(obj1, a))
+               for a in attribute_list)
+
+
+def _fancy_equal(o1, o2):
+    if not _types_equal(o1, o2):
+        return False
+
+    # Turn MultiField into dict
+    if isinstance(o1, ift.MultiField):
+        o1, o2 = o1.val, o2.val
+
+    # Compare dicts
+    if isinstance(o1, dict):
+        return _deep_equal(o1, o2)
+
+    # Compare simple objects and np.ndarrays
+    return _compare_simple_or_array(o1, o2)
+
+
+def _deep_equal(a, b):
+    if not isinstance(a, dict) or not isinstance(b, dict):
+        raise TypeError
+
+    if a.keys() != b.keys():
+        return False
+
+    return all(_compare_simple_or_array(a[kk], b[kk]) for kk in a.keys())
+
+
+def _compare_simple_or_array(a, b):
+    equal = a == b
+    try:
+        return bool(equal)
+    except ValueError:
+        return equal.all()
+
+
+def _types_equal(a, b):
+    return type(a) == type(b)
 
 
 class Reshaper(ift.LinearOperator):

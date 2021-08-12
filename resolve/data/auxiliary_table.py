@@ -19,7 +19,7 @@ class AuxiliaryTable:
             my_asserteq(nrow, len(lst))
             my_asserteq(type(elem) for elem in lst)
         self._dct = inp_dict
-        self._eq_attributes = [self._dct]
+        self._eq_attributes = "_dct",
 
     def __eq__(self, other):
         if not isinstance(other, type(self)):
