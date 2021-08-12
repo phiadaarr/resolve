@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright(C) 2019-2020 Max-Planck-Society
 # Author: Philipp Arras

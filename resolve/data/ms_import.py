@@ -1,15 +1,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright(C) 2019-2021 Max-Planck-Society
 
+import os
 from os.path import isdir, join, splitext
 
 import numpy as np
 
+from ..util import my_assert, my_assert_isinstance, my_asserteq
 from .antenna_positions import AntennaPositions
 from .direction import Direction
 from .observation import Observation
 from .polarization import Polarization
-from ..util import my_assert, my_asserteq, my_assert_isinstance
 
 
 def ms_table(path):
@@ -17,15 +18,9 @@ def ms_table(path):
     return table(path, readonly=True, ack=False)
 
 
-def ms2observations(
-    ms,
-    data_column,
-    with_calib_info,
-    spectral_window,
-    polarizations="all",
-    channel_slice=slice(None),
-    ignore_flags=False,
-):
+def ms2observations(ms, data_column, with_calib_info, spectral_window,
+                    polarizations="all", channel_slice=slice(None),
+                    ignore_flags=False):
     """Read and convert a given measurement set into an array of :class:`Observation`
 
     If WEIGHT_SPECTRUM is available this column is used for weighting.
@@ -162,18 +157,8 @@ def _determine_weighting(t):
     return fullwgt, weightcol
 
 
-def read_ms_i(
-    name,
-    data_column,
-    freq,
-    field,
-    spectral_window,
-    pol_indices,
-    pol_summation,
-    with_calib_info,
-    channel_slice,
-    ignore_flags,
-):
+def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices,
+              pol_summation, with_calib_info, channel_slice, ignore_flags):
     freq = np.array(freq)
     my_asserteq(freq.ndim, 1)
     my_assert(len(freq) > 0)
