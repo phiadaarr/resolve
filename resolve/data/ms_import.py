@@ -242,7 +242,7 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices,
             start = stop
         nrealrows, nrealchan = np.sum(active_rows), np.sum(active_channels)
         if nrealrows == 0 or nrealchan == 0:
-            raise RuntimeError("Empty data set")
+            return None
 
         # Create output arrays
         if pol_summation:

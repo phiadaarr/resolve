@@ -44,6 +44,8 @@ if __name__ == "__main__":
         args.ignore_flags
     )
     for ifield, oo in enumerate(obs):
+        if oo is None:
+            continue
         if args.autocorrelations_only:
             oo = oo.restrict_to_autocorrelations()
             auto = "autocorrelationsonly"
