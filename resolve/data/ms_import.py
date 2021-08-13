@@ -210,9 +210,7 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices,
             print("First pass:", f"{(start/nrow*100):.1f}%", end="\r")
             stop = min(nrow, start + step)
             tflags = _conditional_flags(t, start, stop, pol_indices, ignore_flags)
-            twgt = t.getcol(weightcol, startrow=start, nrow=stop - start)[
-                ..., pol_indices
-            ]
+            twgt = t.getcol(weightcol, startrow=start, nrow=stop - start)[..., pol_indices]
             if channel_slice != slice(None):
                 tchslcflags = np.ones_like(tflags)
                 tchslcflags[:, channel_slice] = False
