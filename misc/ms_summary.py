@@ -28,3 +28,8 @@ if __name__ == "__main__":
     print("NAME REFERNCE_DIR DELAY_DIR PHASE_DIR")
     for nn, rd, dd, pd in zip(name, refdir, deldir, phdir):
         print(nn, rd, dd, pd)
+
+    with rve.ms_table(join(args.ms, "POINTING")) as t:
+        print(t.getcol("ANTENNA_ID"))
+        print(t.getcol("TIME"))
+        print(t.getcol("DIRECTION").shape)

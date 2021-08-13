@@ -84,8 +84,6 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window,
     my_assert_isinstance(spectral_window, int)
     my_assert(spectral_window >= 0)
     my_assert(spectral_window < ms_n_spectral_windows(ms))
-    with ms_table(join(ms, "SPECTRAL_WINDOW")) as t:
-        freq = t.getcol("CHAN_FREQ")[spectral_window]
 
     # Polarization
     with ms_table(join(ms, "POLARIZATION")) as t:
@@ -110,11 +108,15 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window,
 
     # Field
     with ms_table(join(ms, "FIELD")) as t:
-        equinox = t.coldesc("REFERENCE_DIR")["desc"]["keywords"]["MEASINFO"]["Ref"]
-        equinox = str(equinox)[1:]
         # FIXME Put proper support for equinox here
-        if equinox == "1950_VLA":
-            equinox = 1950
+        # FIXME Eventually get rid of this and use auxiliary table
+        try:
+            equinox = t.coldesc("REFERENCE_DIR")["desc"]["keywords"]["MEASINFO"]["Ref"]
+            equinox = str(equinox)[1:]
+            if equinox == "1950_VLA":
+                equinox = 1950
+        except KeyError:
+            equinox = 2000
         dirs = []
         for pc in t.getcol("REFERENCE_DIR"):
             my_asserteq(pc.shape, (1, 2))
@@ -125,37 +127,32 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window,
     with ms_table(join(ms, "ANTENNA")) as t:
         keys = ["NAME", "STATION", "TYPE", "MOUNT", "POSITION", "OFFSET", "DISH_DIAMETER"]
         auxtables["ANTENNA"] = AuxiliaryTable({kk: t.getcol(kk) for kk in keys})
-    with ms_table(join(ms, "FIELD")) as t:
-        keys = ["NAME", "CODE", "TIME", "NUM_POLY", "DELAY_DIR", "PHASE_DIR", "REFERENCE_DIR",
-                "SOURCE_ID"]
-        auxtables["FIELD"] = AuxiliaryTable({kk: t.getcol(kk) for kk in keys})
     with ms_table(join(ms, "SPECTRAL_WINDOW")) as t:
         keys = ["NAME", "REF_FREQUENCY", "CHAN_FREQ", "CHAN_WIDTH", "MEAS_FREQ_REF", "EFFECTIVE_BW",
                 "RESOLUTION", "TOTAL_BANDWIDTH", "NET_SIDEBAND", "IF_CONV_CHAIN", "FREQ_GROUP",
                 "FREQ_GROUP_NAME"]
-        auxtables["SPECTRAL_WINDOW"] = AuxiliaryTable({kk: t.getcol(kk) for kk in keys})
+        dct = {kk: t.getcol(kk, startrow=spectral_window, nrow=1) for kk in keys}
+        auxtables["SPECTRAL_WINDOW"] = AuxiliaryTable(dct)
 
     # FIXME Determine which observation is calibration observation
-    # FIXME Import name of source
     observations = []
     for ifield, direction in enumerate(dirs):
-        uvw, ant1, ant2, time, freq_out, vis, wgt = read_ms_i(
-            ms,
-            data_column,
-            freq,
-            ifield,
-            spectral_window,
-            pol_ind,
-            pol_summation,
-            with_calib_info,
-            channel_slice,
-            ignore_flags,
-        )
-        vis[wgt == 0] = 0.0
-        vis = _ms2resolve_transpose(vis)
-        wgt = _ms2resolve_transpose(wgt)
-        antpos = AntennaPositions(uvw, ant1, ant2, time)
-        obs = Observation(antpos, vis, wgt, polobj, freq_out, direction,
+        with ms_table(join(ms, "FIELD")) as t:
+            keys = ["NAME", "CODE", "TIME", "NUM_POLY", "DELAY_DIR", "PHASE_DIR", "REFERENCE_DIR",
+                    "SOURCE_ID"]
+            dct = {kk: t.getcol(kk, startrow=ifield, nrow=1) for kk in keys}
+            auxtables["FIELD"] = AuxiliaryTable(dct)
+
+        mm = read_ms_i(ms, data_column, ifield, spectral_window, pol_ind, pol_summation,
+                       with_calib_info, channel_slice, ignore_flags,)
+        if mm is None:
+            print(f"{ms}, field #{ifield} is empty or fully flagged")
+            observations.append(None)
+            continue
+        if mm["ptg"] is not None:
+            raise NotImplementedError
+        antpos = AntennaPositions(mm["uvw"], mm["ant1"], mm["ant2"], mm["time"])
+        obs = Observation(antpos, mm["vis"], mm["wgt"], polobj, mm["freq"], direction,
                           auxiliary_tables=auxtables)
         observations.append(obs)
     return observations
@@ -178,12 +175,18 @@ def _determine_weighting(t):
     return fullwgt, weightcol
 
 
-def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices,
-              pol_summation, with_calib_info, channel_slice, ignore_flags):
-    freq = np.array(freq)
-    my_asserteq(freq.ndim, 1)
+def read_ms_i(name, data_column, field, spectral_window, pol_indices, pol_summation,
+              with_calib_info, channel_slice, ignore_flags):
+
+    # Freq
+    with ms_table(join(name, "SPECTRAL_WINDOW")) as t:
+        freq = t.getcol("CHAN_FREQ", startrow=spectral_window, nrow=1)
+    my_asserteq(freq.ndim, 2)
+    my_asserteq(freq.shape[0], 1)
+    freq = freq[0]
     my_assert(len(freq) > 0)
     nchan = len(freq)
+
     assert pol_indices is None or isinstance(pol_indices, list)
     if pol_indices is None:
         pol_indices = slice(None)
@@ -242,7 +245,11 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices,
         if nrealrows == 0 or nrealchan == 0:
             return None
 
-        # Create output arrays
+    # Freq
+    freq = freq[active_channels]
+
+    # Vis, wgt, (flags)
+    with ms_table(name) as t:
         if pol_summation:
             npol = 1
         else:
@@ -263,9 +270,8 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices,
             if realstop > realstart:
                 allrows = stop - start == realstop - realstart
 
-                twgt = t.getcol(weightcol, startrow=start, nrow=stop - start)[
-                    ..., pol_indices
-                ]
+                # Weights
+                twgt = t.getcol(weightcol, startrow=start, nrow=stop - start)[..., pol_indices]
                 assert twgt.dtype == np.float32
                 if not fullwgt:
                     twgt = np.repeat(twgt[:, None], nchan, axis=1)
@@ -302,19 +308,45 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices,
                 wgt[realstart:realstop] = twgt
 
             start, realstart = stop, realstop
-        uvw = t.getcol("UVW")[active_rows]
-        if with_calib_info:
-            ant1 = np.ascontiguousarray(t.getcol("ANTENNA1")[active_rows])
-            ant2 = np.ascontiguousarray(t.getcol("ANTENNA2")[active_rows])
-            time = np.ascontiguousarray(t.getcol("TIME")[active_rows])
-        else:
-            ant1 = ant2 = time = None
     print("Selected:", 10 * " ")
     print(f"  shape: {vis.shape}")
     print(f"  flagged: {(1.0-np.sum(wgt!=0)/wgt.size)*100:.1f} %")
-    freq = freq[active_channels]
+
+    # UVW
+    with ms_table(name) as t:
+        uvw = np.ascontiguousarray(t.getcol("UVW")[active_rows])
+
+    # Calibration info
+    if with_calib_info:
+        with ms_table(name) as t:
+            ant1 = np.ascontiguousarray(t.getcol("ANTENNA1")[active_rows])
+            ant2 = np.ascontiguousarray(t.getcol("ANTENNA2")[active_rows])
+            time = np.ascontiguousarray(t.getcol("TIME")[active_rows])
+    else:
+        ant1 = ant2 = time = None
+
+    # Pointing
+    with ms_table(join(name, "POINTING")) as t:
+        if t.nrows() == 0:
+            ptg = None
+        else:
+            ptg = np.empty((nrealrows, 1, 2), dtype=np.float64)
+            start, realstart = 0, 0
+            while start < nrow:
+                print("Second pass:", f"{(start/nrow*100):.1f}%", end="\r")
+                stop = min(nrow, start + step)
+                realstop = realstart + np.sum(active_rows[start:stop])
+                if realstop > realstart:
+                    allrows = stop - start == realstop - realstart
+                    tptg = t.getcol("DIRECTION", startrow=start, nrow=stop - start)
+                    tptg = tptg[active_rows[start:stop]]
+                    ptg[realstart:realstop] = tptg
+                start, realstart = stop, realstop
 
     my_asserteq(wgt.shape, vis.shape)
+    vis = np.ascontiguousarray(_ms2resolve_transpose(vis))
+    wgt = np.ascontiguousarray(_ms2resolve_transpose(wgt))
+    vis[wgt == 0] = 0.0
     return {"uvw": uvw, "ant1": ant1, "ant2": ant2, "time": time, "freq": freq, "vis": vis, "wgt": wgt, "ptg": ptg}
 
 
