@@ -333,7 +333,7 @@ class Observation(BaseObservation):
         if self._auxiliary_tables is not None:
             for kk, auxtable in self._auxiliary_tables.items():
                 for ii, elem in enumerate(auxtable.to_list()):
-                    dct[f"auxtable_{kk}_{ii}"] = elem
+                    dct[f"auxtable_{kk}_{ii:>04}"] = elem
         f = np.savez_compressed if compress else np.savez
         f(file_name, **dct)
 
@@ -348,7 +348,7 @@ class Observation(BaseObservation):
             antpos.append(val)
 
         # Load auxtables
-        keys = set(kk.split("_")[1] for kk in dct.keys() if kk[:8] == "auxtable")
+        keys = set(kk[9:-5] for kk in dct.keys() if kk[:9] == "auxtable_")
         if len(keys) == 0:
             auxtables = None
         else:
@@ -356,8 +356,8 @@ class Observation(BaseObservation):
             for kk in keys:
                 ii = 0
                 inp = []
-                while f"auxtable_{kk}_{ii}" in dct.keys():
-                    inp.append(dct[f"auxtable_{kk}_{ii}"])
+                while f"auxtable_{kk}_{ii:>04}" in dct.keys():
+                    inp.append(dct[f"auxtable_{kk}_{ii:>04}"])
                     ii += 1
                 auxtables[kk] = AuxiliaryTable.from_list(inp)
         # /Load auxtables
