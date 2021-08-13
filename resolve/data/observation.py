@@ -487,7 +487,7 @@ class Observation(BaseObservation):
     def antenna_positions(self):
         return self._antpos
 
-    def auxiliary_table(name):
+    def auxiliary_table(self, name):
         return self._auxiliary_tables[name]
 
     def effective_uvw(self):
