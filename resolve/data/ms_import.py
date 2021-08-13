@@ -329,8 +329,8 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices,
 
 def ms_n_spectral_windows(ms):
     with ms_table(join(ms, "SPECTRAL_WINDOW")) as t:
-        freq = t.getcol("CHAN_FREQ")
-    return freq.shape[0]
+        n_spectral_windows = t.nrows()
+    return n_spectral_windows
 
 
 def _conditional_flags(table, start, stop, pol_indices, ignore):
