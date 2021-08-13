@@ -275,19 +275,20 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices,
                     twgt = twgt[active_rows[start:stop]]
                 twgt = twgt[:, active_channels]
 
-                tvis = t.getcol(data_column, startrow=start, nrow=stop - start)[
-                    ..., pol_indices
-                ]
+                # Vis
+                tvis = t.getcol(data_column, startrow=start, nrow=stop - start)[..., pol_indices]
                 assert tvis.dtype == np.complex64
                 if not allrows:
                     tvis = tvis[active_rows[start:stop]]
                 tvis = tvis[:, active_channels]
 
+                # Flags
                 tflags = _conditional_flags(t, start, stop, pol_indices, ignore_flags)
                 if not allrows:
                     tflags = tflags[active_rows[start:stop]]
                 tflags = tflags[:, active_channels]
 
+                # Polarization summation
                 assert twgt.ndim == tflags.ndim == 3
                 assert tflags.dtype == np.bool
                 if not ignore_flags:
@@ -316,15 +317,7 @@ def read_ms_i(name, data_column, freq, field, spectral_window, pol_indices,
     freq = freq[active_channels]
 
     my_asserteq(wgt.shape, vis.shape)
-    return (
-        np.ascontiguousarray(uvw),
-        ant1,
-        ant2,
-        time,
-        np.ascontiguousarray(freq),
-        np.ascontiguousarray(vis),
-        np.ascontiguousarray(wgt),
-    )
+    return {"uvw": uvw, "ant1": ant1, "ant2": ant2, "time": time, "freq": freq, "vis": vis, "wgt": wgt, "ptg": ptg}
 
 
 def ms_n_spectral_windows(ms):
