@@ -139,6 +139,7 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window,
             keys = ["NAME", "CODE", "TIME", "NUM_POLY", "DELAY_DIR", "PHASE_DIR", "REFERENCE_DIR",
                     "SOURCE_ID"]
             dct = {kk: t.getcol(kk, startrow=ifield, nrow=1) for kk in keys}
+            # FIXME Somehow not the correct field is loaded here
             auxtables["FIELD"] = AuxiliaryTable(dct)
 
         mm = read_ms_i(ms, data_column, ifield, spectral_window, pol_ind, pol_summation,
