@@ -15,9 +15,17 @@ if __name__ == "__main__":
     nspec = rve.ms_n_spectral_windows(args.ms)
     from casacore.tables import tablesummary
     tablesummary(args.ms)
-    print()
-    print(f"The data set has {nspec} spectral windows.")
-    print()
+
+    with rve.ms_table(join(args.ms, "SPECTRAL_WINDOW")) as t:
+        for ii in range(nspec):
+            print(f"Spectral window #{ii}")
+            chans = t.getcol("CHAN_FREQ", startrow=ii, nrow=1)
+
+            print(f"Shape: {chans.shape}")
+            print(f"f1-f0: {(chans[0][1]-chans[0][0])/1e6} MHz")
+            print("Frequencies (GHz)")
+            print(chans/1e9)
+            print()
 
     with rve.ms_table(join(args.ms, "FIELD")) as t:
         name = t.getcol("NAME")
