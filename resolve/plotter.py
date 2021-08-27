@@ -203,7 +203,8 @@ def _plot_nifty(state, op, kwargs, fname):
                 sc.add(op.force(ss))
             p = ift.Plot()
             p.add(sc.mean, **kwargs)
-            p.add(sc.var.sqrt() / sc.mean)
+            if len(state) > 1:
+                p.add(sc.var.sqrt() / sc.mean)
             p.output(nx=2, ny=1, xsize=2 * UNIT, ysize=UNIT, name=fname)
     else:
         pos = state if isinstance(state, ift.MultiField) else state.mean
