@@ -83,12 +83,15 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window,
     my_assert(spectral_window >= 0)
     my_assert(spectral_window < ms_n_spectral_windows(ms))
 
+    with ms_table(join(ms, "DATA_DESCRIPTION")) as t:
+        polid = t.getcol("POLARIZATION_ID")[spectral_window]
+
     # Polarization
     with ms_table(join(ms, "POLARIZATION")) as t:
-        pol = t.getcol("CORR_TYPE")
+        pol = t.getcol("CORR_TYPE", startrow=polid, nrow=1)
         my_asserteq(pol.ndim, 2)
         my_asserteq(pol.shape[0], 1)
-        pol = list(pol[0])  # Not clear what the first dimension is used for
+        pol = list(pol[0])
         polobj = Polarization(pol)
         if polarizations[0] == "stokesi":
             polarizations = ["LL", "RR"] if polobj.circular() else ["XX", "YY"]
