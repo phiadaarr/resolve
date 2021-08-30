@@ -62,7 +62,7 @@ if __name__ == "__main__":
             raise RuntimeError("Channels are not sorted")
         channels = slice(begin, end)
     else:
-        channels = slice(args.ch_begin, args.ch_end, args.ch_jump),
+        channels = slice(args.ch_begin, args.ch_end, args.ch_jump)
 
     makedirs(args.output_folder, exist_ok=True)
     name = splitext(split(args.ms)[1])[0]

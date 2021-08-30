@@ -13,7 +13,8 @@ class AuxiliaryTable:
         nrow = None
         for kk, lst in inp_dict.items():
             my_assert_isinstance(kk, str)
-            my_assert_isinstance(lst, (list, np.ndarray))
+            if not isinstance(lst, (list, np.ndarray)):
+                raise RuntimeError(f"{kk} neither list nor np.ndarray")
             if nrow is None:
                 nrow = len(lst)
             my_asserteq(nrow, len(lst))
@@ -34,6 +35,15 @@ class AuxiliaryTable:
             else:
                 s.append(f"  {kk:<20} {len(lst):>10} {str(type(lst[0])):>15}")
         return "\n".join(s)
+
+    def __getitem__(self, key):
+        return self._dct[key]
+
+    def __contains__(self, key):
+        return key in self._dct
+
+    def row(self, i):
+        return AuxiliaryTable({kk: vv[i:i+1] for kk, vv in self._dct.items()})
 
     def to_list(self):
         return [list(self._dct.keys())] + [ss for ss in self._dct.values()]

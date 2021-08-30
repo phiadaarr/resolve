@@ -42,10 +42,7 @@ freqdomain = rve.IRGSpace(np.linspace(1000, 1050, num=10))
 FACETS = [(1, 1), (2, 2), (2, 1), (1, 4)]
 
 
-@pmp(
-    "ms",
-    ("CYG-ALL-2052-2MHZ", "CYG-D-6680-64CH-10S", "AM754_A030124_flagged", "1052735056"),
-)
+@pmp("ms", ("CYG-ALL-2052-2MHZ", "CYG-D-6680-64CH-10S", "AM754_A030124_flagged"))
 @pmp("with_calib_info", (False, True))
 @pmp("compress", (False, True))
 def test_save_and_load_observation(ms, with_calib_info, compress):
@@ -58,11 +55,11 @@ def test_save_and_load_observation(ms, with_calib_info, compress):
             assert ob == ob1
 
 
-@pmp("slc", [slice(3), slice(14, 15), slice(None, None, None), slice(None, None, 5)])
+@pmp("slc", [slice(3), slice(14, 15), [14, 15], slice(None, None, None), slice(None, None, 5)])
 def test_sliced_readin(slc):
     ms = f"{direc}CYG-D-6680-64CH-10S.ms"
     obs0 = rve.ms2observations(ms, "DATA", False, 0)[0]
-    obs = rve.ms2observations(ms, "DATA", False, 0, channel_slice=slc)[0]
+    obs = rve.ms2observations(ms, "DATA", False, 0, channels=slc)[0]
     ch0 = obs0.weight.val[..., slc]
     ch = obs.weight.val
     assert ch0.ndim == 3

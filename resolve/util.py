@@ -60,10 +60,10 @@ def _deep_equal(a, b):
 
 def _compare_simple_or_array(a, b):
     equal = a == b
-    try:
-        return bool(equal)
-    except ValueError:
-        return equal.all()
+    if isinstance(equal, np.ndarray):
+        return np.all(equal)
+    assert isinstance(equal, bool)
+    return equal
 
 
 def _types_equal(a, b):

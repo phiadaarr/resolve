@@ -19,9 +19,16 @@ def ms_table(path):
     return table(path, readonly=True, ack=False)
 
 
+def _pol_id(ms_path, spectral_window):
+    """Return id for indexing polarization table for a given spectral window."""
+    with ms_table(join(ms_path, "DATA_DESCRIPTION")) as t:
+        polid = t.getcol("POLARIZATION_ID")[spectral_window]
+    return polid
+
+
+
 def ms2observations(ms, data_column, with_calib_info, spectral_window,
-                    polarizations="all", channel_slice=slice(None),
-                    ignore_flags=False):
+                    polarizations="all", channels=slice(None), ignore_flags=False):
     """Read and convert a given measurement set into an array of :class:`Observation`
 
     If WEIGHT_SPECTRUM is available this column is used for weighting.
@@ -38,15 +45,15 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window,
         Reads in all information necessary for calibration, if True. If only
         imaging shall be performed, this can be set to False.
     spectral_window : int
-        Index of spectral window which shall be imported.
+        Index of spectral window that shall be imported.
     polarizations
         "all":     All polarizations are imported.
         "stokesi": Only LL/RR or XX/YY polarizations are imported.
         "stokesiavg": Only LL/RR or XX/YY polarizations are imported and averaged on the fly.
         List of strings: Strings can be "XX", "YY", "XY", "YX", "LL", "LR", "RL", "RR". The respective polarizations are loaded.
-    channel_slice : slice
-        Slice of selected channels. Default: select all channels
-        FIXME Select channels by indices
+    channels : slice or list
+        Select channels. Can be either a slice object or an index list. Default:
+        select all channels
     ignore_flags : bool
         If True, the whole measurement set is imported irrespective of the
         flags. Default is false.
@@ -58,95 +65,63 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window,
 
     Note
     ----
-    We cannot import multiple spectral windows into one Observation instance
+    Multiple spectral windows are not imported into one Observation instance
     because it is not guaranteed by the measurement set data structure that all
     baselines are present in all spectral windows.
     """
+    # Input checks
     if ms[-1] == "/":
         ms = ms[:-1]
     if not isdir(ms):
         raise RuntimeError
     if ms == ".":
         ms = os.getcwd()
-    if isinstance(polarizations, str):
-        polarizations = [polarizations]
-    if (
-        "stokesiavg" in polarizations
-        or "stokesi" in polarizations
-        or "all" in polarizations
-    ) and len(polarizations) > 1:
-        raise ValueError
-
-    # Spectral windows
-    my_assert_isinstance(channel_slice, slice)
+    if isinstance(polarizations, list):
+        for ll in polarizations:
+            my_assert(ll in ["XX", "YY", "XY", "YX", "LL", "LR", "RL", "RR"])
+        my_asserteq(len(set(polarizations)), len(polarizations))
+    else:
+        my_assert(polarizations in ["stokesi", "stokesiavg", "all"])
+    my_assert_isinstance(channels, (slice, list))
     my_assert_isinstance(spectral_window, int)
     my_assert(spectral_window >= 0)
     my_assert(spectral_window < ms_n_spectral_windows(ms))
-
-    with ms_table(join(ms, "DATA_DESCRIPTION")) as t:
-        polid = t.getcol("POLARIZATION_ID")[spectral_window]
+    # /Input checks
 
     # Polarization
     with ms_table(join(ms, "POLARIZATION")) as t:
-        pol = t.getcol("CORR_TYPE", startrow=polid, nrow=1)
-        my_asserteq(pol.ndim, 2)
-        my_asserteq(pol.shape[0], 1)
-        pol = list(pol[0])
+        pol = t.getcol("CORR_TYPE", startrow=_pol_id(ms, spectral_window), nrow=1)[0]
         polobj = Polarization(pol)
-        if polarizations[0] == "stokesi":
-            polarizations = ["LL", "RR"] if polobj.circular() else ["XX", "YY"]
-        if polarizations[0] == "stokesiavg":
+        if polarizations == "stokesiavg":
             pol_ind = polobj.stokes_i_indices()
             polobj = Polarization.trivial()
             pol_summation = True
-        elif polarizations[0] == "all":
+        elif polarizations == "all":
             pol_ind = None
             pol_summation = False
         else:
+            if polarizations == "stokesi":
+                polarizations = ["LL", "RR"] if polobj.circular() else ["XX", "YY"]
             polobj = polobj.restrict_by_name(polarizations)
             pol_ind = [polobj.to_str_list().index(ii) for ii in polarizations]
             pol_summation = False
 
-    # Field
-    with ms_table(join(ms, "FIELD")) as t:
-        # FIXME Put proper support for equinox here
-        # FIXME Eventually get rid of this and use auxiliary table
-        try:
-            equinox = t.coldesc("REFERENCE_DIR")["desc"]["keywords"]["MEASINFO"]["Ref"]
-            equinox = str(equinox)[1:]
-            if equinox == "1950_VLA":
-                equinox = 1950
-        except KeyError:
-            equinox = 2000
-        dirs = []
-        for pc in t.getcol("REFERENCE_DIR"):
-            my_asserteq(pc.shape, (1, 2))
-            dirs.append(Direction(pc[0], equinox))
-        dirs = tuple(dirs)
-
-    auxtables = {}
-    with ms_table(join(ms, "ANTENNA")) as t:
-        keys = ["NAME", "STATION", "TYPE", "MOUNT", "POSITION", "OFFSET", "DISH_DIAMETER"]
-        auxtables["ANTENNA"] = AuxiliaryTable({kk: t.getcol(kk) for kk in keys})
-    with ms_table(join(ms, "SPECTRAL_WINDOW")) as t:
-        keys = ["NAME", "REF_FREQUENCY", "CHAN_FREQ", "CHAN_WIDTH", "MEAS_FREQ_REF", "EFFECTIVE_BW",
-                "RESOLUTION", "TOTAL_BANDWIDTH", "NET_SIDEBAND", "IF_CONV_CHAIN", "FREQ_GROUP",
-                "FREQ_GROUP_NAME"]
-        dct = {kk: t.getcol(kk, startrow=spectral_window, nrow=1) for kk in keys}
-        auxtables["SPECTRAL_WINDOW"] = AuxiliaryTable(dct)
-
-    # FIXME Determine which observation is calibration observation
     observations = []
-    for ifield, direction in enumerate(dirs):
-        with ms_table(join(ms, "FIELD")) as t:
-            keys = ["NAME", "CODE", "TIME", "NUM_POLY", "DELAY_DIR", "PHASE_DIR", "REFERENCE_DIR",
-                    "SOURCE_ID"]
-            dct = {kk: t.getcol(kk, startrow=ifield, nrow=1) for kk in keys}
-            # FIXME Somehow not the correct field is loaded here
-            auxtables["FIELD"] = AuxiliaryTable(dct)
+    for ifield in range(ms_n_fields(ms)):
+        auxtables = {}
+        auxtables["ANTENNA"] = _import_aux_table(ms, "ANTENNA")
+        auxtables["STATE"] = _import_aux_table(ms, "STATE")
+        auxtables["SPECTRAL_WINDOW"] = _import_aux_table(ms, "SPECTRAL_WINDOW", row=spectral_window, skip=["ASSOC_NATURE"])
+        sf = _source_and_field_table(ms, spectral_window, ifield)
+        if sf is None:
+            print(f"Field {ifield} cannot be found in SOURCE table")
+            observations.append(None)
+            continue
+        auxtables = {**auxtables, **sf}
+        print(f"Work on Field {ifield}: {auxtables['SOURCE']['NAME'][0]}")
 
         mm = read_ms_i(ms, data_column, ifield, spectral_window, pol_ind, pol_summation,
-                       with_calib_info, channel_slice, ignore_flags,)
+                       with_calib_info, channels, ignore_flags)
         if mm is None:
             print(f"{ms}, field #{ifield} is empty or fully flagged")
             observations.append(None)
@@ -154,7 +129,7 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window,
         if mm["ptg"] is not None:
             raise NotImplementedError
         antpos = AntennaPositions(mm["uvw"], mm["ant1"], mm["ant2"], mm["time"])
-        obs = Observation(antpos, mm["vis"], mm["wgt"], polobj, mm["freq"], direction,
+        obs = Observation(antpos, mm["vis"], mm["wgt"], polobj, mm["freq"],
                           auxiliary_tables=auxtables)
         observations.append(obs)
     return observations
@@ -178,14 +153,12 @@ def _determine_weighting(t):
 
 
 def read_ms_i(name, data_column, field, spectral_window, pol_indices, pol_summation,
-              with_calib_info, channel_slice, ignore_flags):
+              with_calib_info, channels, ignore_flags):
 
     # Freq
     with ms_table(join(name, "SPECTRAL_WINDOW")) as t:
-        freq = t.getcol("CHAN_FREQ", startrow=spectral_window, nrow=1)
-    my_asserteq(freq.ndim, 2)
-    my_asserteq(freq.shape[0], 1)
-    freq = freq[0]
+        freq = t.getcol("CHAN_FREQ", startrow=spectral_window, nrow=1)[0]
+    my_asserteq(freq.ndim, 1)
     my_assert(len(freq) > 0)
     nchan = len(freq)
 
@@ -216,10 +189,11 @@ def read_ms_i(name, data_column, field, spectral_window, pol_indices, pol_summat
             stop = min(nrow, start + step)
             tflags = _conditional_flags(t, start, stop, pol_indices, ignore_flags)
             twgt = t.getcol(weightcol, startrow=start, nrow=stop - start)[..., pol_indices]
-            if channel_slice != slice(None):
-                tchslcflags = np.ones_like(tflags)
-                tchslcflags[:, channel_slice] = False
-                tflags = np.logical_or(tflags, tchslcflags)
+
+            tchslcflags = np.ones_like(tflags)
+            tchslcflags[:, channels] = False
+            tflags = np.logical_or(tflags, tchslcflags)
+
             if not fullwgt:
                 twgt = np.repeat(twgt[:, None], nchan, axis=1)
             my_asserteq(twgt.ndim, 3)
@@ -358,8 +332,43 @@ def ms_n_spectral_windows(ms):
     return n_spectral_windows
 
 
+def ms_n_fields(ms):
+    with ms_table(join(ms, "FIELD")) as t:
+        n = t.nrows()
+    return n
+
+
 def _conditional_flags(table, start, stop, pol_indices, ignore):
     tflags = table.getcol("FLAG", startrow=start, nrow=stop - start)[..., pol_indices]
     if ignore:
         tflags = np.zeros_like(tflags)
     return tflags
+
+
+def _import_aux_table(ms, table_name, row=None, skip=[]):
+    with ms_table(join(ms, table_name)) as t:
+        keys = filter(lambda s: s not in skip, t.colnames())
+        if row is None:
+            dct = {kk: t.getcol(kk) for kk in keys}
+        else:
+            dct = {kk: t.getcol(kk, startrow=row, nrow=1) for kk in keys}
+        aux_table = AuxiliaryTable(dct)
+    return aux_table
+
+
+def _source_and_field_table(ms, spectral_window, ifield):
+    source_table = _import_aux_table(ms, "SOURCE", skip=["POSITION", "TRANSITION", "REST_FREQUENCY",
+                                                         "SYSVEL", "SOURCE_MODEL", "PULSAR_ID"])
+    field_table = _import_aux_table(ms, "FIELD", row=ifield)
+    source_id = field_table["SOURCE_ID"][0]
+    ind = np.where(np.logical_and(source_table["SOURCE_ID"] == source_id,
+                                  np.logical_or(source_table["SPECTRAL_WINDOW_ID"] == spectral_window,
+                                                source_table["SPECTRAL_WINDOW_ID"] == -1)))[0]
+    if len(ind) == 0:
+        return None
+    elif len(ind) == 1:
+        ind = ind[0]
+    else:
+        raise RuntimeError
+
+    return {"SOURCE": source_table.row(ind), "FIELD": field_table}

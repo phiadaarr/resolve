@@ -267,8 +267,6 @@ class Observation(BaseObservation):
         Polarization information of the data set.
     freq : numpy.ndarray
         Contains the measured frequencies. Shape (n_channels)
-    direction : Direction
-        Direction information of the data set.
     auxiliary_tables : dict
         Dictionary of auxiliary tables. Default: None.
 
@@ -277,9 +275,8 @@ class Observation(BaseObservation):
     vis and weight must have the same shape.
     """
 
-    def __init__(self, antenna_positions, vis, weight, polarization, freq, direction, auxiliary_tables=None):
+    def __init__(self, antenna_positions, vis, weight, polarization, freq, auxiliary_tables=None):
         nrows = len(antenna_positions)
-        my_assert_isinstance(direction, Direction)
         my_assert_isinstance(polarization, Polarization)
         my_assert_isinstance(antenna_positions, AntennaPositions)
         my_asserteq(weight.shape, vis.shape)
@@ -305,7 +302,6 @@ class Observation(BaseObservation):
         self._weight = weight
         self._polarization = polarization
         self._freq = freq
-        self._direction = direction
 
         if auxiliary_tables is not None:
             my_assert_isinstance(auxiliary_tables, dict)
@@ -314,8 +310,8 @@ class Observation(BaseObservation):
                 my_assert_isinstance(kk, str)
         self._auxiliary_tables = auxiliary_tables
 
-        self._eq_attributes = ("_direction", "_polarization", "_freq",
-                               "_antpos", "_vis", "_weight", "_auxiliary_tables")
+        self._eq_attributes = ("_polarization", "_freq", "_antpos", "_vis", "_weight",
+                               "_auxiliary_tables")
 
     @onlymaster
     def save(self, file_name, compress):
@@ -324,7 +320,6 @@ class Observation(BaseObservation):
             weight=self._weight,
             freq=self._freq,
             polarization=self._polarization.to_list(),
-            direction=self._direction.to_list(),
         )
         for ii, vv in enumerate(self._antpos.to_list()):
             if vv is None:
@@ -363,7 +358,6 @@ class Observation(BaseObservation):
         # /Load auxtables
 
         pol = Polarization.from_list(dct["polarization"])
-        direction = Direction.from_list(dct["direction"])
         slc = slice(None) if lo_hi_index is None else slice(*lo_hi_index)
         # FIXME Put barrier here that makes sure that only one full Observation is loaded at a time
         return Observation(
@@ -372,7 +366,6 @@ class Observation(BaseObservation):
             dct["weight"][..., slc],
             pol,
             dct["freq"][slc],
-            direction,
             auxtables
         )
 
@@ -382,7 +375,7 @@ class Observation(BaseObservation):
         vis = self._vis.copy()
         vis[self.flags.val] = np.nan
         return Observation(self._antpos, vis, self._weight, self._polarization, self._freq,
-                           self._direction)
+                           self._auxiliary_tables)
 
     @staticmethod
     def load_mf(file_name, n_imaging_bands, comm=None):
@@ -413,13 +406,14 @@ class Observation(BaseObservation):
         return obs_list, nu0
 
     def __getitem__(self, slc):
+        # FIXME Do I need to change something in self._auxiliary_tables?
         return Observation(
             self._antpos[slc],
             self._vis[:, slc],
             self._weight[:, slc],
             self._polarization,
             self._freq,
-            self._direction,
+            self._auxiliary_tables,
         )
 
     def get_freqs(self, frequency_list):
@@ -435,16 +429,18 @@ class Observation(BaseObservation):
         return self.get_freqs_by_slice(mask)
 
     def get_freqs_by_slice(self, slc):
+        # FIXME Do I need to change something in self._auxiliary_tables?
         return Observation(
             self._antpos,
             self._vis[..., slc],
             self._weight[..., slc],
             self._polarization,
             self._freq[slc],
-            self._direction,
+            self._auxiliary_tables,
         )
 
     def average_stokesi(self):
+        # FIXME Do I need to change something in self._auxiliary_tables?
         my_asserteq(self._vis.shape[0], 2)
         my_asserteq(self._polarization.restrict_to_stokes_i(), self._polarization)
         vis = np.sum(self._weight * self._vis, axis=0)[None]
@@ -453,22 +449,24 @@ class Observation(BaseObservation):
         vis /= wgt + np.ones_like(wgt) * invmask
         vis[invmask] = 0.0
         return Observation(
-            self._antpos, vis, wgt, Polarization.trivial(), self._freq, self._direction
+            self._antpos, vis, wgt, Polarization.trivial(), self._freq, self._auxiliary_tables
         )
 
     def restrict_to_stokesi(self):
+        # FIXME Do I need to change something in self._auxiliary_tables?
         my_asserteq(self._vis.shape[0], 4)
         ind = self._polarization.stokes_i_indices()
         vis = self._vis[ind]
         wgt = self._weight[ind]
         pol = self._polarization.restrict_to_stokes_i()
-        return Observation(self._antpos, vis, wgt, pol, self._freq, self._direction)
+        return Observation(self._antpos, vis, wgt, pol, self._freq, self._auxiliary_tables)
 
     def restrict_to_autocorrelations(self):
         slc = self._antpos.ant1 == self._antpos.ant2
         return self[slc]
 
     def move_time(self, t0):
+        # FIXME Do I need to change something in self._auxiliary_tables?
         antpos = self._antpos.move_time(t0)
         return Observation(
             antpos,
@@ -476,7 +474,7 @@ class Observation(BaseObservation):
             self._weight,
             self._polarization,
             self._freq,
-            self._direction,
+            self._auxiliary_tables
         )
 
     @property
@@ -486,6 +484,15 @@ class Observation(BaseObservation):
     @property
     def antenna_positions(self):
         return self._antpos
+
+    @property
+    def direction(self):
+        if self._auxiliary_tables is not None and "FIELD" in self._auxiliary_tables:
+            equinox = 2000  # FIXME Figure out how to extract this from a measurement set
+            refdir = self._auxiliary_tables["FIELD"]["REFERENCE_DIR"][0]
+            my_asserteq(refdir.shape[0] == 0)
+            return Direction(refdir[0], equinox)
+        return None
 
     def auxiliary_table(self, name):
         return self._auxiliary_tables[name]
