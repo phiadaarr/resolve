@@ -124,8 +124,7 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window,
             print(f"{ms}, field #{ifield} is empty or fully flagged")
             observations.append(None)
             continue
-        if mm["ptg"] is not None:
-            raise NotImplementedError
+        print("WARNING: POINTING table is ignored for now")
         antpos = AntennaPositions(mm["uvw"], mm["ant1"], mm["ant2"], mm["time"])
         obs = Observation(antpos, mm["vis"], mm["wgt"], polobj, mm["freq"],
                           auxiliary_tables=auxtables)
