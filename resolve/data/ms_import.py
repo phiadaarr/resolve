@@ -160,7 +160,7 @@ def read_ms_i(name, data_column, field, spectral_window, pol_indices, pol_summat
     # Check if data column is available and get shape
     with ms_table(name) as t:
         nmspol = t.getcol(data_column, startrow=0, nrow=3).shape[2]
-        nrow = t.nrow()
+        nrow = t.nrows()
     print("Measurement set visibilities:")
     print(f"  shape: ({nrow}, {_ms_nchannels(name, spectral_window)}, {nmspol})")
 
@@ -180,10 +180,10 @@ def read_ms_i(name, data_column, field, spectral_window, pol_indices, pol_summat
         if pol_summation:
             npol = 1
         else:
-            if pol_indices != slice(None):
-                npol = len(pol_indices)
+            if pol_indices == slice(None):
+                npol = nmspol
             else:
-                npol = npol
+                npol = len(pol_indices)
         shp = (nrealrows, nrealchan, npol)
         vis = np.empty(shp, dtype=np.complex64)
         wgt = np.empty(shp, dtype=np.float32)
