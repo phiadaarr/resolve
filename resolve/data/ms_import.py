@@ -319,9 +319,7 @@ def _first_pass(ms, field, spectral_window, channels, pol_indices, pol_summation
             assert tflags.ndim == 3
             tflags = np.all(tflags, axis=2)
             active_rows[start:stop] = np.invert(np.all(tflags, axis=1))
-            active_channels = np.logical_or(
-                active_channels, np.invert(np.all(tflags, axis=0))
-            )
+            active_channels = np.logical_or(active_channels, np.invert(np.all(tflags, axis=0)))
             start = stop
     return active_rows, active_channels
 
