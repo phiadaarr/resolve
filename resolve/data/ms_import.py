@@ -143,6 +143,13 @@ def _determine_weighting(ms):
         if "WEIGHT_SPECTRUM" in t.colnames():
             weightcol = "WEIGHT_SPECTRUM"
             fullwgt = True
+
+            # TODO Find a better way to detect whether weight spectrum is available
+            try:
+                t.getcol("WEIGHT_SPECTRUM", nrow=1)
+            except RuntimeError:
+                weightcol = "WEIGHT"
+                fullwgt = False
         else:
             weightcol = "WEIGHT"
             fullwgt = False
