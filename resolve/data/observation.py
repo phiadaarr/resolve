@@ -497,6 +497,12 @@ class Observation(BaseObservation):
     def auxiliary_table(self, name):
         return self._auxiliary_tables[name]
 
+    @property
+    def source_name(self):
+        if "FIELD" in self._auxiliary_tables:
+            return self._auxiliary_tables["FIELD"]["NAME"][0]
+        raise NotImplementedError("FIELD subtable not available.")
+
     def effective_uvw(self):
         out = np.einsum("ij,k->jik", self.uvw, self._freq / SPEEDOFLIGHT)
         my_asserteq(out.shape, (3, self.nrow, self.nfreq))
