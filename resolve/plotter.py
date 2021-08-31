@@ -27,9 +27,15 @@ def makedirs(*args, **kwargs):
 class Plotter:
     def __init__(self, fileformat, directory):
         self._nifty, self._calib, self._hist = [], [], []
+        self._fits = []
         self._f = fileformat
         self._dir = directory
         makedirs(self._dir, exist_ok=True)
+
+    @onlymaster
+    def add_fits(self, name, operator, direction=None):
+        self._fits.append({"operator": operator, "title": str(name),
+                           "direction": direction})
 
     @onlymaster
     def add_npy(self, name, operator, nsamples=0):
@@ -92,6 +98,13 @@ class Plotter:
             if fname is None:
                 continue
             _plot_histograms(state, fname, 20, 0.5, postop=op)
+        for ii, obj in enumerate(self._fits):
+            from .fits import field2fits
+            op, fname = self._plot_init(obj, state, identifier)
+            sc = ift.StatCalculator()
+            for ss in state:
+                sc.add(op.force(ss))
+            field2fits(sc.mean, f"{fname}.fits", True, obj["direction"])
         mydir = join(self._dir, "zzz_latent")
         makedirs(mydir, exist_ok=True)
         _plot_histograms(state, join(mydir, f"{identifier}.{self._f}"), 5, 0.5)
