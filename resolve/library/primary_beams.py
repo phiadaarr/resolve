@@ -241,6 +241,7 @@ def alma_beam_func(D, d, freq, x, use_cache=False):
     except FileNotFoundError:
         arr = _compute_alma_beam(D, d, freq, x)
         np.save(fname, arr)
+        return arr
 
 
 def _compute_alma_beam(D, d, freq, x):
