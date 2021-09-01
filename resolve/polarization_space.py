@@ -27,7 +27,7 @@ class PolarizationSpace(ift.UnstructuredDomain):
         super(PolarizationSpace, self).__init__(len(self._lbl))
 
     def __repr__(self):
-        return f"PolarizationSpace({self._lbl})"
+        return f"PolarizationSpace(polarization_labels={self._lbl})"
 
     @property
     def labels(self):
