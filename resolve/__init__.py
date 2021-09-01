@@ -23,6 +23,7 @@ from .plotter import MfPlotter, Plotter
 from .points import PointInserter
 from .data.polarization import Polarization
 from .polarization_matrix_exponential import *
+from .polarization_space import *
 from .response import MfResponse, ResponseDistributor, StokesIResponse, SingleResponse
 from .simple_operators import *
 from .util import *
