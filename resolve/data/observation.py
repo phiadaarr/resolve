@@ -486,6 +486,18 @@ class Observation(BaseObservation):
         return self._antpos
 
     @property
+    def ant1(self):
+        return self._antpos.ant1
+
+    @property
+    def ant2(self):
+        return self._antpos.ant2
+
+    @property
+    def time(self):
+        return self._antpos.time
+
+    @property
     def direction(self):
         if self._auxiliary_tables is not None and "FIELD" in self._auxiliary_tables:
             equinox = 2000  # FIXME Figure out how to extract this from a measurement set
