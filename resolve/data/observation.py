@@ -452,6 +452,14 @@ class Observation(BaseObservation):
             self._antpos, vis, wgt, Polarization.trivial(), self._freq, self._auxiliary_tables
         )
 
+    def restrict_by_time(self, tmin, tmax):
+        ind = np.logical_and(tmin <= self.time , self.time < tmax)
+        return self[ind]
+
+    def restrict_by_freq(self, fmin, fmax):
+        ind = np.logical_and(fmin <= self.freq, self.freq < fmax)
+        return self.get_freqs_by_slice(ind)
+
     def restrict_to_stokesi(self):
         # FIXME Do I need to change something in self._auxiliary_tables?
         my_asserteq(self._vis.shape[0], 4)

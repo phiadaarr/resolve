@@ -222,7 +222,7 @@ class FullResponse(ift.LinearOperator):
 
 
 class SingleResponse(ift.LinearOperator):
-    def __init__(self, domain, uvw, freq, mask, facets=(1, 1)):
+    def __init__(self, domain, uvw, freq, mask=None, facets=(1, 1)):
         my_assert_isinstance(facets, tuple)
         for ii in range(2):
             if domain.shape[ii] % facets[ii] != 0:
@@ -234,7 +234,6 @@ class SingleResponse(ift.LinearOperator):
         self._args = {
             "uvw": uvw,
             "freq": freq,
-            "mask": mask.astype(np.uint8),
             "pixsize_x": self._domain[0].distances[0],
             "pixsize_y": self._domain[0].distances[1],
             "epsilon": epsilon(),
@@ -242,6 +241,8 @@ class SingleResponse(ift.LinearOperator):
             "nthreads": nthreads(),
             "flip_v": True,
         }
+        if mask is not None:
+            self._args["mask"] = mask.astype(np.uint8)
         self._vol = self._domain[0].scalar_dvol
         self._target_dtype = np_dtype(True)
         self._domain_dtype = np_dtype(False)
