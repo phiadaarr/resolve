@@ -294,6 +294,8 @@ class Observation(BaseObservation):
         my_assert(np.all(np.isfinite(vis[weight > 0.])))
         my_assert(np.all(np.isfinite(weight)))
 
+        my_assert(np.all(np.diff(freq)))
+
         vis.flags.writeable = False
         weight.flags.writeable = False
 
@@ -452,13 +454,23 @@ class Observation(BaseObservation):
             self._antpos, vis, wgt, Polarization.trivial(), self._freq, self._auxiliary_tables
         )
 
-    def restrict_by_time(self, tmin, tmax):
-        ind = np.logical_and(tmin <= self.time , self.time < tmax)
-        return self[ind]
+    def restrict_by_time(self, tmin, tmax, with_index=False):
+        my_assert(all(np.diff(self.time) >= 0))
+        start, stop = np.searchsorted(self.time, [tmin, tmax])
+        ind = slice(start, stop)
+        res = self[ind]
+        if with_index:
+            return res, ind
+        return res
 
-    def restrict_by_freq(self, fmin, fmax):
-        ind = np.logical_and(fmin <= self.freq, self.freq < fmax)
-        return self.get_freqs_by_slice(ind)
+    def restrict_by_freq(self, fmin, fmax, with_index=False):
+        my_assert(all(np.diff(self.freq) > 0))
+        start, stop = np.searchsorted(self.freq, [fmin, fmax])
+        ind = slice(start, stop)
+        res = self.get_freqs_by_slice(ind)
+        if with_index:
+            return res, ind
+        return res
 
     def restrict_to_stokesi(self):
         # FIXME Do I need to change something in self._auxiliary_tables?
