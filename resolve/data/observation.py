@@ -334,13 +334,23 @@ class Observation(BaseObservation):
             antpos.append(val)
         pol = Polarization.from_list(dct["polarization"])
         direction = Direction.from_list(dct["direction"])
-        slc = slice(None) if lo_hi_index is None else slice(*lo_hi_index)
+        if lo_hi_index is None:
+            vis = dct["vis"]
+            weight = dct["weight"]
+            freq = dct["freq"]
+        else:
+            slc = slice(*lo_hi_index)
+            # Convert view into its own array
+            vis = dct["vis"][..., slc].copy()
+            weight = dct["weight"][..., slc].copy()
+            freq = dct["freq"][slc].copy()
+        del dct
         return Observation(
             AntennaPositions.from_list(antpos),
-            dct["vis"][..., slc],
-            dct["weight"][..., slc],
+            vis,
+            weight,
             pol,
-            dct["freq"][slc],
+            freq,
             direction,
         )
 
