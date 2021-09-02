@@ -325,7 +325,7 @@ class Observation(BaseObservation):
 
     @staticmethod
     def load(file_name, lo_hi_index=None):
-        dct = dict(np.load(file_name))
+        dct = np.load(file_name)
         antpos = []
         for ii in range(4):
             val = dct[f"antpos{ii}"]
@@ -335,7 +335,6 @@ class Observation(BaseObservation):
         pol = Polarization.from_list(dct["polarization"])
         direction = Direction.from_list(dct["direction"])
         slc = slice(None) if lo_hi_index is None else slice(*lo_hi_index)
-        # FIXME Put barrier here that makes sure that only one full Observation is loaded at a time
         return Observation(
             AntennaPositions.from_list(antpos),
             dct["vis"][..., slc],
