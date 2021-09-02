@@ -364,15 +364,13 @@ class Observation(BaseObservation):
             obs = Observation.load(data_path, (lo, hi))
             obs.save(f"{target_folder}/{base_name}_{rank}.npz")
 
-        return "Done"
 
     @staticmethod
     def mpi_load(data_folder, base_name, full_data_set, nwork, comm=None):
         if master:
             from os.path import isdir
             if not isdir(data_folder):
-                end_message = Observation.split_data_file(full_data_set, comm.Get_size, data_folder, base_name, nwork)
-                comm.bcast(end_message)
+                Observation.split_data_file(full_data_set, comm.Get_size, data_folder, base_name, nwork)
             if comm is None:
                 return Observation.load(full_data_set)
 
