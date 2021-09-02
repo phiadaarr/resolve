@@ -373,7 +373,7 @@ class Observation(BaseObservation):
             if comm is None:
                 return Observation.load(full_data_set)
 
-        comm.Barrier()
+        comm.barrier()
         return Observation.load(f"{data_folder}/{base_name}_{comm.Get_rank()}.npz")
 
 
