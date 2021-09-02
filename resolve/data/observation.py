@@ -362,7 +362,7 @@ class Observation(BaseObservation):
         for rank in range(ntask):
             lo, hi = ift.utilities.shareRange(nwork, ntask, rank)
             obs = Observation.load(data_path, (lo, hi))
-            obs.save(f"{target_folder}/{base_name}_{rank}.npz")
+            obs.save(f"{target_folder}/{base_name}_{rank}.npz", compress=False)
 
 
     @staticmethod
