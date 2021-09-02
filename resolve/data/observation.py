@@ -355,7 +355,7 @@ class Observation(BaseObservation):
         )
 
     @staticmethod
-    def split_data_file(self, data_path, ntask, target_folder, base_name, nwork):
+    def split_data_file(data_path, ntask, target_folder, base_name, nwork):
         from os import makedirs
         makedirs(target_folder, exist_ok=True)
 
@@ -365,7 +365,7 @@ class Observation(BaseObservation):
             obs.save(f"{target_folder}/{base_name}_{rank}.npz")
 
     @staticmethod
-    def mpi_load(self, data_folder, base_name, full_data_set, nwork, comm=None):
+    def mpi_load(data_folder, base_name, full_data_set, nwork, comm=None):
         if master:
             from os.path import isdir
             if not isdir(data_folder):
