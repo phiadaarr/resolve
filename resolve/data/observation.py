@@ -370,7 +370,7 @@ class Observation(BaseObservation):
         if master:
             from os.path import isdir
             if not isdir(data_folder):
-                Observation.split_data_file(full_data_set, comm.Get_size, data_folder, base_name, nwork)
+                Observation.split_data_file(full_data_set, comm.Get_size(), data_folder, base_name, nwork)
             if comm is None:
                 return Observation.load(full_data_set)
 
