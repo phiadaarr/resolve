@@ -160,8 +160,8 @@ class BaseObservation:
         if not isinstance(other, self.__class__):
             return False
         if (
-            self._vis.dtype != other._vis.dtype
-            or self._weight.dtype != other._weight.dtype
+                self._vis.dtype != other._vis.dtype
+                or self._weight.dtype != other._weight.dtype
         ):
             return False
         return compare_attributes(self, other, self._eq_attributes)
@@ -186,6 +186,7 @@ class SingleDishObservation(BaseObservation):
     freq : numpy.ndarray
         Contains the measured frequencies. Shape (n_channels)
     """
+
     def __init__(self, pointings, data, weight, polarization, freq):
         my_assert_isinstance(pointings, Directions)
         my_assert_isinstance(polarization, Polarization)
@@ -306,7 +307,6 @@ class Observation(BaseObservation):
 
         self._eq_attributes = "_direction", "_polarization", "_freq", "_antpos", "_vis", "_weight"
 
-
     @onlymaster
     def save(self, file_name, compress):
         dct = dict(
@@ -359,11 +359,12 @@ class Observation(BaseObservation):
         from os import makedirs
         makedirs(target_folder, exist_ok=True)
 
+        obs = Observation.load(data_path)
+
         for rank in range(ntask):
             lo, hi = ift.utilities.shareRange(nwork, ntask, rank)
-            obs = Observation.load(data_path, (lo, hi))
-            obs.save(f"{target_folder}/{base_name}_{rank}.npz", compress=compress)
-
+            sliced_obs = obs.get_freqs_by_slice(slice(*(lo, hi)))
+            sliced_obs.save(f"{target_folder}/{base_name}_{rank}.npz", compress=compress)
 
     @staticmethod
     def mpi_load(data_folder, base_name, full_data_set, nwork, comm=None, compress=False):
@@ -376,7 +377,6 @@ class Observation(BaseObservation):
 
         comm.Barrier()
         return Observation.load(f"{data_folder}/{base_name}_{comm.Get_rank()}.npz")
-
 
     def flags_to_nan(self):
         if self.fraction_useful == 1.:
