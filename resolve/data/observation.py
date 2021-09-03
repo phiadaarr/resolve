@@ -18,7 +18,8 @@ from .polarization import Polarization
 class BaseObservation:
     @property
     def _dom(self):
-        dom = [ift.UnstructuredDomain(ss) for ss in self._vis.shape]
+        pol_dom = self.polarization.space
+        dom = [pol_dom] + [ift.UnstructuredDomain(ss) for ss in self._vis.shape[1:]]
         return ift.makeDomain(dom)
 
     @property

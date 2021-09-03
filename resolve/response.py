@@ -41,7 +41,7 @@ def StokesIResponse(observation, domain):
         return contr.adjoint @ sr0
     elif npol == 2:
         sr1 = SingleResponse(domain, observation.uvw, observation.freq, mask[1])
-        return ResponseDistributor(sr0, sr1)
+        return ResponseDistributor(observation.polarization.space, sr0, sr1)
     raise RuntimeError
 
 
@@ -186,7 +186,7 @@ class MfResponse(ift.LinearOperator):
 
 
 class ResponseDistributor(ift.LinearOperator):
-    def __init__(self, *ops):
+    def __init__(self, iterating_target_space, *ops):
         dom, tgt = ops[0].domain, ops[0].target
         cap = self.TIMES | self.ADJOINT_TIMES
         for op in ops:
@@ -194,8 +194,10 @@ class ResponseDistributor(ift.LinearOperator):
             my_assert(dom is op.domain)
             my_assert(tgt is op.target)
             my_assert(self.TIMES & op.capability, self.ADJOINT_TIMES & op.capability)
+        my_asserteq(len(iterating_target_space.shape), 1)
+        my_asserteq(len(ops), iterating_target_space.shape[0])
         self._domain = ift.makeDomain(dom)
-        self._target = ift.makeDomain((ift.UnstructuredDomain(len(ops)), *tgt))
+        self._target = ift.makeDomain((iterating_target_space, *tgt))
         self._capability = cap
         self._ops = ops
 
