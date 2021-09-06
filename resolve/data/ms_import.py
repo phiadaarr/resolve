@@ -100,8 +100,8 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window,
         else:
             if polarizations == "stokesi":
                 polarizations = ["LL", "RR"] if polobj.circular() else ["XX", "YY"]
-            polobj = polobj.restrict_by_name(polarizations)
             pol_ind = [polobj.to_str_list().index(ii) for ii in polarizations]
+            polobj = polobj.restrict_by_name(polarizations)
             pol_summation = False
 
     observations = []
