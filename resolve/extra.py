@@ -5,7 +5,7 @@
 import nifty8 as ift
 
 from .mpi import master
-from data.observation import Observation
+from .data.observation import Observation
 
 
 def split_data_file(data_path, n_task, target_folder, base_name, n_work, compress):
