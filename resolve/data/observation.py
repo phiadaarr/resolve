@@ -503,6 +503,15 @@ class Observation(BaseObservation):
             return self._auxiliary_tables["FIELD"]["NAME"][0]
         raise NotImplementedError("FIELD subtable not available.")
 
+    @property
+    def station_names(self):
+        """The index of the resulting list is the same as in self.ant1 or self.ant2."""
+        if "ANTENNA" in self._auxiliary_tables:
+            tab = self._auxiliary_tables["ANTENNA"]
+            return [f"{a} {b}" for a, b in zip(tab["NAME"], tab["STATION"])]
+        raise NotImplementedError("ANTENNA subtable not available.")
+
+
     def effective_uvw(self):
         out = np.einsum("ij,k->jik", self.uvw, self._freq / SPEEDOFLIGHT)
         my_asserteq(out.shape, (3, self.nrow, self.nfreq))
