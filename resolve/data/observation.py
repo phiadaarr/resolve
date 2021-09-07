@@ -9,7 +9,7 @@ import nifty8 as ift
 from .antenna_positions import AntennaPositions
 from ..constants import SPEEDOFLIGHT
 from .direction import Direction, Directions
-from ..mpi import onlymaster, master
+from ..mpi import onlymaster
 from .polarization import Polarization
 from ..util import compare_attributes, my_assert, my_assert_isinstance, my_asserteq
 
@@ -353,30 +353,6 @@ class Observation(BaseObservation):
             freq,
             direction,
         )
-
-    @staticmethod
-    def split_data_file(data_path, ntask, target_folder, base_name, nwork, compress):
-        from os import makedirs
-        makedirs(target_folder, exist_ok=True)
-
-        obs = Observation.load(data_path)
-
-        for rank in range(ntask):
-            lo, hi = ift.utilities.shareRange(nwork, ntask, rank)
-            sliced_obs = obs.get_freqs_by_slice(slice(*(lo, hi)))
-            sliced_obs.save(f"{target_folder}/{base_name}_{rank}.npz", compress=compress)
-
-    @staticmethod
-    def mpi_load(data_folder, base_name, full_data_set, nwork, comm=None, compress=False):
-        if master:
-            from os.path import isdir
-            if not isdir(data_folder):
-                Observation.split_data_file(full_data_set, comm.Get_size(), data_folder, base_name, nwork, compress)
-            if comm is None:
-                return Observation.load(full_data_set)
-
-        comm.Barrier()
-        return Observation.load(f"{data_folder}/{base_name}_{comm.Get_rank()}.npz")
 
     def flags_to_nan(self):
         if self.fraction_useful == 1.:
