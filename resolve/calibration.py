@@ -37,6 +37,8 @@ class CalibrationDistributor(ift.LinearOperator):
         my_assert(np.max(ant_col) < len(antenna_dct))
         self._domain = ift.DomainTuple.make(domain)
         self._target = ift.DomainTuple.make(target)
+        my_asserteq(len(self._domain), 4)
+        my_asserteq(len(self._target), 3)
         self._capability = self.TIMES | self.ADJOINT_TIMES
         self._nantennas = len(antenna_dct)
 
@@ -101,9 +103,7 @@ class MyLinearInterpolator(ift.LinearOperator):
         my_assert(np.min(time_col) >= 0)
         my_assert(np.max(time_col) < self._domain.shape[1] * dom[0].distances[1])
         my_assert(np.issubdtype(ant_col.dtype, np.integer))
-        my_assert(
-            np.issubdtype(time_col.dtype, np.floating if floattime else np.integer)
-        )
+        my_assert(np.issubdtype(time_col.dtype, np.floating if floattime else np.integer))
 
     def apply(self, x, mode):
         self._check_input(x, mode)
