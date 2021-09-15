@@ -111,7 +111,7 @@ class MfResponse(ift.LinearOperator):
         Contains the the :class:`nifty8.RGSpace` for the positions.
     """
 
-    def __init__( self, observation, frequency_domain, position_domain):
+    def __init__( self, observation, frequency_domain, position_domain, log_freq=False):
         my_assert_isinstance(observation, Observation)
         # FIXME Add polarization support
         my_assert(observation.npol in [1, 2])
@@ -123,7 +123,11 @@ class MfResponse(ift.LinearOperator):
         self._target = observation.vis.domain
         self._capability = self.TIMES | self.ADJOINT_TIMES
 
-        data_freq = observation.freq
+        if log_freq:
+            data_freq = np.log(observation.freq / observation.freq.mean())
+        else:
+            data_freq = observation.freq
+
         my_assert(np.all(np.diff(data_freq) > 0))
         sky_freq = np.array(frequency_domain.coordinates)
         band_indices = self.band_indices(sky_freq, data_freq)
