@@ -452,7 +452,7 @@ class Observation(BaseObservation):
         ind = np.logical_and(ant1 == ant1_index, ant2 == ant2_index)
         wgt = self._weight.copy()
         wgt[:, ind] = 0.
-        print(f"INFO: Flag baseline {ant1_index}-{ant2_index}, {np.sum(ind)}/{obs.nrows} rows flagged.")
+        print(f"INFO: Flag baseline {ant1_index}-{ant2_index}, {np.sum(ind)}/{self.nrow} rows flagged.")
         return Observation(self._antpos, self._vis, wgt, self._polarization, self._freq, self._direction)
 
     @property
