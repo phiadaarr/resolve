@@ -106,12 +106,14 @@ class MfResponse(ift.LinearOperator):
     observation : Observation
         Instance of the :class:`Observation` that represents the measured data.
     frequency_domain : IRGSpace
-        Contains the :class:`IRGSpace` for the frequencies.
+        Contains the :class:`IRGSpace` for the frequencies. The coordinates of
+        the space can be either frequencies or normalized log-frequencies. In
+        the latter case set `log_freq` to True.
     position_domain : nifty8.RGSpace
         Contains the the :class:`nifty8.RGSpace` for the positions.
     log_freq : bool
-        Set to true if the coordinates in the frequency domain are normalized by the mean frequency and in log-scale.
-        Default is False.
+        If true, the coordinates of `frequency_domain` are interpreted to be
+        normalized log-frequencies.  Default is False.
     """
 
     def __init__(self, observation, frequency_domain, position_domain, log_freq=False):
