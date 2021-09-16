@@ -369,6 +369,30 @@ class Observation(BaseObservation):
             auxtables
         )
 
+    @staticmethod
+    def legacy_load(file_name, lo_hi_index=None):
+        """Provide potentially incomplete interface for loading legacy npz files."""
+        dct = np.load(file_name)
+        antpos = []
+        for ii in range(4):
+            val = dct[f"antpos{ii}"]
+            if val.size == 0:
+                val = None
+            antpos.append(val)
+        antpos = AntennaPositions.from_list(antpos)
+        pol = Polarization.from_list(dct["polarization"])
+        vis = dct["vis"]
+        wgt = dct["weight"]
+        freq = dct["freq"]
+        if lo_hi_index is not None:
+            slc = slice(*lo_hi_index)
+            # Convert view into its own array
+            vis = vis[..., slc].copy()
+            wgt = wgt[..., slc].copy()
+            freq = freq[slc].copy()
+        del dct
+        return Observation(antpos, vis, wgt, pol, freq)
+
     def flags_to_nan(self):
         if self.fraction_useful == 1.:
             return self
@@ -510,7 +534,6 @@ class Observation(BaseObservation):
             tab = self._auxiliary_tables["ANTENNA"]
             return [f"{a} {b}" for a, b in zip(tab["NAME"], tab["STATION"])]
         raise NotImplementedError("ANTENNA subtable not available.")
-
 
     def effective_uvw(self):
         out = np.einsum("ij,k->jik", self.uvw, self._freq / SPEEDOFLIGHT)
