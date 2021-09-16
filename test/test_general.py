@@ -67,6 +67,10 @@ def test_sliced_readin(slc):
     np.testing.assert_equal(ch0, ch)
 
 
+def test_legacy_load():
+    rve.Observation.legacy_load(f"{direc}legacy.npz")
+
+
 def try_operator(op):
     pos = ift.from_random(op.domain)
     op(pos)
