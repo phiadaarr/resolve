@@ -70,6 +70,12 @@ def test_sliced_readin(slc):
     np.testing.assert_equal(ch0, ch)
 
 
+def test_flag_baseline():
+    ms = f"{direc}CYG-D-6680-64CH-10S.ms"
+    obs = rve.ms2observations(ms, "DATA", True, 0)[0]
+    obs.flag_baseline(3, 5)
+
+
 def try_operator(op):
     pos = ift.from_random(op.domain)
     op(pos)
