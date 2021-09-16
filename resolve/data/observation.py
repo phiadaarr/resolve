@@ -444,7 +444,7 @@ class Observation(BaseObservation):
     def flag_baseline(self, ant1_index, ant2_index):
         ant1 = self.antenna_positions.ant1
         ant2 = self.antenna_positions.ant2
-        assert ant1 < ant2
+        assert np.all(ant1 < ant2)
         ind = np.logical_and(ant1 == ant1_index, ant2 == ant2_index)
         wgt = self._weight.copy()
         wgt[:, ind] = 0.
