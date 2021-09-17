@@ -498,6 +498,53 @@ class Observation(BaseObservation):
             self._auxiliary_tables
         )
 
+    def time_average(self, list_of_timebins):
+        # FIXME check that timebins do not overlap
+        # time, ant1, ant2
+        ts = self._antpos.time
+        row_to_bin_map = np.empty(ts.shape)
+        row_to_bin_map[:] = np.nan
+
+        for ii, (lo, hi) in enumerate(list_of_timebins):
+            ind = np.logical_and(ts >= lo, ts < hi)
+            assert np.all(np.isnan(row_to_bin_map[ind]))
+            row_to_bin_map[ind] = ii
+
+        assert np.all(~np.isnan(row_to_bin_map))
+        row_to_bin_map = row_to_bin_map.astype(int)
+
+        ant1 = self._antpos.ant1
+        ant2 = self._antpos.ant2
+        assert np.max(ant1) < 1000
+        assert np.max(ant2) < 1000
+        assert np.max(row_to_bin_map) < np.iinfo(np.dtype("int64")).max / 1000000
+        atset = set(zip(ant1, ant2, row_to_bin_map))
+        dct = {aa: ii for ii, aa in enumerate(atset)}
+        dct_inv = {yy: xx for xx, yy in dct.items()}
+        masterindex = np.array([dct[(a1, a2, tt)] for a1, a2, tt in zip(ant1, ant2, row_to_bin_map)])
+
+        vis, wgt = self.vis.val, self.weight.val
+        new_vis = np.empty((self.npol, len(atset), self.nfreq), dtype=self.vis.dtype)
+        new_wgt = np.empty((self.npol, len(atset), self.nfreq), dtype=self.weight.dtype)
+        for pol in range(self.npol):
+            for freq in range(self.nfreq):
+                enum = np.bincount(masterindex, weights=vis[pol, :, freq].real*wgt[pol, :, freq])
+                enum = enum + 1j*np.bincount(masterindex, weights=vis[pol, :, freq].imag*wgt[pol, :, freq])
+                denom = np.bincount(masterindex, weights=wgt[pol, :, freq])
+                new_vis[pol, :, freq] = enum/denom
+                new_wgt[pol, :, freq] = denom
+
+        new_times = np.array([dct_inv[ii][2] for ii in range(len(atset))])
+        new_times = np.mean(np.array(list_of_timebins), axis=1)[new_times]
+
+        new_ant1 = np.array([dct_inv[ii][0] for ii in range(len(atset))])
+        new_ant2 = np.array([dct_inv[ii][1] for ii in range(len(atset))])
+        new_uvw = ap.uvw
+        # FIXME Find correct uvw
+        ap = self._antpos
+        ap = AntennaPositions(new_uvw, new_ant1, new_ant2, new_times)
+        return Observation(ap, new_vis, new_wgt, self._polarization, self._freq, self._auxiliary_tables)
+
     @property
     def uvw(self):
         return self._antpos.uvw
