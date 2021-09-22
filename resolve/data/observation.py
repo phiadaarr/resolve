@@ -441,6 +441,20 @@ class Observation(BaseObservation):
             self._direction,
         )
 
+    def flag_baseline(self, ant1_index, ant2_index):
+        ant1 = self.antenna_positions.ant1
+        ant2 = self.antenna_positions.ant2
+        if ant1 is None or ant2 is None:
+            raise RuntimeError("The calibration information needed for flagging a baseline is not "
+                               "available. Please import the measurement set with "
+                               "`with_calib_info=True`.")
+        assert np.all(ant1 < ant2)
+        ind = np.logical_and(ant1 == ant1_index, ant2 == ant2_index)
+        wgt = self._weight.copy()
+        wgt[:, ind] = 0.
+        print(f"INFO: Flag baseline {ant1_index}-{ant2_index}, {np.sum(ind)}/{self.nrow} rows flagged.")
+        return Observation(self._antpos, self._vis, wgt, self._polarization, self._freq, self._direction)
+
     @property
     def uvw(self):
         return self._antpos.uvw
