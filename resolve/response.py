@@ -41,7 +41,7 @@ def StokesIResponse(observation, domain):
         return contr.adjoint @ sr0
     elif npol == 2:
         sr1 = SingleResponse(domain, observation.uvw, observation.freq, mask[1])
-        return ResponseDistributor(sr0, sr1)
+        return ResponseDistributor(observation.polarization.space, sr0, sr1)
     raise RuntimeError
 
 
@@ -186,7 +186,7 @@ class MfResponse(ift.LinearOperator):
 
 
 class ResponseDistributor(ift.LinearOperator):
-    def __init__(self, *ops):
+    def __init__(self, iterating_target_space, *ops):
         dom, tgt = ops[0].domain, ops[0].target
         cap = self.TIMES | self.ADJOINT_TIMES
         for op in ops:
@@ -194,8 +194,10 @@ class ResponseDistributor(ift.LinearOperator):
             my_assert(dom is op.domain)
             my_assert(tgt is op.target)
             my_assert(self.TIMES & op.capability, self.ADJOINT_TIMES & op.capability)
+        my_asserteq(len(iterating_target_space.shape), 1)
+        my_asserteq(len(ops), iterating_target_space.shape[0])
         self._domain = ift.makeDomain(dom)
-        self._target = ift.makeDomain((ift.UnstructuredDomain(len(ops)), *tgt))
+        self._target = ift.makeDomain((iterating_target_space, *tgt))
         self._capability = cap
         self._ops = ops
 
@@ -222,7 +224,7 @@ class FullResponse(ift.LinearOperator):
 
 
 class SingleResponse(ift.LinearOperator):
-    def __init__(self, domain, uvw, freq, mask, facets=(1, 1)):
+    def __init__(self, domain, uvw, freq, mask=None, facets=(1, 1)):
         my_assert_isinstance(facets, tuple)
         for ii in range(2):
             if domain.shape[ii] % facets[ii] != 0:
@@ -234,7 +236,6 @@ class SingleResponse(ift.LinearOperator):
         self._args = {
             "uvw": uvw,
             "freq": freq,
-            "mask": mask.astype(np.uint8),
             "pixsize_x": self._domain[0].distances[0],
             "pixsize_y": self._domain[0].distances[1],
             "epsilon": epsilon(),
@@ -242,6 +243,8 @@ class SingleResponse(ift.LinearOperator):
             "nthreads": nthreads(),
             "flip_v": True,
         }
+        if mask is not None:
+            self._args["mask"] = mask.astype(np.uint8)
         self._vol = self._domain[0].scalar_dvol
         self._target_dtype = np_dtype(True)
         self._domain_dtype = np_dtype(False)

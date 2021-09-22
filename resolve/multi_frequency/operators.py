@@ -2,10 +2,10 @@
 # Copyright(C) 2013-2021 Max-Planck-Society
 # Authors: Philipp Frank, Philipp Arras, Philipp Haim
 
+import nifty8 as ift
 import numpy as np
 
-import nifty8 as ift
-
+from ..polarization_space import PolarizationSpace
 from ..util import my_assert, my_assert_isinstance, my_asserteq
 from .irg_space import IRGSpace
 
@@ -91,7 +91,7 @@ class MfWeightingInterpolation(ift.LinearOperator):
         my_asserteq(domain.shape[0], eff_uvw.shape[2])  # freqaxis
         self._domain = domain
         nrow, nfreq = eff_uvw.shape[1:]
-        tgt = [ift.UnstructuredDomain(aa) for aa in [1, nrow, nfreq]]
+        tgt = [PolarizationSpace("I")] + [ift.UnstructuredDomain(aa) for aa in [nrow, nfreq]]
         self._target = ift.DomainTuple.make(tgt)
         self._capability = self.TIMES | self.ADJOINT_TIMES
         # FIXME Try to unify all those operators which loop over freq dimension

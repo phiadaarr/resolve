@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright(C) 2020 Max-Planck-Society
+# Copyright(C) 2020-2021 Max-Planck-Society
 # Author: Philipp Arras
 
 from os.path import join
@@ -150,7 +150,7 @@ def test_calibration_likelihood(time_mode):
     npol, nfreq = obs[0].npol, obs[0].nfreq
     total_N = npol * nants * nfreq
     dom = [
-        ift.UnstructuredDomain(npol),
+        obs[0].polarization.space,
         ift.UnstructuredDomain(len(uants)),
         time_domain,
         ift.UnstructuredDomain(nfreq),
@@ -217,10 +217,8 @@ def test_calibration_distributor(obs):
     tgt = obs.vis.domain
     utimes = rve.unique_times(obs)
     uants = obs.antenna_positions.unique_antennas()
-    dom = [
-        ift.UnstructuredDomain(nn)
-        for nn in [obs.npol, len(uants), len(utimes), obs.nfreq]
-    ]
+    dom = [obs.polarization.space] + \
+        [ift.UnstructuredDomain(nn) for nn in [len(uants), len(utimes), obs.nfreq]]
     uants = rve.unique_antennas(obs)
     time_dct = {aa: ii for ii, aa in enumerate(utimes)}
     antenna_dct = {aa: ii for ii, aa in enumerate(uants)}
@@ -263,7 +261,7 @@ def test_response_distributor():
     dom = ift.UnstructuredDomain(2), ift.UnstructuredDomain(4)
     op0 = ift.makeOp(ift.makeField(dom, np.arange(8).reshape(2, -1)))
     op1 = ift.makeOp(ift.makeField(dom, 2 * np.arange(8).reshape(2, -1)))
-    op = rve.response.ResponseDistributor(op0, op1)
+    op = rve.response.ResponseDistributor(ift.UnstructuredDomain(2), op0, op1)
     ift.extra.check_linear_operator(op)
 
 
