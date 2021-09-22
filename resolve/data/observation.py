@@ -162,8 +162,8 @@ class BaseObservation:
         if not isinstance(other, type(self)):
             return False
         if (
-            self._vis.dtype != other._vis.dtype
-            or self._weight.dtype != other._weight.dtype
+                self._vis.dtype != other._vis.dtype
+                or self._weight.dtype != other._weight.dtype
         ):
             return False
         return compare_attributes(self, other, self._eq_attributes)
@@ -188,6 +188,7 @@ class SingleDishObservation(BaseObservation):
     freq : numpy.ndarray
         Contains the measured frequencies. Shape (n_channels)
     """
+
     def __init__(self, pointings, data, weight, polarization, freq):
         my_assert_isinstance(pointings, Directions)
         my_assert_isinstance(polarization, Polarization)
@@ -337,7 +338,7 @@ class Observation(BaseObservation):
 
     @staticmethod
     def load(file_name, lo_hi_index=None):
-        dct = dict(np.load(file_name))
+        dct = np.load(file_name)
         antpos = []
         for ii in range(4):
             val = dct[f"antpos{ii}"]
@@ -361,16 +362,18 @@ class Observation(BaseObservation):
         # /Load auxtables
 
         pol = Polarization.from_list(dct["polarization"])
-        slc = slice(None) if lo_hi_index is None else slice(*lo_hi_index)
-        # FIXME Put barrier here that makes sure that only one full Observation is loaded at a time
-        return Observation(
-            AntennaPositions.from_list(antpos),
-            dct["vis"][..., slc],
-            dct["weight"][..., slc],
-            pol,
-            dct["freq"][slc],
-            auxtables
-        )
+        vis = dct["vis"]
+        wgt = dct["weight"]
+        freq = dct["freq"]
+        if lo_hi_index is not None:
+            slc = slice(*lo_hi_index)
+            # Convert view into its own array
+            vis = vis[..., slc].copy()
+            wgt = wgt[..., slc].copy()
+            freq = freq[slc].copy()
+        del dct
+        antpos = AntennaPositions.from_list(antpos)
+        return Observation(antpos, vis, wgt, pol, freq, auxtables)
 
     @staticmethod
     def legacy_load(file_name, lo_hi_index=None):
@@ -417,33 +420,28 @@ class Observation(BaseObservation):
         if comm is None:
             local_imaging_bands = range(n_imaging_bands)
         else:
-            local_imaging_bands = range(
-                *ift.utilities.shareRange(
-                    n_imaging_bands, comm.Get_size(), comm.Get_rank()
-                )
-            )
+            lo, hi = ift.utilities.shareRange( n_imaging_bands, comm.Get_size(), comm.Get_rank())
+            local_imaging_bands = range(lo, hi)
         full_obs = Observation.load(file_name)
-        obs_list = [
-            full_obs.get_freqs_by_slice(
-                slice(*ift.utilities.shareRange(len(global_freqs), n_imaging_bands, ii))
-            )
-            for ii in local_imaging_bands
-        ]
+        obs_list = []
+        for ii in local_imaging_bands:
+            slc = slice(*ift.utilities.shareRange(len(global_freqs), n_imaging_bands, ii))
+            obs_list.append(full_obs.get_freqs_by_slice(slc))
         nu0 = global_freqs.mean()
         return obs_list, nu0
 
-    def __getitem__(self, slc):
+    def __getitem__(self, slc, copy=False):
         # FIXME Do I need to change something in self._auxiliary_tables?
-        return Observation(
-            self._antpos[slc],
-            self._vis[:, slc],
-            self._weight[:, slc],
-            self._polarization,
-            self._freq,
-            self._auxiliary_tables,
-        )
+        ap = self._antpos[slc]
+        vis = self._vis[slc]
+        wgt = self._weight[:, slc]
+        if copy:
+            ap = ap.copy()
+            vis = vis.copy()
+            wgt = wgt.copy()
+        return Observation(ap, vis, wgt, self._polarization, self._freq, self._auxiliary_tables)
 
-    def get_freqs(self, frequency_list):
+    def get_freqs(self, frequency_list, copy=False):
         """Return observation that contains a subset of the present frequencies
 
         Parameters
@@ -453,18 +451,18 @@ class Observation(BaseObservation):
         """
         mask = np.zeros(self.nfreq, dtype=bool)
         mask[frequency_list] = 1
-        return self.get_freqs_by_slice(mask)
+        return self.get_freqs_by_slice(mask, copy)
 
-    def get_freqs_by_slice(self, slc):
+    def get_freqs_by_slice(self, slc, copy=False):
         # FIXME Do I need to change something in self._auxiliary_tables?
-        return Observation(
-            self._antpos,
-            self._vis[..., slc],
-            self._weight[..., slc],
-            self._polarization,
-            self._freq[slc],
-            self._auxiliary_tables,
-        )
+        vis = self._vis[..., slc]
+        wgt = self._weight[..., slc]
+        freq = self._freq[slc]
+        if copy:
+            vis = vis.copy()
+            wgt = wgt.copy()
+            freq = freq.copy()
+        return Observation( self._antpos, vis, wgt, self._polarization, freq, self._auxiliary_tables)
 
     def average_stokesi(self):
         # FIXME Do I need to change something in self._auxiliary_tables?
@@ -564,10 +562,25 @@ class Observation(BaseObservation):
         new_ant1 = np.array([dct_inv[ii][0] for ii in range(len(atset))])
         new_ant2 = np.array([dct_inv[ii][1] for ii in range(len(atset))])
         new_uvw = ap.uvw
+        raise NotImplementedError("FIXME The implementation of this is not complete.")
         # FIXME Find correct uvw
         ap = self._antpos
         ap = AntennaPositions(new_uvw, new_ant1, new_ant2, new_times)
         return Observation(ap, new_vis, new_wgt, self._polarization, self._freq, self._auxiliary_tables)
+
+    def flag_baseline(self, ant1_index, ant2_index):
+        ant1 = self.antenna_positions.ant1
+        ant2 = self.antenna_positions.ant2
+        if ant1 is None or ant2 is None:
+            raise RuntimeError("The calibration information needed for flagging a baseline is not "
+                               "available. Please import the measurement set with "
+                               "`with_calib_info=True`.")
+        assert np.all(ant1 < ant2)
+        ind = np.logical_and(ant1 == ant1_index, ant2 == ant2_index)
+        wgt = self._weight.copy()
+        wgt[:, ind] = 0.
+        print(f"INFO: Flag baseline {ant1_index}-{ant2_index}, {np.sum(ind)}/{self.nrow} rows flagged.")
+        return Observation(self._antpos, self._vis, wgt, self._polarization, self._freq, self._auxiliary_tables)
 
     @property
     def uvw(self):

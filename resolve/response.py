@@ -106,12 +106,17 @@ class MfResponse(ift.LinearOperator):
     observation : Observation
         Instance of the :class:`Observation` that represents the measured data.
     frequency_domain : IRGSpace
-        Contains the :class:`IRGSpace` for the frequencies.
+        Contains the :class:`IRGSpace` for the frequencies. The coordinates of
+        the space can be either frequencies or normalized log-frequencies. In
+        the latter case set `log_freq` to True.
     position_domain : nifty8.RGSpace
         Contains the the :class:`nifty8.RGSpace` for the positions.
+    log_freq : bool
+        If true, the coordinates of `frequency_domain` are interpreted to be
+        normalized log-frequencies.  Default is False.
     """
 
-    def __init__( self, observation, frequency_domain, position_domain):
+    def __init__(self, observation, frequency_domain, position_domain, log_freq=False):
         my_assert_isinstance(observation, Observation)
         # FIXME Add polarization support
         my_assert(observation.npol in [1, 2])
@@ -123,7 +128,11 @@ class MfResponse(ift.LinearOperator):
         self._target = observation.vis.domain
         self._capability = self.TIMES | self.ADJOINT_TIMES
 
-        data_freq = observation.freq
+        if log_freq:
+            data_freq = np.log(observation.freq / observation.freq.mean())
+        else:
+            data_freq = observation.freq
+
         my_assert(np.all(np.diff(data_freq) > 0))
         sky_freq = np.array(frequency_domain.coordinates)
         band_indices = self.band_indices(sky_freq, data_freq)
@@ -278,9 +287,9 @@ class SingleResponse(ift.LinearOperator):
         if self._ofac is not None:
             return self._ofac
         maxuv = (
-            np.max(np.abs(self._args["uvw"][:, 0:2]), axis=0)
-            * np.max(self._args["freq"])
-            / SPEEDOFLIGHT
+                np.max(np.abs(self._args["uvw"][:, 0:2]), axis=0)
+                * np.max(self._args["freq"])
+                / SPEEDOFLIGHT
         )
         hspace = self._domain[0].get_default_codomain()
         hvol = np.array(hspace.shape) * np.array(hspace.distances) / 2
@@ -308,7 +317,7 @@ class SingleResponse(ift.LinearOperator):
         for xx, yy in product(range(nfacets_x), range(nfacets_y)):
             cx = ((0.5 + xx) / nfacets_x - 0.5) * self._args["pixsize_x"] * npix_x
             cy = ((0.5 + yy) / nfacets_y - 0.5) * self._args["pixsize_y"] * npix_y
-            facet = x[nx * xx : nx * (xx + 1), ny * yy : ny * (yy + 1)]
+            facet = x[nx * xx: nx * (xx + 1), ny * yy: ny * (yy + 1)]
             foo = dirty2vis(
                 dirty=facet,
                 center_x=cx,
@@ -340,5 +349,5 @@ class SingleResponse(ift.LinearOperator):
                 verbosity=verbosity(),
                 **self._args
             )
-            res[nx * xx : nx * (xx + 1), ny * yy : ny * (yy + 1)] = im
+            res[nx * xx: nx * (xx + 1), ny * yy: ny * (yy + 1)] = im
         return res
