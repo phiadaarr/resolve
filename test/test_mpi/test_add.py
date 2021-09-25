@@ -24,7 +24,7 @@ def getop(comm, typ):
         ddom = ift.UnstructuredDomain(d[0].shape)
         ops = [
             ift.GaussianEnergy(
-                ift.makeField(ddom, d[ii]), ift.makeOp(ift.makeField(ddom, invcov[ii]))
+                ift.makeField(ddom, d[ii]), ift.makeOp(ift.makeField(ddom, invcov[ii]), sampling_dtype=d[ii].dtype)
             )
             @ ift.DomainTupleFieldInserter(skydom, 0, (ii,)).adjoint
             for ii in range(nwork)
@@ -39,7 +39,7 @@ def getop(comm, typ):
         for ii in local_indices:
             ddom = ift.UnstructuredDomain(d[ii].shape)
             dd = ift.makeField(ddom, d[ii])
-            iicc = ift.makeOp(ift.makeField(ddom, invcov[ii]))
+            iicc = ift.makeOp(ift.makeField(ddom, invcov[ii]), sampling_dtype=d[ii].dtype)
             ee = ift.GaussianEnergy(dd, iicc)
             if typ == 0:
                 ee = ee @ ift.DomainTupleFieldInserter(skydom, 0, (ii,)).adjoint
@@ -117,6 +117,7 @@ def test_mpi_adder():
         lin = ift.Linearization.make_var(ift.from_random(dom), True)
         samps_lh, samps_ham = [], []
         for ii, (llhh, hh) in enumerate(zip(lhs_for_sampling, hams_for_sampling)):
+            print(ii)
             with ift.random.Context(42):
                 samps_lh.append(llhh(lin).metric.draw_sample())
             with ift.random.Context(42):
