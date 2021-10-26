@@ -128,7 +128,5 @@ def test_mpi_adder():
         mini_results = []
         for ham in hams_for_sampling:
             with ift.random.Context(42):
-                mini_results.append(
-                    mini(ift.MetricGaussianKL(pos, ham, 3, True))[0].position
-                )
+                mini_results.append(mini(ift.SampledKLEnergy(pos, ham, 3, None))[0].position)
         allclose(mini_results)
