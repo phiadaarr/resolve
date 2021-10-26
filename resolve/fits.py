@@ -36,10 +36,24 @@ def field2fits(field, file_name, overwrite, direction=None):
     h["CDELT2"] = dom.distances[1] * 180 / np.pi
     h["CRPIX2"] = dom.shape[1] / 2
     h["CUNIT2"] = "deg"
+    # Compulsory header entries
+    h["SIMPLE"] = "T"
+    h["BITPIX"] = 64
+    h["NAXIS"] = 2
+    h["NAXIS1"] = dom.shape[0]
+    h["NAXIS2"] = dom.shape[1]
+    # /Compulsory header entries
+
     h["DATE-MAP"] = Time(time.time(), format="unix").iso.split()[0]
     if direction is not None:
         h["EQUINOX"] = direction.equinox
-    hdu = pyfits.PrimaryHDU(field.val[:, :].T, header=h)
+    # physical value = bzero + bscale * array value
+    h["BSCALE"] = 1.
+    h["BZERO"] = 0.
+    # physical unit
+    h["BUNIT"] = "Jy/sr"
+
+    hdu = pyfits.PrimaryHDU(field.val.T, header=h)
     hdulist = pyfits.HDUList([hdu])
     base, ext = splitext(file_name)
     hdulist.writeto(base + ext, overwrite=overwrite)
