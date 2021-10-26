@@ -18,9 +18,7 @@ def simple_minimize(
 
 
 class Minimization:
-    def __init__(
-        self, operator, position, n_samples, constants=[], point_estimates=[], comm=None
-    ):
+    def __init__(self, operator, position, n_samples, constants=[], point_estimates=[], comm=None):
         n_samples = int(n_samples)
         self._position = position
         position = position.extract(operator.domain)
