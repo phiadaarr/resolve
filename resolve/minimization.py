@@ -28,7 +28,7 @@ class Minimization:
         else:
             my_assert(n_samples > 0)
             dct = {
-                "mean": position,
+                "position": position,
                 "hamiltonian": operator,
                 "n_samples": n_samples,
                 "minimizer_sampling": None,
@@ -38,7 +38,7 @@ class Minimization:
                 "comm": comm,
                 "nanisinf": True,
             }
-            self._e = ift.SampledKL(**dct)
+            self._e = ift.SampledKLEnergy(**dct)
             self._n, self._m = dct["n_samples"], dct["mirror_samples"]
 
     def minimize(self, minimizer):

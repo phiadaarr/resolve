@@ -55,7 +55,7 @@ def _build_gauss_lh_nres(op, mean, invcov):
     my_assert_isinstance(mean, invcov, (ift.Field, ift.MultiField))
     my_asserteq(op.target, mean.domain, invcov.domain)
 
-    lh = ift.GaussianEnergy(mean=mean, inverse_covariance=ift.makeOp(invcov)) @ op
+    lh = ift.GaussianEnergy(mean=mean, inverse_covariance=ift.makeOp(invcov, sampling_dtype=mean.dtype)) @ op
     return _Likelihood(lh, mean, lambda x: ift.makeOp(invcov), op)
 
 
