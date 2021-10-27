@@ -18,9 +18,7 @@ def simple_minimize(
 
 
 class Minimization:
-    def __init__(
-        self, operator, position, n_samples, constants=[], point_estimates=[], comm=None
-    ):
+    def __init__(self, operator, position, n_samples, constants=[], point_estimates=[], comm=None):
         n_samples = int(n_samples)
         self._position = position
         position = position.extract(operator.domain)
@@ -33,13 +31,14 @@ class Minimization:
                 "mean": position,
                 "hamiltonian": operator,
                 "n_samples": n_samples,
+                "minimizer_sampling": None,
                 "constants": constants,
                 "point_estimates": point_estimates,
                 "mirror_samples": True,
                 "comm": comm,
                 "nanisinf": True,
             }
-            self._e = ift.MetricGaussianKL(**dct)
+            self._e = ift.SampledKL(**dct)
             self._n, self._m = dct["n_samples"], dct["mirror_samples"]
 
     def minimize(self, minimizer):
