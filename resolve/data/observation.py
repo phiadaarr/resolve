@@ -531,6 +531,7 @@ class Observation(BaseObservation):
             ind = np.logical_and(ts >= lo, ts < hi)
             assert np.all(np.isnan(row_to_bin_map[ind]))
             row_to_bin_map[ind] = ii
+        assert np.all(np.diff(row_to_bin_map) >= 0)
 
         assert np.all(~np.isnan(row_to_bin_map))
         row_to_bin_map = row_to_bin_map.astype(int)
@@ -540,7 +541,9 @@ class Observation(BaseObservation):
         assert np.max(ant1) < 1000
         assert np.max(ant2) < 1000
         assert np.max(row_to_bin_map) < np.iinfo(np.dtype("int64")).max / 1000000
-        atset = set(zip(ant1, ant2, row_to_bin_map))
+        atset = np.array(list(set(zip(ant1, ant2, row_to_bin_map))))
+        atset = atset[np.lexsort(atset.T)]
+        atset = tuple(map(tuple, atset))
         dct = {aa: ii for ii, aa in enumerate(atset)}
         dct_inv = {yy: xx for xx, yy in dct.items()}
         masterindex = np.array([dct[(a1, a2, tt)] for a1, a2, tt in zip(ant1, ant2, row_to_bin_map)])
@@ -566,6 +569,8 @@ class Observation(BaseObservation):
 
         new_times = np.array([dct_inv[ii][2] for ii in range(len(atset))])
         new_times = np.mean(np.array(list_of_timebins), axis=1)[new_times]
+
+        assert np.all(np.diff(new_times) >= 0)
 
         new_ant1 = np.array([dct_inv[ii][0] for ii in range(len(atset))])
         new_ant2 = np.array([dct_inv[ii][1] for ii in range(len(atset))])
