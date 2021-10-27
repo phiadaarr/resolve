@@ -556,15 +556,19 @@ class Observation(BaseObservation):
                 new_vis[pol, :, freq] = enum/denom
                 new_wgt[pol, :, freq] = denom
 
+        new_uvw = np.empty((len(atset), 3), dtype=self._antpos.uvw.dtype)
+        new_uvw[()] = np.nan
+        denom = np.bincount(masterindex)
+        # Assumption: Uvw value for averaged data is average of uvw values of finely binned data
+        for ii in range(3):
+            new_uvw[:, ii] = np.bincount(masterindex, weights=self._antpos.uvw[:, ii]) / denom
+        assert np.sum(np.isnan(new_uvw)) == 0
+
         new_times = np.array([dct_inv[ii][2] for ii in range(len(atset))])
         new_times = np.mean(np.array(list_of_timebins), axis=1)[new_times]
 
         new_ant1 = np.array([dct_inv[ii][0] for ii in range(len(atset))])
         new_ant2 = np.array([dct_inv[ii][1] for ii in range(len(atset))])
-        new_uvw = ap.uvw
-        raise NotImplementedError("FIXME The implementation of this is not complete.")
-        # FIXME Find correct uvw
-        ap = self._antpos
         ap = AntennaPositions(new_uvw, new_ant1, new_ant2, new_times)
         return Observation(ap, new_vis, new_wgt, self._polarization, self._freq, self._auxiliary_tables)
 
