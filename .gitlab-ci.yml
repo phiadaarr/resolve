@@ -5,6 +5,7 @@ variables:
 
 stages:
   - build_docker
+  - static_checks
   - testing
   - release
 
@@ -60,3 +61,12 @@ pages:
   only:
     - master
 
+
+check_code_formatting:
+  image: debian:testing-slim
+  stage: static_checks
+  before_script:
+    - ls
+  script:
+    - apt-get update && apt-get install -y yapf3
+    - yapf3 -d -r .
