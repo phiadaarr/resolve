@@ -497,7 +497,6 @@ class Observation(BaseObservation):
 
     def restrict_to_stokesi(self):
         # FIXME Do I need to change something in self._auxiliary_tables?
-        my_asserteq(self._vis.shape[0], 4)
         ind = self._polarization.stokes_i_indices()
         vis = self._vis[ind]
         wgt = self._weight[ind]
