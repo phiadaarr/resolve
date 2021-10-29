@@ -433,7 +433,7 @@ class Observation(BaseObservation):
     def __getitem__(self, slc, copy=False):
         # FIXME Do I need to change something in self._auxiliary_tables?
         ap = self._antpos[slc]
-        vis = self._vis[slc]
+        vis = self._vis[:, slc]
         wgt = self._weight[:, slc]
         if copy:
             ap = ap.copy()
@@ -556,6 +556,8 @@ class Observation(BaseObservation):
                 enum = np.bincount(masterindex, weights=vis[pol, :, freq].real*wgt[pol, :, freq])
                 enum = enum + 1j*np.bincount(masterindex, weights=vis[pol, :, freq].imag*wgt[pol, :, freq])
                 denom = np.bincount(masterindex, weights=wgt[pol, :, freq])
+                if np.min(denom) == 0.:
+                    raise ValueError("Time bin with total weight 0. detected.")
                 new_vis[pol, :, freq] = enum/denom
                 new_wgt[pol, :, freq] = denom
 
