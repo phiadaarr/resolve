@@ -560,16 +560,17 @@ class Observation(BaseObservation):
                 new_wgt[pol, :, freq] = denom
 
         new_uvw = np.empty((len(atset), 3), dtype=self._antpos.uvw.dtype)
-        new_uvw[()] = np.nan
+        new_times = np.empty(len(atset), dtype=self._antpos.time.dtype)
+        new_uvw[()] = new_times[()] = np.nan
         denom = np.bincount(masterindex)
         # Assumption: Uvw value for averaged data is average of uvw values of finely binned data
         for ii in range(3):
             new_uvw[:, ii] = np.bincount(masterindex, weights=self._antpos.uvw[:, ii]) / denom
+        new_times = np.bincount(row_to_bin_map, weights=self._antpos.time) / np.bincount(row_to_bin_map)
         assert np.sum(np.isnan(new_uvw)) == 0
+        assert np.sum(np.isnan(new_times)) == 0
 
-        new_times = np.array([dct_inv[ii][2] for ii in range(len(atset))])
-        new_times = np.mean(np.array(list_of_timebins), axis=1)[new_times]
-
+        new_times = new_times[np.array([dct_inv[ii][2] for ii in range(len(atset))])]
         assert np.all(np.diff(new_times) >= 0)
 
         new_ant1 = np.array([dct_inv[ii][0] for ii in range(len(atset))])

@@ -4,6 +4,7 @@ from .library.calibrators import *
 from .library.primary_beams import *
 from .constants import *
 from .data.direction import *
+from .data.averaging import *
 from .fits import field2fits, fits2field
 from .global_config import *
 from .likelihood import *
