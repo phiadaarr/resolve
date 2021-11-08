@@ -113,3 +113,16 @@ def MultiDomainVariableCovarianceGaussianEnergy(data, signal_response, invcov):
     resi = KeyPrefixer(data.domain, "resi") @ ift.Adder(data, True) @ signal_response
     invcov = KeyPrefixer(data.domain, "icov") @ invcov
     return reduce(add, res) @ (resi + invcov)
+
+
+class DomainChangerAndReshaper(ift.LinearOperator):
+    def __init__(self, domain, target):
+        self._domain = ift.DomainTuple.make(domain)
+        self._target = ift.DomainTuple.make(target)
+        self._capability = self.TIMES | self.ADJOINT_TIMES
+
+    def apply(self, x, mode):
+        self._check_input(x, mode)
+        x = x.val
+        tgt = self._tgt(mode)
+        return ift.makeField(tgt, x.reshape(tgt.shape))

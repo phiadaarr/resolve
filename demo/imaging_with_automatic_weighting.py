@@ -1,193 +1,211 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright(C) 2019-2020 Max-Planck-Society
-# Author: Philipp Arras
-
-import argparse
+# Copyright(C) 2021 Max-Planck-Society
+# Author: Philipp Arras, Jakob Knollmüller
 
 import numpy as np
+import configparser
+import os
+import sys
+from distutils.util import strtobool
 
 import nifty8 as ift
 import resolve as rve
-from os.path import isfile, splitext
+from matplotlib.colors import LogNorm
+from resolve.mpi import master
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    # TODO OU process for automatic weighting
-    parser.add_argument("-j", type=int, default=1)
-    parser.add_argument("--use-cached", action="store_true")
-    parser.add_argument("--use-wgridding", action="store_true")
-    parser.add_argument(
-        "--data-column",
-        default="DATA",
-        help="Only active if a measurement set is read.",
-    )
-    parser.add_argument("--point", action="append", nargs=2)
-    parser.add_argument("ms", type=str)
-    parser.add_argument("xfov", type=str)
-    parser.add_argument("yfov", type=str)
-    parser.add_argument("xpix", type=int)
-    parser.add_argument("ypix", type=int)
-    parser.add_argument("diffusefluxlevel", type=float)
-    args = parser.parse_args()
+def main(cfg_file_name):
+    cfg = configparser.ConfigParser()
+    cfg.read(cfg_file_name)
+    if master:
+        print(f"Load {cfg_file_name}")
 
-    ############################################################################
-    # Define likelihood(s)
-    ############################################################################
-    if splitext(args.ms)[1] == ".npz":
-        obs = rve.Observation.load(args.ms)
+    point_sources = [("0deg", "0deg")]
+
+    rve.set_epsilon(cfg["response"].getfloat("epsilon"))
+    rve.set_wgridding(strtobool(cfg["response"]["wgridding"]))
+    rve.set_double_precision(True)
+    rve.set_nthreads(cfg["technical"].getint("nthreads"))
+
+    nx = cfg["sky"].getint("space npix x")
+    ny = cfg["sky"].getint("space npix y")
+    dx = rve.str2rad(cfg["sky"]["space fov x"]) / nx
+    dy = rve.str2rad(cfg["sky"]["space fov y"]) / ny
+    dom = ift.RGSpace([nx, ny], [dx, dy])
+
+    # Sky model
+    # Diffuse
+    cfm_zm_args = {
+        "offset_mean":
+            cfg["sky"].getfloat("zero mode offset"),
+        "offset_std": (
+            cfg["sky"].getfloat("zero mode mean"),
+            cfg["sky"].getfloat("zero mode stddev"),
+        ),
+    }
+    cfm_spatial_args = {
+        "fluctuations": (
+            cfg["sky"].getfloat("space fluctuations mean"),
+            cfg["sky"].getfloat("space fluctuations stddev"),
+        ),
+        "loglogavgslope": (
+            cfg["sky"].getfloat("space loglogavgslope mean"),
+            cfg["sky"].getfloat("space loglogavgslope stddev"),
+        ),
+        "flexibility": (
+            cfg["sky"].getfloat("space flexibility mean"),
+            cfg["sky"].getfloat("space flexibility stddev"),
+        ),
+        "asperity": (
+            cfg["sky"].getfloat("space asperity mean"),
+            cfg["sky"].getfloat("space asperity stddev"),
+        ),
+    }
+    logdiffuse = ift.SimpleCorrelatedField(dom, **cfm_spatial_args, **cfm_zm_args)
+
+    # Point sources
+    ppos = []
+    for point in point_sources:
+        ppos.append([rve.str2rad(point[0]), rve.str2rad(point[1])])
+    inserter = rve.PointInserter(dom, ppos)
+    points = ift.InverseGammaOperator(
+        inserter.domain, alpha=0.5, q=0.2 / dom.scalar_dvol).ducktape("points")
+    points = inserter @ points
+
+    sky = logdiffuse.exp() + points
+    # /Sky model
+
+    p = ift.Plot()
+    for _ in range(9):
+        p.add(sky(ift.from_random(sky.domain)), norm=LogNorm())
+    if master:
+        p.output(name="sky_prior_samples.png")
+
+    obs_file_name = cfg["data"]["path"]
+    if os.path.splitext(obs_file_name)[1] == ".npz":
+        obs = rve.Observation.load(obs_file_name).restrict_to_stokesi().average_stokesi()
+    elif os.path.splitext(obs_file_name)[1] == ".ms":
+        obs = rve.ms2observations(obs_file_name, "DATA", False, 0, "stokesiavg")
+        assert len(obs) == 1
+        obs = obs[0]
     else:
-        obs = rve.ms2observations(args.ms, args.data_column, False, 0, "stokesiavg")[0]
+        raise RuntimeError(
+            f"Do not understand file name ending of {obs_file_name}. Supported: ms, npz.")
 
-    rve.set_nthreads(args.j)
-    rve.set_wgridding(args.use_wgridding)
-    fov = np.array([rve.str2rad(args.xfov), rve.str2rad(args.yfov)])
-    npix = np.array([args.xpix, args.ypix])
-    rve.set_epsilon(1 / 10 / obs.max_snr())
-
-    dom = ift.RGSpace(npix, fov / npix)
-    logsky = ift.SimpleCorrelatedField(
-        dom, args.diffusefluxlevel, (1, 0.1), (5, 1), (1.2, 0.4), (0.2, 0.2), (-2, 0.5)
-    )
-    diffuse = logsky.exp()
-    if args.point is not None:
-        ppos = []
-        for point in args.point:
-            ppos.append([rve.str2rad(point[0]), rve.str2rad(point[1])])
-        inserter = rve.PointInserter(dom, ppos)
-        points = ift.InverseGammaOperator(
-            inserter.domain, alpha=0.5, q=0.2 / dom.scalar_dvol
-        ).ducktape("points")
-        points = inserter @ points
-        sky = diffuse + points
-    else:
-        sky = diffuse
-    # TODO Add mode with independent noise learning
+    # Weightop
     npix = 2500
     effuv = obs.effective_uvwlen().val[0]
     assert obs.nfreq == obs.npol == 1
     dom = ift.RGSpace(npix, 2 * np.max(effuv) / npix)
-    logwgt = ift.SimpleCorrelatedField(
-        dom, 0, (2, 2), (2, 2), (1.2, 0.4), (0.5, 0.2), (-2, 0.5), "invcov"
-    )
-    li = ift.LinearInterpolator(dom, effuv)
-    weightop = ift.makeOp(obs.weight) @ (
-        rve.AddEmptyDimension(li.target) @ li @ logwgt.exp()
-    ) ** (-2)
+    logwgt = ift.SimpleCorrelatedField(dom, 0, (2, 2), (2, 2), (1.2, 0.4), (0.5, 0.2), (-2, 0.5),
+                                       "invcov")
+    li = ift.LinearInterpolator(dom, effuv.T)
+    conv = rve.DomainChangerAndReshaper(li.target, obs.weight.domain)
+    weightop = ift.makeOp(obs.weight) @ (conv @ li @ logwgt.exp()) ** (-2)
+    # /Weightop
 
-    plotter = rve.Plotter("png", "plots")
-    plotter.add("logsky", logsky)
-    plotter.add("power spectrum logsky", logsky.power_spectrum)
-    plotter.add("bayesian weighting", logwgt.exp())
-    plotter.add("power spectrum bayesian weighting", logwgt.power_spectrum)
+    full_lh = rve.ImagingLikelihood(obs, sky, inverse_covariance_operator=weightop)
+    position = 0.1 * ift.from_random(full_lh.domain)
 
-    ############################################################################
-    # MINIMIZATION
-    ############################################################################
-    if rve.mpi.master:
-        if args.point is not None:
-            # MAP points with original weights
-            lh = rve.ImagingLikelihood(obs, points)
-            ham = ift.StandardHamiltonian(lh)
-            state = rve.MinimizationState(0.1 * ift.from_random(ham.domain), [])
-            mini = ift.NewtonCG(
-                ift.GradientNormController(name="newton", iteration_limit=4)
-            )
-            if args.use_cached and isfile("stage0"):
-                state = rve.MinimizationState.load("stage0")
-            else:
-                state = rve.simple_minimize(ham, state.mean, 0, mini)
-                plotter.plot("stage0", state)
-                state.save("stage0")
+    common = {
+        "output_directory": cfg["output"]["directory"],
+        "plottable_operators": {
+            "sky": sky,
+            "logsky": sky.log(),
+            "points": points,
+            "logdiffuse": logdiffuse,
+            "logdiffuse pspec": logdiffuse.power_spectrum
+        },
+        "overwrite": True
+    }
 
-        # MAP diffuse with original weights
+    if master:
+        # Points only, MAP
+        lh = rve.ImagingLikelihood(obs, points)
+        sl = ift.optimize_kl(
+            lh,
+            1,
+            0,
+            ift.NewtonCG(ift.GradientNormController(name="hamiltonian", iteration_limit=4)),
+            None,
+            None,
+            initial_position=position,
+            **common)
+        position = ift.MultiField.union([position, sl.local_item(0)])
+
+        # Points constant, diffuse only, MAP
         lh = rve.ImagingLikelihood(obs, sky)
-        plotter.add_histogram(
-            "normalized residuals (original weights)", lh.normalized_residual
-        )
-        ham = ift.StandardHamiltonian(lh)
-        if args.point is None:
-            fld = 0.1 * ift.from_random(diffuse.domain)
-        else:
-            fld = ift.MultiField.union(
-                [0.1 * ift.from_random(diffuse.domain), state.mean]
-            )
-        state = rve.MinimizationState(fld, [])
-        mini = ift.NewtonCG(
-            ift.GradientNormController(name="newton", iteration_limit=20)
-        )
-        if args.use_cached and isfile("stage1"):
-            state = rve.MinimizationState.load("stage1")
-        else:
-            state = rve.simple_minimize(ham, state.mean, 0, mini)
-            plotter.plot("stage1", state)
-            state.save("stage1")
+        sl = ift.optimize_kl(
+            lh,
+            1,
+            0,
+            ift.NewtonCG(ift.GradientNormController(name="hamiltonian", iteration_limit=20)),
+            None,
+            None,
+            initial_position=position,
+            initial_index=1,
+            **common)
+        position = ift.MultiField.union([position, sl.local_item(0)])
 
-        # Only weights
-        lh = rve.ImagingLikelihood(obs, sky, inverse_covariance_operator=weightop)
-        plotter.add_histogram(
-            "normalized residuals (learned weights)", lh.normalized_residual
-        )
-        ic = ift.AbsDeltaEnergyController(0.1, 3, 100, name="Sampling")
-        ham = ift.StandardHamiltonian(lh, ic)
         cst = sky.domain.keys()
-        state = rve.MinimizationState(
-            ift.MultiField.union([0.1 * ift.from_random(weightop.domain), state.mean]),
-            [],
-        )
-        mini = ift.VL_BFGS(ift.GradientNormController(name="bfgs", iteration_limit=20))
-        if args.use_cached and isfile("stage2"):
-            state = rve.MinimizationState.load("stage2")
-        else:
-            for ii in range(10):
-                state = rve.simple_minimize(ham, state.mean, 0, mini, cst, cst)
-                plotter.plot(f"stage2_{ii}", state)
-            state.save("stage2")
+        sl = ift.optimize_kl(
+            full_lh,
+            1,
+            0,
+            ift.VL_BFGS(ift.GradientNormController(name="bfgs", iteration_limit=20)),
+            ift.AbsDeltaEnergyController(0.1, 3, 100, name="Sampling"),
+            None,
+            constants=cst,
+            point_estimates=cst,
+            initial_position=position,
+            initial_index=2,
+            **common)
+        position = ift.MultiField.union([position, sl.local_item(0)])
 
     if rve.mpi.mpi:
-        if not rve.mpi.master:
-            state = None
-        state = rve.mpi.comm.bcast(state, root=0)
+        if not master:
+            position = None
+        position = rve.mpi.comm.bcast(position, root=0)
     ift.random.push_sseq_from_seed(42)
 
-    # MGVI sky
-    ic = ift.AbsDeltaEnergyController(0.1, 3, 200, name="Sampling")
-    lh = rve.ImagingLikelihoodVariableCovariance(obs, sky, weightop)
-    ham = ift.StandardHamiltonian(lh, ic)
-    if args.point is not None:
-        cst = list(points.domain.keys()) + list(weightop.domain.keys())
-    else:
-        cst = list(weightop.domain.keys())
-    mini = ift.NewtonCG(ift.GradientNormController(name="newton", iteration_limit=15))
-    for ii in range(4):
-        fname = f"stage3_{ii}"
-        if args.use_cached and isfile(fname):
-            state = rve.MinimizationState.load(fname)
-        else:
-            state = rve.simple_minimize(ham, state.mean, 5, mini, cst, cst)
-            plotter.plot(f"stage3_{ii}", state)
-            state.save(fname)
+    # First MGVI diffuse sky, then sky + weighting simultaneously
 
-    # Sky + weighting simultaneously
-    ic = ift.AbsDeltaEnergyController(0.1, 3, 700, name="Sampling")
-    ham = ift.StandardHamiltonian(lh, ic)
-    for ii in range(30):
-        if ii < 5:
-            mini = ift.VL_BFGS(
-                ift.GradientNormController(name="newton", iteration_limit=15)
-            )
+    def get_mini(iglobal):
+        if iglobal < 7:
+            return ift.NewtonCG(ift.GradientNormController(name="kl", iteration_limit=15))
+        elif iglobal < 7 + 5:
+            return ift.VL_BFGS(ift.GradientNormController(name="kl", iteration_limit=15))
         else:
-            mini = ift.NewtonCG(
-                ift.GradientNormController(name="newton", iteration_limit=15)
-            )
-        fname = f"stage4_{ii}"
-        if args.use_cached and isfile(fname):
-            state = rve.MinimizationState.load(fname)
+            return ift.NewtonCG(ift.GradientNormController(name="kl", iteration_limit=15))
+
+    def get_sampling(iglobal):
+        if iglobal < 7:
+            lim = 200
+        elif iglobal < 7 + 5:
+            lim = 700
         else:
-            state = rve.simple_minimize(ham, state.mean, 5, mini)
-            plotter.plot(f"stage4_{ii}", state)
-            state.save(fname)
+            lim = 700
+        return ift.AbsDeltaEnergyController(deltaE=0.5, iteration_limit=lim)
+
+    def get_cst(iglobal):
+        if iglobal < 7:
+            return list(points.domain.keys()) + list(weightop.domain.keys())
+        else:
+            return []
+
+    sl = ift.optimize_kl(
+        full_lh,
+        35,
+        5,
+        get_mini,
+        get_sampling,
+        None,
+        constants=get_cst,
+        point_estimates=get_cst,
+        initial_position=position,
+        initial_index=7,
+        **common)
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1])
