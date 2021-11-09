@@ -58,7 +58,7 @@ def main(cfg_file_name):
         assert obs.nfreq == obs.npol == 1
         subcfg = cfg["weighting"]
         if subcfg["model"] == "cfm":
-            npix = 2500
+            npix = 2500  # FIXME Use numbers from config file
             xs = np.log(obs.effective_uvwlen().val)
             xs -= np.min(xs)
             if not xs.shape[0] == xs.shape[2] == 1:
@@ -112,6 +112,7 @@ def main(cfg_file_name):
         position = ift.MultiField.union([0.1*ift.from_random(sky.domain), position.extract(weightop.domain)])
 
     if rve.mpi.mpi:
+        rve.mpi.comm.Barrier()
         if not master:
             position = None
         position = rve.mpi.comm.bcast(position, root=0)
