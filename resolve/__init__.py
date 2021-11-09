@@ -8,7 +8,6 @@ from .data.averaging import *
 from .fits import field2fits, fits2field
 from .global_config import *
 from .likelihood import *
-from .minimization import Minimization, MinimizationState, simple_minimize
 from .mosaicing import *
 from .mpi import onlymaster
 from .mpi_operators import *
@@ -20,7 +19,6 @@ from .multi_frequency.operators import (
     WienerIntegrations,
 )
 from .data.observation import *
-from .plotter import MfPlotter, Plotter
 from .points import PointInserter
 from .data.polarization import Polarization
 from .polarization_matrix_exponential import *
@@ -29,3 +27,4 @@ from .response import MfResponse, ResponseDistributor, StokesIResponse, SingleRe
 from .simple_operators import *
 from .util import *
 from .extra import mpi_load
+from .sky_model import *

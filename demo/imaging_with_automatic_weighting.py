@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright(C) 2021 Max-Planck-Society
-# Author: Philipp Arras, Jakob Knollmüller
+# Author: Philipp Arras
 
-import numpy as np
 import configparser
 import os
 import sys
 from distutils.util import strtobool
 
 import nifty8 as ift
+import numpy as np
 import resolve as rve
 from matplotlib.colors import LogNorm
 from resolve.mpi import master
@@ -20,67 +20,14 @@ def main(cfg_file_name):
     if master:
         print(f"Load {cfg_file_name}")
 
-    point_sources = [("0deg", "0deg")]
-
     rve.set_epsilon(cfg["response"].getfloat("epsilon"))
     rve.set_wgridding(strtobool(cfg["response"]["wgridding"]))
     rve.set_double_precision(True)
     rve.set_nthreads(cfg["technical"].getint("nthreads"))
 
-    nx = cfg["sky"].getint("space npix x")
-    ny = cfg["sky"].getint("space npix y")
-    dx = rve.str2rad(cfg["sky"]["space fov x"]) / nx
-    dy = rve.str2rad(cfg["sky"]["space fov y"]) / ny
-    dom = ift.RGSpace([nx, ny], [dx, dy])
+    enable_weighting = cfg["weighting"].getboolean("enable")
 
-    # Sky model
-    # Diffuse
-    cfm_zm_args = {
-        "offset_mean":
-            cfg["sky"].getfloat("zero mode offset"),
-        "offset_std": (
-            cfg["sky"].getfloat("zero mode mean"),
-            cfg["sky"].getfloat("zero mode stddev"),
-        ),
-    }
-    cfm_spatial_args = {
-        "fluctuations": (
-            cfg["sky"].getfloat("space fluctuations mean"),
-            cfg["sky"].getfloat("space fluctuations stddev"),
-        ),
-        "loglogavgslope": (
-            cfg["sky"].getfloat("space loglogavgslope mean"),
-            cfg["sky"].getfloat("space loglogavgslope stddev"),
-        ),
-        "flexibility": (
-            cfg["sky"].getfloat("space flexibility mean"),
-            cfg["sky"].getfloat("space flexibility stddev"),
-        ),
-        "asperity": (
-            cfg["sky"].getfloat("space asperity mean"),
-            cfg["sky"].getfloat("space asperity stddev"),
-        ),
-    }
-    logdiffuse = ift.SimpleCorrelatedField(dom, **cfm_spatial_args, **cfm_zm_args)
-
-    # Point sources
-    ppos = []
-    for point in point_sources:
-        ppos.append([rve.str2rad(point[0]), rve.str2rad(point[1])])
-    inserter = rve.PointInserter(dom, ppos)
-    points = ift.InverseGammaOperator(
-        inserter.domain, alpha=0.5, q=0.2 / dom.scalar_dvol).ducktape("points")
-    points = inserter @ points
-
-    sky = logdiffuse.exp() + points
-    # /Sky model
-
-    p = ift.Plot()
-    for _ in range(9):
-        p.add(sky(ift.from_random(sky.domain)), norm=LogNorm())
-    if master:
-        p.output(name="sky_prior_samples.png")
-
+    # Data
     obs_file_name = cfg["data"]["path"]
     if os.path.splitext(obs_file_name)[1] == ".npz":
         obs = rve.Observation.load(obs_file_name).restrict_to_stokesi().average_stokesi()
@@ -91,84 +38,85 @@ def main(cfg_file_name):
     else:
         raise RuntimeError(
             f"Do not understand file name ending of {obs_file_name}. Supported: ms, npz.")
+    # /Data
 
-    # Weightop
-    npix = 2500
-    effuv = obs.effective_uvwlen().val[0]
-    assert obs.nfreq == obs.npol == 1
-    dom = ift.RGSpace(npix, 2 * np.max(effuv) / npix)
-    logwgt = ift.SimpleCorrelatedField(dom, 0, (2, 2), (2, 2), (1.2, 0.4), (0.5, 0.2), (-2, 0.5),
-                                       "invcov")
-    li = ift.LinearInterpolator(dom, effuv.T)
-    conv = rve.DomainChangerAndReshaper(li.target, obs.weight.domain)
-    weightop = ift.makeOp(obs.weight) @ (conv @ li @ logwgt.exp()) ** (-2)
-    # /Weightop
+    # Sky model
+    sky, operators = rve.single_frequency_sky(cfg["sky"])
+    enable_points = operators["points"] is not None
+    operators["sky"] = sky
+    operators["logsky"] = sky.log()
+
+    p = ift.Plot()
+    for _ in range(9):
+        p.add(sky(ift.from_random(sky.domain)), norm=LogNorm())
+    if master:
+        p.output(name="sky_prior_samples.png")
+    # /Sky model
+
+    # Bayesian weighting
+    if enable_weighting:
+        assert obs.nfreq == obs.npol == 1
+        subcfg = cfg["weighting"]
+        if subcfg["model"] == "cfm":
+            npix = 2500
+            xs = np.log(obs.effective_uvwlen().val)
+            xs -= np.min(xs)
+            if not xs.shape[0] == xs.shape[2] == 1:
+                raise RuntimeError
+            # FIXME Use Integrated Wiener process
+            dom = ift.RGSpace(npix, 2 * np.max(xs) / npix)
+            logwgt, cfm = rve.cfm_from_cfg(subcfg, dom, "invcov")
+            li = ift.LinearInterpolator(dom, xs[0].T)
+            conv = rve.DomainChangerAndReshaper(li.target, obs.weight.domain)
+            weightop = ift.makeOp(obs.weight) @ (conv @ li @ logwgt.exp()) ** (-2)
+            operators["logweights"] = logwgt
+            operators["weights"] = logwgt.exp()
+            operators["logweights power spectrum"] = cfm.power_spectrum
+        else:
+            raise NotImplementedError
+    else:
+        weightop = None
+    # /Bayesian weighting
 
     full_lh = rve.ImagingLikelihood(obs, sky, inverse_covariance_operator=weightop)
     position = 0.1 * ift.from_random(full_lh.domain)
-
-    common = {
-        "output_directory": cfg["output"]["directory"],
-        "plottable_operators": {
-            "sky": sky,
-            "logsky": sky.log(),
-            "points": points,
-            "logdiffuse": logdiffuse,
-            "logdiffuse pspec": logdiffuse.power_spectrum
-        },
-        "overwrite": True
-    }
+    common = {"output_directory": cfg["output"]["directory"],
+              "plottable_operators": operators,
+              "overwrite": True}
 
     if master:
-        # Points only, MAP
-        lh = rve.ImagingLikelihood(obs, points)
-        sl = ift.optimize_kl(
-            lh,
-            1,
-            0,
-            ift.NewtonCG(ift.GradientNormController(name="hamiltonian", iteration_limit=4)),
-            None,
-            None,
-            initial_position=position,
-            **common)
-        position = ift.MultiField.union([position, sl.local_item(0)])
+        common["comm"] = rve.mpi.comm_self
+        if enable_points:
+            # Points only, MAP
+            lh = rve.ImagingLikelihood(obs, operators["points"])
+            mini = ift.NewtonCG(ift.GradientNormController(name="hamiltonian", iteration_limit=4))
+            sl = ift.optimize_kl(lh, 1, 0, mini, None, None, initial_position=position, **common)
+            position = sl.local_item(0)
 
         # Points constant, diffuse only, MAP
         lh = rve.ImagingLikelihood(obs, sky)
-        sl = ift.optimize_kl(
-            lh,
-            1,
-            0,
-            ift.NewtonCG(ift.GradientNormController(name="hamiltonian", iteration_limit=20)),
-            None,
-            None,
-            initial_position=position,
-            initial_index=1,
-            **common)
-        position = ift.MultiField.union([position, sl.local_item(0)])
+        mini = ift.NewtonCG(ift.GradientNormController(name="hamiltonian", iteration_limit=20))
+        sl = ift.optimize_kl(lh, 1, 0, mini, None, None, initial_position=position, initial_index=1, **common)
+        position = sl.local_item(0)
 
+        # Only weighting, MGVI
         cst = sky.domain.keys()
-        sl = ift.optimize_kl(
-            full_lh,
-            1,
-            0,
-            ift.VL_BFGS(ift.GradientNormController(name="bfgs", iteration_limit=20)),
-            ift.AbsDeltaEnergyController(0.1, 3, 100, name="Sampling"),
-            None,
-            constants=cst,
-            point_estimates=cst,
-            initial_position=position,
-            initial_index=2,
-            **common)
-        position = ift.MultiField.union([position, sl.local_item(0)])
+        mini = ift.VL_BFGS(ift.GradientNormController(name="bfgs", iteration_limit=20))
+        ic_sampling = ift.AbsDeltaEnergyController(0.1, 3, 100, name="Sampling")
+        sl = ift.optimize_kl(full_lh, 5, 3, mini, ic_sampling, None,
+                             constants=cst, point_estimates=cst,
+                             initial_position=position, initial_index=2, **common)
+        position = sl.local_item(0)
+
+        # Reset sky
+        position = ift.MultiField.union([0.1*ift.from_random(sky.domain), position.extract(weightop.domain)])
 
     if rve.mpi.mpi:
         if not master:
             position = None
         position = rve.mpi.comm.bcast(position, root=0)
     ift.random.push_sseq_from_seed(42)
-
-    # First MGVI diffuse sky, then sky + weighting simultaneously
+    common["comm"] = rve.mpi.comm
 
     def get_mini(iglobal):
         if iglobal < 7:
@@ -185,26 +133,20 @@ def main(cfg_file_name):
             lim = 700
         else:
             lim = 700
-        return ift.AbsDeltaEnergyController(deltaE=0.5, iteration_limit=lim)
+        return ift.AbsDeltaEnergyController(deltaE=0.5, iteration_limit=lim, name="Sampling")
 
     def get_cst(iglobal):
+        res = []
         if iglobal < 7:
-            return list(points.domain.keys()) + list(weightop.domain.keys())
-        else:
-            return []
+            res += list(weightop.domain.keys())
+            if enable_points:
+                res += list(operators["points"].domain.keys())
+        return res
 
-    sl = ift.optimize_kl(
-        full_lh,
-        35,
-        5,
-        get_mini,
-        get_sampling,
-        None,
-        constants=get_cst,
-        point_estimates=get_cst,
-        initial_position=position,
-        initial_index=7,
-        **common)
+    # First MGVI diffuse sky, then sky + weighting simultaneously
+    sl = ift.optimize_kl(full_lh, 35, 6, get_mini, get_sampling, None,
+                         constants=get_cst, point_estimates=get_cst,
+                         initial_position=position, initial_index=7, **common)
 
 
 if __name__ == "__main__":
