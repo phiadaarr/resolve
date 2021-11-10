@@ -27,7 +27,9 @@ class WienerIntegrations(ift.LinearOperator):
         self._target = ift.makeDomain((time_domain, remaining_domain))
         dom = ift.UnstructuredDomain((2, time_domain.size - 1)), remaining_domain
         self._domain = ift.makeDomain(dom)
-        self._volumes = time_domain.dvol[:, None, None]
+        self._volumes = time_domain.dvol
+        for _ in range(len(remaining_domain.shape)):
+            self._volumes = self._volumes[..., np.newaxis]
         self._capability = self.TIMES | self.ADJOINT_TIMES
 
     def apply(self, x, mode):
