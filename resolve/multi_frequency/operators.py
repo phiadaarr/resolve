@@ -55,17 +55,30 @@ class WienerIntegrations(ift.LinearOperator):
         return ift.makeField(self._tgt(mode), res)
 
 
-def IntWProcessInitialConditions(a0, b0, wfop):
-    for op in [a0, b0, wfop]:
+def IntWProcessInitialConditions(a0, b0, wpop, irg_space=None):
+    for op in [a0, b0]:
         my_assert(ift.is_operator(op))
-    my_asserteq(a0.target, b0.target, ift.makeDomain(wfop.target[1]))
-    bc = _FancyBroadcast(wfop.target)
-    factors = ift.full(wfop.target[0], 0)
-    factors = np.empty(wfop.target[0].shape)
+
+    if ift.is_operator(wpop):
+        tgt = wpop.target
+    else:
+        tgt = irg_space, a0.target[0]
+    my_asserteq(a0.target[0], b0.target[0], tgt[1])
+
+    sdom = tgt[0]
+
+    bc = _FancyBroadcast(tgt)
+    factors = ift.full(sdom, 0)
+    factors = np.empty(sdom.shape)
     factors[0] = 0
-    factors[1:] = np.cumsum(wfop.target[0].dvol)
-    factors = ift.makeField(wfop.target[0], factors)
-    return wfop + bc @ a0 + ift.DiagonalOperator(factors, wfop.target, 0) @ bc @ b0
+    factors[1:] = np.cumsum(sdom.dvol)
+    factors = ift.makeField(sdom, factors)
+    res = bc @ a0 + ift.DiagonalOperator(factors, tgt, 0) @ bc @ b0
+
+    if wpop is None:
+        return res
+    else:
+        return wpop + res
 
 
 class _FancyBroadcast(ift.LinearOperator):
