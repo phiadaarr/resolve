@@ -83,7 +83,6 @@ def main(cfg_file_name):
 
     common = {"plottable_operators": operators, "overwrite": True}
 
-
     def get_mini(iglobal):
         if iglobal == 0:
             return ift.NewtonCG(ift.GradientNormController(name="hamiltonian", iteration_limit=4))
@@ -126,7 +125,7 @@ def main(cfg_file_name):
     sl = ift.optimize_kl(get_lh, 7, get_n_samples, get_mini, get_sampling, None,
                          constants=get_cst, point_estimates=get_cst, initial_position=position,
                          comm=get_comm, callback=callback,
-                         output_directory=cfg["output"]["directory"] + "initial", **common)
+                         output_directory=cfg["output"]["directory"] + "_initial", **common)
 
     # Reset sky
     position = ift.MultiField.union([0.1*ift.from_random(sky.domain),
@@ -153,7 +152,6 @@ def main(cfg_file_name):
                          constants=get_cst, point_estimates=get_cst,
                          initial_position=position, comm=rve.mpi.comm,
                          output_directory=cfg["output"]["directory"], **common)
-            
 
 
 if __name__ == "__main__":
