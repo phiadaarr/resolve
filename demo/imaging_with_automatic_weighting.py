@@ -80,61 +80,66 @@ def main(cfg_file_name):
 
     full_lh = rve.ImagingLikelihood(obs, sky, inverse_covariance_operator=weightop)
     position = 0.1 * ift.from_random(full_lh.domain)
-    common = {"output_directory": cfg["output"]["directory"],
-              "plottable_operators": operators,
-              "overwrite": True}
 
-    if master:
-        common["comm"] = rve.mpi.comm_self
-        if enable_points:
-            # Points only, MAP
-            lh = rve.ImagingLikelihood(obs, operators["points"])
-            mini = ift.NewtonCG(ift.GradientNormController(name="hamiltonian", iteration_limit=4))
-            sl = ift.optimize_kl(lh, 1, 0, mini, None, None, initial_position=position, **common)
-            position = sl.local_item(0)
+    common = {"plottable_operators": operators, "overwrite": True}
 
-        # Points constant, diffuse only, MAP
-        lh = rve.ImagingLikelihood(obs, sky)
-        mini = ift.NewtonCG(ift.GradientNormController(name="hamiltonian", iteration_limit=20))
-        sl = ift.optimize_kl(lh, 1, 0, mini, None, None, initial_position=position, initial_index=1, **common)
-        position = sl.local_item(0)
-
-        # Only weighting, MGVI
-        cst = sky.domain.keys()
-        mini = ift.VL_BFGS(ift.GradientNormController(name="bfgs", iteration_limit=20))
-        ic_sampling = ift.AbsDeltaEnergyController(0.1, 3, 100, name="Sampling")
-        sl = ift.optimize_kl(full_lh, 5, 3, mini, ic_sampling, None,
-                             constants=cst, point_estimates=cst,
-                             initial_position=position, initial_index=2, **common)
-        position = sl.local_item(0)
-
-        # Reset sky
-        position = ift.MultiField.union([0.1*ift.from_random(sky.domain), position.extract(weightop.domain)])
-
-    if rve.mpi.mpi:
-        rve.mpi.comm.Barrier()
-        if not master:
-            position = None
-        position = rve.mpi.comm.bcast(position, root=0)
-    ift.random.push_sseq_from_seed(42)
-    common["comm"] = rve.mpi.comm
 
     def get_mini(iglobal):
-        if iglobal < 7:
-            return ift.NewtonCG(ift.GradientNormController(name="kl", iteration_limit=15))
-        elif iglobal < 7 + 5:
-            return ift.VL_BFGS(ift.GradientNormController(name="kl", iteration_limit=15))
-        else:
-            return ift.NewtonCG(ift.GradientNormController(name="kl", iteration_limit=15))
+        if iglobal == 0:
+            return ift.NewtonCG(ift.GradientNormController(name="hamiltonian", iteration_limit=4))
+        if iglobal == 1:
+            return ift.NewtonCG(ift.GradientNormController(name="hamiltonian", iteration_limit=20))
+        return ift.VL_BFGS(ift.GradientNormController(name="bfgs", iteration_limit=20))
 
     def get_sampling(iglobal):
-        if iglobal < 7:
-            lim = 200
-        elif iglobal < 7 + 5:
-            lim = 700
-        else:
-            lim = 700
-        return ift.AbsDeltaEnergyController(deltaE=0.5, iteration_limit=lim, name="Sampling")
+        if iglobal in [0, 1]:
+            return None
+        return ift.AbsDeltaEnergyController(deltaE=0.5, convergence_level=3, iteration_limit=500,
+                                            name="Sampling")
+
+    def get_cst(iglobal):
+        if iglobal in [0, 1]:
+            return []
+        return sky.domain.keys()
+
+    def get_lh(iglobal):
+        if iglobal == 0:
+            return rve.ImagingLikelihood(obs, operators["points"])
+        if iglobal == 1:
+            return rve.ImagingLikelihood(obs, sky)
+        return full_lh
+
+    def get_n_samples(iglobal):
+        if iglobal in [0, 1]:
+            return 0
+        return 3
+
+    def get_comm(iglobal):
+        return rve.mpi.comm
+
+    def callback(sl, iglobal):
+        lh = get_lh(iglobal)
+        s = ift.extra.minisanity(lh.data, lh.metric_at_pos, lh.model_data, sl)
+        if rve.mpi.master:
+            print(s)
+
+    sl = ift.optimize_kl(get_lh, 7, get_n_samples, get_mini, get_sampling, None,
+                         constants=get_cst, point_estimates=get_cst, initial_position=position,
+                         comm=get_comm, callback=callback,
+                         output_directory=cfg["output"]["directory"] + "initial", **common)
+
+    # Reset sky
+    position = ift.MultiField.union([0.1*ift.from_random(sky.domain),
+                                     position.extract(weightop.domain)])
+
+    def get_mini(iglobal):
+        if iglobal < 5:
+            return ift.VL_BFGS(ift.GradientNormController(name="kl", iteration_limit=15))
+        return ift.NewtonCG(ift.GradientNormController(name="kl", iteration_limit=15))
+
+    def get_sampling(iglobal):
+        return ift.AbsDeltaEnergyController(deltaE=0.5, convergence_level=3, iteration_limit=100,
+                                            name="Sampling")
 
     def get_cst(iglobal):
         res = []
@@ -144,10 +149,11 @@ def main(cfg_file_name):
                 res += list(operators["points"].domain.keys())
         return res
 
-    # First MGVI diffuse sky, then sky + weighting simultaneously
     sl = ift.optimize_kl(full_lh, 35, 6, get_mini, get_sampling, None,
                          constants=get_cst, point_estimates=get_cst,
-                         initial_position=position, initial_index=7, **common)
+                         initial_position=position, comm=rve.mpi.comm,
+                         output_directory=cfg["output"]["directory"], **common)
+            
 
 
 if __name__ == "__main__":
