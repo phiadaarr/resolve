@@ -59,10 +59,13 @@ class IRGSpace(ift.StructuredDomain):
 
     @property
     def dvol(self):
-        """This has one pixel less than :meth:`shape`. Not sure if this is
-        okay.
-        """
-        return np.diff(np.array(self._coordinates))
+        """Assume that the coordinates are the center of symmetric pixels."""
+        c = np.array(self._coordinates)
+        bounds = np.empty(self.size + 1)
+        bounds[1:-1] = c[:-1] + 0.5*np.diff(c)
+        bounds[0] = c[0] - 0.5*(c[1] - c[0])
+        bounds[-1] = c[-1] + 0.5*(c[-1] - c[-2])
+        return np.diff(bounds)
 
     @property
     def coordinates(self):
