@@ -34,7 +34,7 @@ class CalibrationDistributor(ift.LinearOperator):
         my_assert(np.issubdtype(ant_col.dtype, np.integer))
         my_assert(set(np.unique(ant_col)) <= set(antenna_dct.keys()))
         my_assert(np.min(ant_col) >= 0)
-        my_assert(np.max(ant_col) < len(antenna_dct))
+        my_assert(np.max(ant_col) <= max(antenna_dct.keys()))
         self._domain = ift.DomainTuple.make(domain)
         self._target = ift.DomainTuple.make(target)
         my_asserteq(len(self._domain), 4)

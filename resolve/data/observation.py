@@ -598,6 +598,13 @@ class Observation(BaseObservation):
         return Observation(self._antpos, self._vis, wgt, self._polarization, self._freq, self._auxiliary_tables)
 
     @property
+    def nbaselines(self):
+        return len(self.baselines())
+
+    def baselines(self):
+        return set((a1, a2) for a1, a2 in zip(self.ant1, self.ant2))
+
+    @property
     def uvw(self):
         return self._antpos.uvw
 
