@@ -58,13 +58,17 @@ def main(cfg_file_name):
         assert obs.nfreq == obs.npol == 1
         subcfg = cfg["weighting"]
         if subcfg["model"] == "cfm":
-            npix = 2500  # FIXME Use numbers from config file
+            import ducc0
+
+            npix = subcfg.getint("npix")
+            fac = subcfg.getfloat("zeropadding factor")
+            npix_padded = ducc0.fft.good_size(int(np.round(npix*fac)))
+
             xs = np.log(obs.effective_uvwlen().val)
             xs -= np.min(xs)
             if not xs.shape[0] == xs.shape[2] == 1:
                 raise RuntimeError
-            # FIXME Use Integrated Wiener process
-            dom = ift.RGSpace(npix, 2 * np.max(xs) / npix)
+            dom = ift.RGSpace(npix_padded, np.max(xs) / npix)
             logwgt, cfm = rve.cfm_from_cfg(subcfg, dom, "invcov")
             li = ift.LinearInterpolator(dom, xs[0].T)
             conv = rve.DomainChangerAndReshaper(li.target, obs.weight.domain)
@@ -81,7 +85,7 @@ def main(cfg_file_name):
     full_lh = rve.ImagingLikelihood(obs, sky, inverse_covariance_operator=weightop)
     position = 0.1 * ift.from_random(full_lh.domain)
 
-    common = {"plottable_operators": operators, "overwrite": True}
+    common = {"plottable_operators": operators, "overwrite": True, "return_final_position": True}
 
     def get_mini(iglobal):
         if iglobal == 0:
@@ -122,14 +126,17 @@ def main(cfg_file_name):
         if rve.mpi.master:
             print(s)
 
-    sl = ift.optimize_kl(get_lh, 7, get_n_samples, get_mini, get_sampling, None,
-                         constants=get_cst, point_estimates=get_cst, initial_position=position,
-                         comm=get_comm, callback=callback,
-                         output_directory=cfg["output"]["directory"] + "_initial", **common)
+    if True:
+        _, position = ift.optimize_kl(get_lh, 7, get_n_samples, get_mini, get_sampling, None,
+                                      constants=get_cst, point_estimates=get_cst,
+                                      initial_position=position, comm=get_comm, callback=callback,
+                                      output_directory=cfg["output"]["directory"] + "_initial",
+                                      **common)
+    else:
+        position = ift.ResidualSampleList.load_mean("Cygnus_A_2052MHz_initial/pickle/last")
 
-    # Reset sky
-    position = ift.MultiField.union([0.1*ift.from_random(sky.domain),
-                                     position.extract(weightop.domain)])
+    # Reset diffuse component
+    position = ift.MultiField.union([position, 0.1*ift.from_random(operators["logdiffuse"].domain)])
 
     def get_mini(iglobal):
         if iglobal < 5:
@@ -148,10 +155,10 @@ def main(cfg_file_name):
                 res += list(operators["points"].domain.keys())
         return res
 
-    sl = ift.optimize_kl(full_lh, 35, 6, get_mini, get_sampling, None,
-                         constants=get_cst, point_estimates=get_cst,
-                         initial_position=position, comm=rve.mpi.comm,
-                         output_directory=cfg["output"]["directory"], **common)
+    ift.optimize_kl(full_lh, 35, 6, get_mini, get_sampling, None,
+                    constants=get_cst, point_estimates=get_cst,
+                    initial_position=position, comm=rve.mpi.comm,
+                    output_directory=cfg["output"]["directory"], **common)
 
 
 if __name__ == "__main__":
