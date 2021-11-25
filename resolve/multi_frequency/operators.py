@@ -27,7 +27,7 @@ class WienerIntegrations(ift.LinearOperator):
         self._target = ift.makeDomain((time_domain, remaining_domain))
         dom = ift.UnstructuredDomain((2, time_domain.size - 1)), remaining_domain
         self._domain = ift.makeDomain(dom)
-        self._volumes = time_domain.dvol
+        self._volumes = time_domain.distances
         for _ in range(len(remaining_domain.shape)):
             self._volumes = self._volumes[..., np.newaxis]
         self._capability = self.TIMES | self.ADJOINT_TIMES
@@ -42,9 +42,7 @@ class WienerIntegrations(ift.LinearOperator):
             x = x.val
             res = np.zeros(self._target.shape)
             res[from_second] = np.cumsum(x[second], axis=0)
-            res[from_second] = (
-                res[from_second] + res[no_border]
-            ) / 2 * self._volumes + x[first]
+            res[from_second] = (res[from_second] + res[no_border]) / 2 * self._volumes + x[first]
             res[from_second] = np.cumsum(res[from_second], axis=0)
         else:
             x = x.val_rw()
@@ -73,7 +71,7 @@ def IntWProcessInitialConditions(a0, b0, wpop, irg_space=None):
     factors = ift.full(sdom, 0)
     factors = np.empty(sdom.shape)
     factors[0] = 0
-    factors[1:] = np.cumsum(sdom.dvol)
+    factors[1:] = np.cumsum(sdom.distances)
     factors = ift.makeField(sdom, factors)
     res = bc @ a0 + ift.DiagonalOperator(factors, tgt, 0) @ bc @ b0
 

@@ -68,5 +68,9 @@ class IRGSpace(ift.StructuredDomain):
         return np.diff(bounds)
 
     @property
+    def distances(self):
+        return np.diff(self._coordinates)
+
+    @property
     def coordinates(self):
         return self._coordinates
