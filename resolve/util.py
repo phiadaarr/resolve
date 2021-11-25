@@ -154,3 +154,31 @@ and `sdom` is a two-dimensional `RGSpace`.
     my_assert_isinstance(fdom, IRGSpace)
     my_assert_isinstance(sdom, ift.RGSpace)
     my_asserteq(len(sdom.shape), 2)
+
+
+def assert_data_domain(dom):
+    """Check that input fulfils resolve's conventions of a data domain.
+
+    A data domain is a DomainTuple:
+
+    dom = (pdom, rdom, fdom)
+
+    where `pdom` is a `PolarizationSpace`, `rdom` is an UnstructuredDomain representing the rows of the measurement set and
+    `fdom` is an `IRGSpace` containing the frequencies.
+
+    Parameters
+    ----------
+    dom : DomainTuple
+        Object that is checked to fulfil the properties.
+    """
+    from .irg_space import IRGSpace
+    from .polarization_space import PolarizationSpace
+
+    my_assert_isinstance(dom, ift.DomainTuple)
+    my_asserteq(len(dom), 3)
+    pdom, rdom, fdom = dom
+    for ii in range(3):
+        my_asserteq(len(dom[ii].shape), 1)
+    my_assert_isinstance(pdom, PolarizationSpace)
+    my_assert_isinstance(rdom, ift.UnstructuredDomain)
+    my_assert_isinstance(fdom, IRGSpace)
