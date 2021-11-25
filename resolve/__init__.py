@@ -15,7 +15,6 @@ from .data.ms_import import *
 from .multi_frequency.irg_space import IRGSpace
 from .multi_frequency.operators import (
     IntWProcessInitialConditions,
-    MfWeightingInterpolation,
     WienerIntegrations,
 )
 from .data.observation import *

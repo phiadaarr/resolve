@@ -5,7 +5,6 @@
 import nifty8 as ift
 import numpy as np
 
-from ..polarization_space import PolarizationSpace
 from ..util import my_assert, my_assert_isinstance, my_asserteq
 from .irg_space import IRGSpace
 
@@ -95,33 +94,4 @@ class _FancyBroadcast(ift.LinearOperator):
             res = np.broadcast_to(x.val[None], self._target.shape)
         else:
             res = np.sum(x.val, axis=0)
-        return ift.makeField(self._tgt(mode), res)
-
-
-class MfWeightingInterpolation(ift.LinearOperator):
-    def __init__(self, eff_uvw, domain):
-        domain = ift.DomainTuple.make(domain)
-        my_asserteq(domain.shape[0], eff_uvw.shape[2])  # freqaxis
-        self._domain = domain
-        nrow, nfreq = eff_uvw.shape[1:]
-        tgt = [PolarizationSpace("I")] + [ift.UnstructuredDomain(aa) for aa in [nrow, nfreq]]
-        self._target = ift.DomainTuple.make(tgt)
-        self._capability = self.TIMES | self.ADJOINT_TIMES
-        # FIXME Try to unify all those operators which loop over freq dimension
-        self._ops = []
-        for ii in range(nfreq):
-            op = ift.LinearInterpolator(domain[1], eff_uvw.val[:, :, ii])
-            self._ops.append(op)
-        my_asserteq(self.target.shape[0], 1)
-
-    def apply(self, x, mode):
-        self._check_input(x, mode)
-        res = np.empty(self._tgt(mode).shape)
-        if mode == self.TIMES:
-            for ii, op in enumerate(self._ops):
-                res[0, :, ii] = op(ift.makeField(op.domain, x.val[ii])).val
-        else:
-            for ii, op in enumerate(self._ops):
-                op = op.adjoint
-                res[ii] = op(ift.makeField(op.domain, x.val[0, :, ii])).val
         return ift.makeField(self._tgt(mode), res)
