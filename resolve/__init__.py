@@ -12,8 +12,8 @@ from .mosaicing import *
 from .mpi import onlymaster
 from .mpi_operators import *
 from .data.ms_import import *
-from .multi_frequency.irg_space import IRGSpace
-from .multi_frequency.operators import (
+from .irg_space import IRGSpace
+from .integrated_wiener_process import (
     IntWProcessInitialConditions,
     WienerIntegrations,
 )
