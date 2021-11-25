@@ -8,7 +8,7 @@ from .constants import str2rad
 from .points import PointInserter
 
 
-def single_frequency_sky(cfg_section, list_point_sources=[]):
+def single_frequency_sky(cfg_section):
     nx = cfg_section.getint("space npix x")
     ny = cfg_section.getint("space npix y")
     dx = str2rad(cfg_section["space fov x"]) / nx
