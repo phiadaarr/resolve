@@ -42,13 +42,13 @@ def main(cfg_file_name):
 
     # Sky model
     sky, operators = rve.single_frequency_sky(cfg["sky"])
+    raw_sky = operators["sky"]
     enable_points = operators["points"] is not None
-    operators["sky"] = sky
-    operators["logsky"] = sky.log()
+    operators["logsky"] = raw_sky.log()
 
     p = ift.Plot()
     for _ in range(9):
-        p.add(sky(ift.from_random(sky.domain)), norm=LogNorm())
+        p.add(raw_sky(ift.from_random(raw_sky.domain)), norm=LogNorm())
     if master:
         p.output(name="sky_prior_samples.png")
     # /Sky model

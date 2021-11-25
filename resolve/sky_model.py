@@ -40,6 +40,10 @@ def single_frequency_sky(cfg_section):
         add["points"] = None
     else:
         raise ValueError(f"In order to disable point source component, set `point sources mode` to `disable`. Got: {mode}")
+
+    add["sky"] = sky
+    sky = DomainChangerAndReshaper(sky.target, _default_sky_domain(sdom=dom)) @ sky
+    assert_sky_domain(sky.target)
     return sky, add
 
 
@@ -60,8 +64,10 @@ def multi_frequency_sky(cfg):
         add["freq normalized power spectrum"] = fampl**2
         add["space normalized power spectrum"] = sampl**2
 
-        tgt = PolarizationSpace("I"), IRGSpace([np.nan]), fdom, sdom
-        sky = DomainChangerAndReshaper(sky.target, tgt) @ sky
+        add["sky"] = sky
+        reshape = DomainChangerAndReshaper(sky.target, _default_sky_domain(fdom=fdom, sdom=sdom))
+        sky = reshape @ sky
+
     elif cfg["freq mode"] == "integrated wiener process":
         raise NotImplementedError
     else:
@@ -111,3 +117,8 @@ def _parse_or_none(cfg, key):
         return None
     if key0 in cfg:
         return (cfg.getfloat(key0), cfg.getfloat(key1))
+
+
+def _default_sky_domain(pdom=PolarizationSpace(), tdom=IRGSpace([np.nan]), fdom=IRGSpace([np.nan]),
+                        sdom=ift.RGSpace([1, 1])):
+    return pdom, tdom, fdom, sdom
