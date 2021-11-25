@@ -5,8 +5,8 @@
 import nifty8 as ift
 import numpy as np
 
-from ..util import my_assert, my_assert_isinstance, my_asserteq
 from .irg_space import IRGSpace
+from .util import my_assert, my_assert_isinstance, my_asserteq
 
 
 class WienerIntegrations(ift.LinearOperator):
