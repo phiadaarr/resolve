@@ -284,14 +284,8 @@ class Observation(BaseObservation):
         my_asserteq(weight.shape, vis.shape)
         my_asserteq(vis.shape, (len(polarization), nrows, len(freq)))
         my_asserteq(nrows, vis.shape[1])
-        if vis.dtype != np.complex64:
-            print(f"Warning: vis.dtype is {vis.dtype}. Casting to np.complex64")
-            vis = vis.astype(np.complex64)
-        if weight.dtype != np.float32:
-            print(f"Warning: weight.dtype is {weight.dtype}. Casting to np.float32")
-            weight = weight.astype(np.float32)
-        my_asserteq(vis.dtype, np.complex64)
-        my_asserteq(weight.dtype, np.float32)
+        #my_asserteq(vis.dtype, np.complex64)
+        #my_asserteq(weight.dtype, np.float32)
         my_assert(np.all(weight >= 0.0))
         my_assert(np.all(np.isfinite(vis[weight > 0.])))
         my_assert(np.all(np.isfinite(weight)))
