@@ -161,7 +161,7 @@ def test_calibration_likelihood(time_mode):
         ift.UnstructuredDomain(nfreq),
     ]
     if time_mode:
-        reshaper = rve.Reshaper([ift.UnstructuredDomain(total_N), time_domain], dom)
+        reshaper = rve.DomainChangerAndReshaper([ift.UnstructuredDomain(total_N), time_domain], dom)
         dct = {"offset_mean": 0, "offset_std": (1, 0.5)}
         dct1 = {
             "fluctuations": (2.0, 1.0),
