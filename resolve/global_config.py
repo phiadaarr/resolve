@@ -9,7 +9,7 @@ _wgridding = None
 _epsilon = None
 _nthreads = 1
 _verbosity = False
-_double_precision = False
+_double_precision = True
 
 
 def wgridding():
