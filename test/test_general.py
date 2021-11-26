@@ -324,14 +324,6 @@ def test_intop():
     ift.extra.check_linear_operator(op)
 
 
-def test_prefixer():
-    op = rve.KeyPrefixer(
-        ift.MultiDomain.make({"a": ift.UnstructuredDomain(10), "b": ift.RGSpace(190)}),
-        "invcov_inp",
-    ).adjoint
-    ift.extra.check_linear_operator(op)
-
-
 def test_global_config():
     rve.set_double_precision(True)
     assert rve.np_dtype() == rve.np_dtype(False) == np.float64

@@ -59,7 +59,6 @@ def _build_gauss_lh_nres(op, mean, invcov):
 
 
 def _varcov(observation, Rs, inverse_covariance_operator):
-    from .simple_operators import KeyPrefixer
     mosaicing = isinstance(observation, dict)
     s0, s1 = "residual", "inverse covariance"
     if mosaicing:
@@ -78,8 +77,8 @@ def _varcov(observation, Rs, inverse_covariance_operator):
             lhs.append(e @ (a+b))
         masks = reduce(add, masks)
 
-        a = KeyPrefixer(masks.target, "modeld") @ masks @ Rs
-        b = KeyPrefixer(masks.target, "icov") @ masks @ inverse_covariance_operator
+        a = ift.PrependKey(masks.target, "modeld") @ masks @ Rs
+        b = ift.PrependKey(masks.target, "icov") @ masks @ inverse_covariance_operator
         lh = reduce(add, lhs) @ (a + b)
 
         vis = ift.MultiField.from_dict(vis)
