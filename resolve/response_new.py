@@ -19,9 +19,9 @@ class InterferometryResponse(ift.LinearOperator):
     def __init__(self, observation, domain):
         assert isinstance(observation, Observation)
         domain = ift.DomainTuple.make(domain)
-        pdom, tdom, fdom, sdom = domain
-
         assert_sky_domain(domain)
+
+        pdom, tdom, fdom, sdom = domain
 
         n_time_bins = tdom.shape[0]
         n_freq_bins = fdom.shape[0]
@@ -33,7 +33,11 @@ class InterferometryResponse(ift.LinearOperator):
         row_indices, freq_indices = [], []
         for tt in range(n_time_bins):
             sr_tmp, t_tmp, f_tmp = [], [], []
-            oo, tind = observation.restrict_by_time(t_binbounds[tt], t_binbounds[tt+1], True)
+            if tuple(t_binbounds[tt:tt+2]) == (-np.inf, np.inf):
+                oo = observation
+                tind = slice(None)
+            else:
+                oo, tind = observation.restrict_by_time(t_binbounds[tt], t_binbounds[tt+1], True)
             for ff in range(n_freq_bins):
                 ooo, find = oo.restrict_by_freq(f_binbounds[ff], f_binbounds[ff+1], True)
                 if any(np.array(ooo.vis.shape) == 0):
@@ -54,6 +58,14 @@ class InterferometryResponse(ift.LinearOperator):
         self._target = ift.makeDomain((domain[0],) + observation.vis.domain[1:])
         self._capability = self.TIMES | self.ADJOINT_TIMES
 
+        foo = np.zeros(self.target.shape, np.int8)
+        for pp in range(self.domain.shape[0]):
+            for tt in range(self.domain.shape[1]):
+                for ff in range(self.domain.shape[2]):
+                    foo[pp, self._row_indices[tt][ff], self._freq_indices[tt][ff]] = 1.
+        if np.any(foo == 0):
+            raise RuntimeError("This should not happen. This is a bug in `InterferometryResponse`.")
+
     def apply(self, x, mode):
         self._check_input(x, mode)
         x = x.val
@@ -65,7 +77,6 @@ class InterferometryResponse(ift.LinearOperator):
 
     def _times(self, x):
         res = np.empty(self.target.shape, np.complex128)
-        res[()] = np.nan  # TEMP
         for pp in range(self.domain.shape[0]):
             for tt in range(self.domain.shape[1]):
                 for ff in range(self.domain.shape[2]):
@@ -74,7 +85,6 @@ class InterferometryResponse(ift.LinearOperator):
                         continue
                     inp = ift.makeField(op.domain, x[pp, tt, ff])
                     res[pp, self._row_indices[tt][ff], self._freq_indices[tt][ff]] = op(inp).val
-        assert np.sum(np.isnan(res)) == 0  # TEMP
         return res
 
     def _adj_times(self, x):
