@@ -6,6 +6,8 @@ import nifty8 as ift
 import numpy as np
 
 from .constants import str2rad
+from .integrated_wiener_process import (IntWProcessInitialConditions,
+                                        WienerIntegrations)
 from .irg_space import IRGSpace
 from .points import PointInserter
 from .polarization_space import PolarizationSpace
@@ -52,6 +54,7 @@ def multi_frequency_sky(cfg):
         raise NotImplementedError("Point sources are not supported yet.")
 
     sdom = _spatial_dom(cfg)
+    add = {}
 
     if cfg["freq mode"] == "cfm":
         fnpix, df = cfg.getfloat("freq npix"), cfg.getfloat("freq pixel size")
@@ -59,7 +62,7 @@ def multi_frequency_sky(cfg):
         fdom_rg = ift.RGSpace(fnpix, df)
         logdiffuse, cfm = cfm_from_cfg(cfg, {"freq": fdom_rg, "space": sdom}, "sky diffuse")
         sky = logdiffuse.exp()
-        add = {"logdiffuse": logdiffuse}
+        add["logdiffuse"] = logdiffuse
         fampl, sampl = list(cfm.get_normalized_amplitudes())
         add["freq normalized power spectrum"] = fampl**2
         add["space normalized power spectrum"] = sampl**2
@@ -69,7 +72,70 @@ def multi_frequency_sky(cfg):
         sky = reshape @ sky
 
     elif cfg["freq mode"] == "integrated wiener process":
-        raise NotImplementedError
+        prefix = "sky"
+
+        freq = np.sort(np.array(list(map(float, cfg["frequencies"].split(",")))))
+        fdom = IRGSpace(freq)
+        log_fdom = IRGSpace(np.log(freq / freq.mean()))
+
+        # Base sky brightness distribution for mean frequency \nu_0
+        i_0, i_0_cfm = cfm_from_cfg(cfg, {"space i0": sdom}, "space i0")
+
+        # simple spectral index that is frequency independent
+        alpha, alpha_cfm = cfm_from_cfg(cfg, {"space alpha": sdom}, "space alpha")
+
+        flexibility = _parse_or_none(cfg, "freq flexibility")
+        if flexibility is None:
+            raise RuntimeError("freq flexibility cannot be None")
+        asperity = _parse_or_none(cfg, "freq asperity")
+
+        # IDEA Try to use individual power spectra
+        n_freq_xi_fields = 2 * (log_fdom.size - 1)
+        cfm = ift.CorrelatedFieldMaker(f"{prefix}freq_xi", total_N=n_freq_xi_fields)
+        cfm.set_amplitude_total_offset(0.0, None)
+        # FIXME Support fixed fluctuations
+        cfm.add_fluctuations(sdom, (1, 1e-6), (1.2, 0.4), (0.2, 0.2), (-2, 0.5), dofdex=n_freq_xi_fields * [0])
+        freq_xi = cfm.finalize(0)
+
+        # Integrate over excitation fields
+        intop = WienerIntegrations(log_fdom, sdom)
+        freq_xi = DomainChangerAndReshaper(freq_xi.target, intop.domain) @ freq_xi
+        broadcast = ift.ContractionOperator(intop.domain[0], None).adjoint
+        broadcast_full = ift.ContractionOperator(intop.domain, 1).adjoint
+        vol = log_fdom.distances
+
+        flex = ift.LognormalTransform(*flexibility, prefix + "flexibility", 0)
+
+        dom = intop.domain[0]
+        vflex = np.empty(dom.shape)
+        vflex[0] = vflex[1] = np.sqrt(vol)
+        sig_flex = ift.makeOp(ift.makeField(dom, vflex)) @ broadcast @ flex
+        sig_flex = broadcast_full @ sig_flex
+        shift = np.ones(dom.shape)
+        shift[0] = vol * vol / 12.0
+        if asperity is None:
+            shift = ift.DiagonalOperator(ift.makeField(dom, shift).sqrt(), intop.domain, 0)
+            increments = shift @ (freq_xi * sig_flex)
+        else:
+            asp = ift.LognormalTransform(*asperity, prefix + "asperity", 0)
+            vasp = np.empty(dom.shape)
+            vasp[0] = 1
+            vasp[1] = 0
+            vasp = ift.DiagonalOperator(ift.makeField(dom, vasp), domain=broadcast.target, spaces=0)
+            sig_asp = broadcast_full @ vasp @ broadcast @ asp
+            shift = ift.makeField(intop.domain, np.broadcast_to(shift[..., None, None], intop.domain.shape))
+            increments = freq_xi * sig_flex * (ift.Adder(shift) @ sig_asp).ptw("sqrt")
+        logsky = IntWProcessInitialConditions(i_0, alpha, intop @ increments)
+
+        sky = logsky.exp()
+        add["sky"] = sky
+        add["logsky"] = logsky
+        add["i0"] = i_0
+        add["alpha"] = alpha
+
+        reshape = DomainChangerAndReshaper(sky.target, _default_sky_domain(fdom=fdom, sdom=sdom))
+        sky = reshape @ sky
+
     else:
         raise RuntimeError
 
