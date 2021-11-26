@@ -119,6 +119,6 @@ def _parse_or_none(cfg, key):
         return (cfg.getfloat(key0), cfg.getfloat(key1))
 
 
-def _default_sky_domain(pdom=PolarizationSpace(), tdom=IRGSpace([np.nan]), fdom=IRGSpace([np.nan]),
+def _default_sky_domain(pdom=PolarizationSpace("I"), tdom=IRGSpace([np.nan]), fdom=IRGSpace([np.nan]),
                         sdom=ift.RGSpace([1, 1])):
     return pdom, tdom, fdom, sdom
