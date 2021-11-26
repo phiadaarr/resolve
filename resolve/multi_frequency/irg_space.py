@@ -63,6 +63,8 @@ class IRGSpace(ift.StructuredDomain):
         return np.diff(self.binbounds())
 
     def binbounds(self):
+        if len(self._coordinates) == 1:
+            return np.array([-np.inf, np.inf])
         c = np.array(self._coordinates)
         bounds = np.empty(self.size + 1)
         bounds[1:-1] = c[:-1] + 0.5*np.diff(c)
