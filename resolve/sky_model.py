@@ -44,7 +44,10 @@ def single_frequency_sky(cfg_section):
         raise ValueError(f"In order to disable point source component, set `point sources mode` to `disable`. Got: {mode}")
 
     add["sky"] = sky
-    sky = DomainChangerAndReshaper(sky.target, _default_sky_domain(sdom=dom)) @ sky
+    conv = DomainChangerAndReshaper(sky.target, _default_sky_domain(sdom=dom))
+    sky = conv @ sky
+    if add["points"] is not None:
+        add["points"] = conv @ add["points"]
     assert_sky_domain(sky.target)
     return sky, add
 
