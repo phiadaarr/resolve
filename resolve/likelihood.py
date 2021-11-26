@@ -5,12 +5,11 @@
 from functools import reduce
 from operator import add
 
+import nifty8 as ift
 import numpy as np
 
-import nifty8 as ift
-
 from .data.observation import Observation
-from .response import FullPolResponse, MfResponse, StokesIResponse
+from .response_new import InterferometryResponse
 from .util import my_assert, my_assert_isinstance, my_asserteq
 
 

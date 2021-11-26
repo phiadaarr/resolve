@@ -187,13 +187,8 @@ class SingleResponse(ift.LinearOperator):
             cx = ((0.5 + xx) / nfacets_x - 0.5) * self._args["pixsize_x"] * npix_x
             cy = ((0.5 + yy) / nfacets_y - 0.5) * self._args["pixsize_y"] * npix_y
             facet = x[nx * xx: nx * (xx + 1), ny * yy: ny * (yy + 1)]
-            foo = dirty2vis(
-                dirty=facet,
-                center_x=cx,
-                center_y=cy,
-                verbosity=verbosity(),
-                **self._args
-            )
+            foo = dirty2vis(dirty=facet, center_x=cx, center_y=cy, verbosity=verbosity(),
+                            **self._args)
             if vis is None:
                 vis = foo
             else:
@@ -209,14 +204,7 @@ class SingleResponse(ift.LinearOperator):
         for xx, yy in product(range(nfacets_x), range(nfacets_y)):
             cx = ((0.5 + xx) / nfacets_x - 0.5) * self._args["pixsize_x"] * npix_x
             cy = ((0.5 + yy) / nfacets_y - 0.5) * self._args["pixsize_y"] * npix_y
-            im = vis2dirty(
-                vis=x,
-                npix_x=nx,
-                npix_y=ny,
-                center_x=cx,
-                center_y=cy,
-                verbosity=verbosity(),
-                **self._args
-            )
+            im = vis2dirty(vis=x, npix_x=nx, npix_y=ny, center_x=cx, center_y=cy,
+                           verbosity=verbosity(), **self._args)
             res[nx * xx: nx * (xx + 1), ny * yy: ny * (yy + 1)] = im
         return res
