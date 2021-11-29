@@ -38,7 +38,7 @@ class IRGSpace(ift.StructuredDomain):
         self._coordinates = tuple(bb)
 
     def __repr__(self):
-        return f"IRGSpace(shape={self.shape}, coordinates=...)"
+        return f"IRGSpace(shape={self.shape}, coordinates={self._coordinates})"
 
     @property
     def harmonic(self):
