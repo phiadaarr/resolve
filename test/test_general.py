@@ -25,7 +25,6 @@ for polmode in ["all", "stokesi", "stokesiavg"]:
             f"{direc}CYG-ALL-2052-2MHZ.ms", "DATA", True, 0, polarizations=polmode
         )[0]
     )
-assert OBS[1].max_snr() >= OBS[2].max_snr()  # Average data so SNR increases
 npix, fov = 256, 1 * rve.DEG2RAD
 dom = ift.RGSpace((npix, npix), (fov / npix, fov / npix))
 sky0 = ift.SimpleCorrelatedField(

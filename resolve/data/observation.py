@@ -490,6 +490,8 @@ class Observation(BaseObservation):
         return res
 
     def restrict_to_stokesi(self):
+        if self.vis.domain[0].labels == ("I",):
+            return self
         # FIXME Do I need to change something in self._auxiliary_tables?
         ind = self._polarization.stokes_i_indices()
         vis = self._vis[ind]
