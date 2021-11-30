@@ -144,6 +144,8 @@ def ImagingLikelihood(
     """
     my_assert_isinstance(sky_operator, ift.Operator)
     model_data = InterferometryResponse(observation, sky_operator.target) @ sky_operator
+    if calibration_operator is not None:
+        model_data = calibration_operator * model_data
     if inverse_covariance_operator is None:
         mask, vis, weight = _get_mask(observation)
         return _build_gauss_lh_nres(mask @ model_data, vis, weight)
