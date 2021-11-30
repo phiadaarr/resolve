@@ -19,7 +19,7 @@ rve.set_nthreads(nthreads)
 rve.set_epsilon(1e-4)
 rve.set_wgridding(False)
 OBS = []
-for polmode in ["all", "stokesi", ["LL"], "stokesiavg"]:
+for polmode in ["all", "stokesi", "stokesiavg"]:
     OBS.append(
         rve.ms2observations(
             f"{direc}CYG-ALL-2052-2MHZ.ms", "DATA", True, 0, polarizations=polmode
@@ -36,6 +36,7 @@ points = ift.InverseGammaOperator(
     inserter.domain, alpha=0.5, q=0.2 / dom.scalar_dvol
 ).ducktape("points")
 sky = rve.vla_beam(dom, np.mean(OBS[0].freq)) @ (sky0 + inserter @ points)
+sky = rve.DomainChangerAndReshaper(sky.target, rve.default_sky_domain(sdom=sky.target[0])) @ sky
 
 freqdomain = rve.IRGSpace(np.linspace(1000, 1050, num=10))
 FACETS = [(1, 1), (2, 2), (2, 1), (1, 4)]
@@ -93,6 +94,8 @@ def try_lh(obs, lh_class, *args):
 
 @pmp("obs", OBS)
 def test_imaging_likelihood(obs):
+    obs = obs.restrict_to_stokesi()
+    op = rve.ImagingLikelihood(obs, sky)
     try_lh(obs, rve.ImagingLikelihood, obs, sky)
 
 

@@ -188,6 +188,10 @@ def _parse_or_none(cfg, key):
         return (cfg.getfloat(key0), cfg.getfloat(key1))
 
 
-def _default_sky_domain(pdom=PolarizationSpace("I"), tdom=IRGSpace([np.nan]), fdom=IRGSpace([np.nan]),
-                        sdom=ift.RGSpace([1, 1])):
-    return pdom, tdom, fdom, sdom
+def default_sky_domain(pdom=PolarizationSpace("I"), tdom=IRGSpace([np.nan]), fdom=IRGSpace([np.nan]),
+                       sdom=ift.RGSpace([1, 1])):
+    from .util import my_assert_isinstance
+
+    for dd in [pdom, tdom, fdom, sdom]:
+        my_assert_isinstance(dd, ift.Domain)
+    return ift.DomainTuple.make((pdom, tdom, fdom, sdom))
