@@ -12,8 +12,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 # Copyright(C) 2013-2020 Max-Planck-Society
-#
-# NIFTy is being developed at the Max-Planck-Institut fuer Astrophysik.
 
 import numpy as np
 
@@ -40,7 +38,7 @@ class IRGSpace(ift.StructuredDomain):
         self._coordinates = tuple(bb)
 
     def __repr__(self):
-        return f"IRGSpace(shape={self.shape}, coordinates=...)"
+        return f"IRGSpace(shape={self.shape}, coordinates={self._coordinates})"
 
     @property
     def harmonic(self):
@@ -61,10 +59,22 @@ class IRGSpace(ift.StructuredDomain):
 
     @property
     def dvol(self):
-        """This has one pixel less than :meth:`shape`. Not sure if this is
-        okay.
-        """
-        return np.diff(np.array(self._coordinates))
+        """Assume that the coordinates are the center of symmetric pixels."""
+        return np.diff(self.binbounds())
+
+    def binbounds(self):
+        if len(self._coordinates) == 1:
+            return np.array([-np.inf, np.inf])
+        c = np.array(self._coordinates)
+        bounds = np.empty(self.size + 1)
+        bounds[1:-1] = c[:-1] + 0.5*np.diff(c)
+        bounds[0] = c[0] - 0.5*(c[1] - c[0])
+        bounds[-1] = c[-1] + 0.5*(c[-1] - c[-2])
+        return bounds
+
+    @property
+    def distances(self):
+        return np.diff(self._coordinates)
 
     @property
     def coordinates(self):

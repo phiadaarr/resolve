@@ -69,27 +69,6 @@ class AddEmptyDimensionAtEnd(ift.LinearOperator):
         return ift.makeField(self._tgt(mode), x)
 
 
-class KeyPrefixer(ift.LinearOperator):
-    def __init__(self, domain, prefix):
-        self._domain = ift.MultiDomain.make(domain)
-        self._target = ift.MultiDomain.make(
-            {prefix + kk: vv for kk, vv in self._domain.items()}
-        )
-        self._capability = self.TIMES | self.ADJOINT_TIMES
-        self._prefix = prefix
-
-    def apply(self, x, mode):
-        self._check_input(x, mode)
-        if mode == self.TIMES:
-            res = {self._prefix + kk: vv for kk, vv in x.items()}
-        else:
-            res = {kk[len(self._prefix) :]: vv for kk, vv in x.items()}
-        return ift.MultiField.from_dict(res)
-
-    def __repr__(self):
-        return f"{self.domain.keys()} -> {self.target.keys()}"
-
-
 def MultiDomainVariableCovarianceGaussianEnergy(data, signal_response, invcov):
     from .likelihood import get_mask_multi_field
 
@@ -110,6 +89,19 @@ def MultiDomainVariableCovarianceGaussianEnergy(data, signal_response, invcov):
                 data.domain[kk], "resi" + kk, "icov" + kk, data[kk].dtype
             )
         )
-    resi = KeyPrefixer(data.domain, "resi") @ ift.Adder(data, True) @ signal_response
-    invcov = KeyPrefixer(data.domain, "icov") @ invcov
+    resi = ift.PrependKey(data.domain, "resi") @ ift.Adder(data, True) @ signal_response
+    invcov = ift.PrependKey(data.domain, "icov") @ invcov
     return reduce(add, res) @ (resi + invcov)
+
+
+class DomainChangerAndReshaper(ift.LinearOperator):
+    def __init__(self, domain, target):
+        self._domain = ift.DomainTuple.make(domain)
+        self._target = ift.DomainTuple.make(target)
+        self._capability = self.TIMES | self.ADJOINT_TIMES
+
+    def apply(self, x, mode):
+        self._check_input(x, mode)
+        x = x.val
+        tgt = self._tgt(mode)
+        return ift.makeField(tgt, x.reshape(tgt.shape))

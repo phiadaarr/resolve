@@ -3,9 +3,8 @@
 # Author: Philipp Arras
 
 import matplotlib.pyplot as plt
-import numpy as np
-
 import nifty8 as ift
+import numpy as np
 
 
 def my_assert(*conds):
@@ -28,31 +27,46 @@ def my_assert_isinstance(*args):
 
 
 def compare_attributes(obj0, obj1, attribute_list):
-    for a in attribute_list:
-        compare = getattr(obj0, a) != getattr(obj1, a)
-        if type(compare) is bool:
-            if compare:
-                return False
-            continue
-        if isinstance(compare, ift.MultiField):
-            for vv in compare.val.values():
-                if vv.any():
-                    return False
-            continue
-        if compare.any():
-            return False
-    return True
+    return all(_fancy_equal(getattr(obj0, a), getattr(obj1, a))
+               for a in attribute_list)
 
 
-class Reshaper(ift.LinearOperator):
-    def __init__(self, domain, target):
-        self._domain = ift.DomainTuple.make(domain)
-        self._target = ift.DomainTuple.make(target)
-        self._capability = self.TIMES | self.ADJOINT_TIMES
+def _fancy_equal(o1, o2):
+    if not _types_equal(o1, o2):
+        return False
 
-    def apply(self, x, mode):
-        self._check_input(x, mode)
-        return ift.makeField(self._tgt(mode), x.val.reshape(self._tgt(mode).shape))
+    # Turn MultiField into dict
+    if isinstance(o1, ift.MultiField):
+        o1, o2 = o1.val, o2.val
+
+    # Compare dicts
+    if isinstance(o1, dict):
+        return _deep_equal(o1, o2)
+
+    # Compare simple objects and np.ndarrays
+    return _compare_simple_or_array(o1, o2)
+
+
+def _deep_equal(a, b):
+    if not isinstance(a, dict) or not isinstance(b, dict):
+        raise TypeError
+
+    if a.keys() != b.keys():
+        return False
+
+    return all(_compare_simple_or_array(a[kk], b[kk]) for kk in a.keys())
+
+
+def _compare_simple_or_array(a, b):
+    equal = a == b
+    if isinstance(equal, np.ndarray):
+        return np.all(equal)
+    assert isinstance(equal, bool)
+    return equal
+
+
+def _types_equal(a, b):
+    return type(a) == type(b)
 
 
 def divide_where_possible(a, b):
@@ -90,11 +104,60 @@ def rows_to_baselines(antenna_positions, data_field):
     return res
 
 
-class DomainChanger(ift.LinearOperator):
-    def __init__(self, domain, target):
-        self._domain = ift.makeDomain(domain)
-        self._target = ift.makeDomain(target)
-        self._capability = self.TIMES | self.ADJOINT_TIMES
+def assert_sky_domain(dom):
+    """Check that input fulfils resolve's conventions of a sky domain.
 
-    def apply(self, x, mode):
-        return ift.makeField(self._tgt(mode), x.val)
+    A sky domain is a DomainTuple:
+
+    dom = (pdom, tdom, fdom, sdom)
+
+    where `pdom` is a `PolarizationSpace`, `tdom` and `fdom` are  an `IRGSpace`,
+and `sdom` is a two-dimensional `RGSpace`.
+
+    Parameters
+    ----------
+    dom : DomainTuple
+        Object that is checked to fulfil the properties.
+    """
+    from .irg_space import IRGSpace
+    from .polarization_space import PolarizationSpace
+
+    my_assert_isinstance(dom, ift.DomainTuple)
+    my_asserteq(len(dom), 4)
+    pdom, tdom, fdom, sdom = dom
+    for ii in range(3):
+        my_asserteq(len(dom[ii].shape), 1)
+    my_asserteq(len(sdom.shape), 2)
+    my_assert_isinstance(pdom, PolarizationSpace)
+    my_assert_isinstance(tdom, IRGSpace)
+    my_assert_isinstance(fdom, IRGSpace)
+    my_assert_isinstance(sdom, ift.RGSpace)
+    my_asserteq(len(sdom.shape), 2)
+
+
+def assert_data_domain(dom):
+    """Check that input fulfils resolve's conventions of a data domain.
+
+    A data domain is a DomainTuple:
+
+    dom = (pdom, rdom, fdom)
+
+    where `pdom` is a `PolarizationSpace`, `rdom` is an UnstructuredDomain representing the rows of the measurement set and
+    `fdom` is an `IRGSpace` containing the frequencies.
+
+    Parameters
+    ----------
+    dom : DomainTuple
+        Object that is checked to fulfil the properties.
+    """
+    from .irg_space import IRGSpace
+    from .polarization_space import PolarizationSpace
+
+    my_assert_isinstance(dom, ift.DomainTuple)
+    my_asserteq(len(dom), 3)
+    pdom, rdom, fdom = dom
+    for ii in range(3):
+        my_asserteq(len(dom[ii].shape), 1)
+    my_assert_isinstance(pdom, PolarizationSpace)
+    my_assert_isinstance(rdom, ift.UnstructuredDomain)
+    my_assert_isinstance(fdom, IRGSpace)

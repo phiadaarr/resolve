@@ -38,3 +38,30 @@ def str2rad(s):
         if unit == kk:
             return float(s[:nn]) * c[kk]
     raise RuntimeError("Unit not understood")
+
+
+def str2val(s):
+    """Convert string of number and unit to value.
+
+    Support the following keys: p n mu m (nothing) k M G T
+
+    Parameters
+    ----------
+    s : str
+        TODO
+
+    """
+    c = {
+        "p": 1e-12,
+        "n": 1e-9,
+        "mu": 1e-6,
+        "m": 1e-3,
+        "k": 1e3,
+        "M": 1e6,
+        "G": 1e9,
+        "T": 1e12
+    }
+    keys = set(c.keys())
+    if s[-1] in keys:
+        return float(s[:-1]) * c[s[-1]]
+    return float(s)

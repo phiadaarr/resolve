@@ -68,6 +68,15 @@ class Polarization:
     def to_str_list(self):
         return [TABLE[ii] for ii in self._ind]
 
+    @property
+    def space(self):
+        from ..polarization_space import PolarizationSpace
+        if self == Polarization.trivial():
+            x = "I"
+        else:
+            x = [TABLE[ii] for ii in self._ind]
+        return PolarizationSpace(x)
+
     @staticmethod
     def from_list(lst):
         return Polarization(lst)

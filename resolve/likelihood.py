@@ -1,16 +1,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright(C) 2020 Max-Planck-Society
+# Copyright(C) 2020-2021 Max-Planck-Society
 # Author: Philipp Arras
 
 from functools import reduce
 from operator import add
 
+import nifty8 as ift
 import numpy as np
 
-import nifty8 as ift
-
 from .data.observation import Observation
-from .response import FullPolResponse, MfResponse, StokesIResponse
+from .response_new import InterferometryResponse
 from .util import my_assert, my_assert_isinstance, my_asserteq
 
 
@@ -55,12 +54,11 @@ def _build_gauss_lh_nres(op, mean, invcov):
     my_assert_isinstance(mean, invcov, (ift.Field, ift.MultiField))
     my_asserteq(op.target, mean.domain, invcov.domain)
 
-    lh = ift.GaussianEnergy(mean=mean, inverse_covariance=ift.makeOp(invcov)) @ op
+    lh = ift.GaussianEnergy(mean=mean, inverse_covariance=ift.makeOp(invcov, sampling_dtype=mean.dtype)) @ op
     return _Likelihood(lh, mean, lambda x: ift.makeOp(invcov), op)
 
 
 def _varcov(observation, Rs, inverse_covariance_operator):
-    from .simple_operators import KeyPrefixer
     mosaicing = isinstance(observation, dict)
     s0, s1 = "residual", "inverse covariance"
     if mosaicing:
@@ -79,8 +77,8 @@ def _varcov(observation, Rs, inverse_covariance_operator):
             lhs.append(e @ (a+b))
         masks = reduce(add, masks)
 
-        a = KeyPrefixer(masks.target, "modeld") @ masks @ Rs
-        b = KeyPrefixer(masks.target, "icov") @ masks @ inverse_covariance_operator
+        a = ift.PrependKey(masks.target, "modeld") @ masks @ Rs
+        b = ift.PrependKey(masks.target, "icov") @ masks @ inverse_covariance_operator
         lh = reduce(add, lhs) @ (a + b)
 
         vis = ift.MultiField.from_dict(vis)
@@ -106,11 +104,7 @@ def ImagingLikelihood(
     inverse_covariance_operator=None,
     calibration_operator=None,
 ):
-    """Versatile likelihood class that automatically chooses the correct
-    response class.
-
-    Supports polarization imaging and Stokes I imaging. Supports single-frequency
-    and multi-frequency imaging.
+    """Versatile likelihood class.
 
     If a calibration operator is passed, it returns an operator that computes:
 
@@ -133,11 +127,12 @@ def ImagingLikelihood(
         observation.weight is used for computing the likelihood.
 
     sky_operator : Operator
-        Operator that generates sky. Can have as a target either a two-dimensional
-        DomainTuple (single-frequency imaging), a three-dimensional DomainTuple
-        (multi-frequency imaging) or a MultiDomain (polarization imaging).
-        For multi-frequency imaging it is required that the first entry of the
-        three-dimensional DomainTuple represents the domain of the frequencies.
+        Operator that generates sky. Needs to have as target:
+
+        dom = (pdom, tdom, fdom, sdom)
+
+        where `pdom` is a `PolarizationSpace`, `tdom` and `fdom` are an
+        `IRGSpace`, and `sdom` is a two-dimensional `RGSpace`.
 
     inverse_covariance_operator : Operator
         Optional. Target needs to be the same space as observation.vis. If it is
@@ -145,38 +140,17 @@ def ImagingLikelihood(
 
     calibration_operator : Operator
         Optional. Target needs to be the same as observation.vis.
+
     """
+    from .polarization_space import polarization_converter
+
     my_assert_isinstance(sky_operator, ift.Operator)
-    sdom = sky_operator.target
-
-    mosaicing = isinstance(observation, dict)
-
-    if isinstance(sdom, ift.MultiDomain) and not mosaicing:
-        if len(sdom["I"].shape) == 3:
-            raise NotImplementedError(
-                "Polarization and multi-frequency at the same time not supported yet."
-            )
-        else:
-            R = FullPolResponse(observation, sky_operator.target)
-    else:
-        if not mosaicing and len(sdom.shape) == 3:
-            R = MfResponse(observation, sdom[0], sdom[1])
-        else:
-            R = StokesIResponse(observation, sdom)
-    model_data = R @ sky_operator
+    model_data = InterferometryResponse(observation, sky_operator.target) @ sky_operator
+    model_data = polarization_converter(model_data.target, observation.vis.domain) @ model_data
+    if calibration_operator is not None:
+        model_data = calibration_operator * model_data
     if inverse_covariance_operator is None:
-        if mosaicing:
-            vis, weight, mask = {}, {}, {}
-            for kk, oo in observation.items():
-                vis[kk], weight[kk] = oo.vis, oo.weight
-            vis = ift.MultiField.from_dict(vis)
-            weight = ift.MultiField.from_dict(weight)
-            # FIXME Use mask here as well
-            mask = get_mask_multi_field(weight)
-            vis = mask(vis)
-            weight = mask(weight)
-        else:
-            mask, vis, weight = _get_mask(observation)
+        mask, vis, weight = _get_mask(observation)
         return _build_gauss_lh_nres(mask @ model_data, vis, weight)
     return _varcov(observation, model_data, inverse_covariance_operator)
 
@@ -187,8 +161,7 @@ def CalibrationLikelihood(
     model_visibilities,
     inverse_covariance_operator=None,
 ):
-    """Versatile calibration likelihood class that automatically chooses
-    the correct response class.
+    """Versatile calibration likelihood class
 
     It returns an operator that computes:
 

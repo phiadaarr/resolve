@@ -4,17 +4,13 @@
 
 from functools import reduce
 from operator import add
-from itertools import product
-
-import numpy as np
-from ducc0.wgridder.experimental import dirty2vis, vis2dirty
 
 import nifty8 as ift
+import numpy as np
 
-from .constants import SPEEDOFLIGHT
-from .global_config import epsilon, nthreads, wgridding, verbosity, np_dtype
-from .multi_frequency.irg_space import IRGSpace
 from .data.observation import Observation
+from .irg_space import IRGSpace
+from .response_new import SingleResponse
 from .util import my_assert, my_assert_isinstance, my_asserteq
 
 
@@ -41,7 +37,7 @@ def StokesIResponse(observation, domain):
         return contr.adjoint @ sr0
     elif npol == 2:
         sr1 = SingleResponse(domain, observation.uvw, observation.freq, mask[1])
-        return ResponseDistributor(sr0, sr1)
+        return ResponseDistributor(observation.polarization.space, sr0, sr1)
     raise RuntimeError
 
 
@@ -195,7 +191,7 @@ class MfResponse(ift.LinearOperator):
 
 
 class ResponseDistributor(ift.LinearOperator):
-    def __init__(self, *ops):
+    def __init__(self, iterating_target_space, *ops):
         dom, tgt = ops[0].domain, ops[0].target
         cap = self.TIMES | self.ADJOINT_TIMES
         for op in ops:
@@ -203,8 +199,10 @@ class ResponseDistributor(ift.LinearOperator):
             my_assert(dom is op.domain)
             my_assert(tgt is op.target)
             my_assert(self.TIMES & op.capability, self.ADJOINT_TIMES & op.capability)
+        my_asserteq(len(iterating_target_space.shape), 1)
+        my_asserteq(len(ops), iterating_target_space.shape[0])
         self._domain = ift.makeDomain(dom)
-        self._target = ift.makeDomain((ift.UnstructuredDomain(len(ops)), *tgt))
+        self._target = ift.makeDomain((iterating_target_space, *tgt))
         self._capability = cap
         self._ops = ops
 
@@ -222,129 +220,4 @@ class ResponseDistributor(ift.LinearOperator):
                 res = new
             else:
                 res = res + new
-        return res
-
-
-class FullResponse(ift.LinearOperator):
-    def __init__(self, observation, sky_domain):
-        raise NotImplementedError
-
-
-class SingleResponse(ift.LinearOperator):
-    def __init__(self, domain, uvw, freq, mask, facets=(1, 1)):
-        my_assert_isinstance(facets, tuple)
-        for ii in range(2):
-            if domain.shape[ii] % facets[ii] != 0:
-                raise ValueError("nfacets needs to be divisor of npix.")
-        self._domain = ift.DomainTuple.make(domain)
-        tgt = ift.UnstructuredDomain(uvw.shape[0]), ift.UnstructuredDomain(freq.size)
-        self._target = ift.makeDomain(tgt)
-        self._capability = self.TIMES | self.ADJOINT_TIMES
-        self._args = {
-            "uvw": uvw,
-            "freq": freq,
-            "mask": mask.astype(np.uint8),
-            "pixsize_x": self._domain[0].distances[0],
-            "pixsize_y": self._domain[0].distances[1],
-            "epsilon": epsilon(),
-            "do_wgridding": wgridding(),
-            "nthreads": nthreads(),
-            "flip_v": True,
-        }
-        self._vol = self._domain[0].scalar_dvol
-        self._target_dtype = np_dtype(True)
-        self._domain_dtype = np_dtype(False)
-        self._ofac = None
-        self._facets = facets
-
-    def apply(self, x, mode):
-        self._check_input(x, mode)
-        one_facet = self._facets == (1, 1)
-        x = x.val
-        if mode == self.TIMES:
-            x = x.astype(self._domain_dtype, copy=False)
-            if one_facet:
-                res = self._times(x)
-            else:
-                res = self._facet_times(x)
-        else:
-            x = x.astype(self._target_dtype, copy=False)
-            if one_facet:
-                res = self._adjoint(x)
-            else:
-                res = self._facet_adjoint(x)
-        res = ift.makeField(self._tgt(mode), res * self._vol)
-
-        expected_dtype = self._target_dtype if mode == self.TIMES else self._domain_dtype
-        my_asserteq(res.dtype, expected_dtype)
-
-        return res
-
-    def oversampling_factors(self):
-        if self._ofac is not None:
-            return self._ofac
-        maxuv = (
-                np.max(np.abs(self._args["uvw"][:, 0:2]), axis=0)
-                * np.max(self._args["freq"])
-                / SPEEDOFLIGHT
-        )
-        hspace = self._domain[0].get_default_codomain()
-        hvol = np.array(hspace.shape) * np.array(hspace.distances) / 2
-        self._ofac = hvol / maxuv
-        return self._ofac
-
-    def _times(self, x):
-        if verbosity():
-            print(f"\nINFO: Oversampling factors in response: {self.oversampling_factors()}\n")
-        return dirty2vis(dirty=x, verbosity=verbosity(), **self._args)
-
-    def _adjoint(self, x):
-        my_assert(x.flags["C_CONTIGUOUS"])
-        nx, ny = self._domain.shape
-        if verbosity():
-            print(f"\nINFO: Oversampling factors in response: {self.oversampling_factors()}\n")
-        return vis2dirty(vis=x, npix_x=nx, npix_y=ny, verbosity=verbosity(), **self._args)
-
-    def _facet_times(self, x):
-        nfacets_x, nfacets_y = self._facets
-        npix_x, npix_y = self._domain.shape
-        nx = npix_x // nfacets_x
-        ny = npix_y // nfacets_y
-        vis = None
-        for xx, yy in product(range(nfacets_x), range(nfacets_y)):
-            cx = ((0.5 + xx) / nfacets_x - 0.5) * self._args["pixsize_x"] * npix_x
-            cy = ((0.5 + yy) / nfacets_y - 0.5) * self._args["pixsize_y"] * npix_y
-            facet = x[nx * xx: nx * (xx + 1), ny * yy: ny * (yy + 1)]
-            foo = dirty2vis(
-                dirty=facet,
-                center_x=cx,
-                center_y=cy,
-                verbosity=verbosity(),
-                **self._args
-            )
-            if vis is None:
-                vis = foo
-            else:
-                vis += foo
-        return vis
-
-    def _facet_adjoint(self, x):
-        nfacets_x, nfacets_y = self._facets
-        npix_x, npix_y = self._domain.shape
-        nx = npix_x // nfacets_x
-        ny = npix_y // nfacets_y
-        res = np.zeros((npix_x, npix_y), self._domain_dtype)
-        for xx, yy in product(range(nfacets_x), range(nfacets_y)):
-            cx = ((0.5 + xx) / nfacets_x - 0.5) * self._args["pixsize_x"] * npix_x
-            cy = ((0.5 + yy) / nfacets_y - 0.5) * self._args["pixsize_y"] * npix_y
-            im = vis2dirty(
-                vis=x,
-                npix_x=nx,
-                npix_y=ny,
-                center_x=cx,
-                center_y=cy,
-                verbosity=verbosity(),
-                **self._args
-            )
-            res[nx * xx: nx * (xx + 1), ny * yy: ny * (yy + 1)] = im
         return res

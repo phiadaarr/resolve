@@ -11,6 +11,7 @@ try:
 
     master = MPI.COMM_WORLD.Get_rank() == 0
     comm = MPI.COMM_WORLD
+    comm_self = MPI.COMM_SELF
     ntask = comm.Get_size()
     rank = comm.Get_rank()
     master = rank == 0
@@ -19,6 +20,7 @@ except ImportError:
     master = True
     mpi = False
     comm = None
+    comm_self = None
     rank = 0
 
 

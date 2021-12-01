@@ -33,7 +33,7 @@ def main():
         good_size(int(2 * (tmax - tmin) / solution_interval)), solution_interval
     )
     print(f"Npix in time domain {time_domain.shape[0]}")
-    reshaper = rve.Reshaper(
+    reshaper = rve.DomainChangerAndReshaper(
         [ift.UnstructuredDomain(total_N), time_domain],
         [
             ift.UnstructuredDomain(npol),

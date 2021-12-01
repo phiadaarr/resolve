@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright(C) 2020 Max-Planck-Society
+# Copyright(C) 2020-2021 Max-Planck-Society
 # Author: Philipp Arras
 
 from os.path import join
@@ -15,18 +15,16 @@ np.seterr(all="raise")
 
 direc = "/data/"
 nthreads = 1
-ift.set_nthreads(nthreads)
 rve.set_nthreads(nthreads)
 rve.set_epsilon(1e-4)
 rve.set_wgridding(False)
 OBS = []
-for polmode in ["all", "stokesi", ["LL"], "stokesiavg"]:
+for polmode in ["all", "stokesi", "stokesiavg"]:
     OBS.append(
         rve.ms2observations(
             f"{direc}CYG-ALL-2052-2MHZ.ms", "DATA", True, 0, polarizations=polmode
         )[0]
     )
-assert OBS[1].max_snr() >= OBS[2].max_snr()  # Average data so SNR increases
 npix, fov = 256, 1 * rve.DEG2RAD
 dom = ift.RGSpace((npix, npix), (fov / npix, fov / npix))
 sky0 = ift.SimpleCorrelatedField(
@@ -37,15 +35,13 @@ points = ift.InverseGammaOperator(
     inserter.domain, alpha=0.5, q=0.2 / dom.scalar_dvol
 ).ducktape("points")
 sky = rve.vla_beam(dom, np.mean(OBS[0].freq)) @ (sky0 + inserter @ points)
+sky = rve.DomainChangerAndReshaper(sky.target, rve.default_sky_domain(sdom=sky.target[0])) @ sky
 
 freqdomain = rve.IRGSpace(np.linspace(1000, 1050, num=10))
 FACETS = [(1, 1), (2, 2), (2, 1), (1, 4)]
 
 
-@pmp(
-    "ms",
-    ("CYG-ALL-2052-2MHZ", "CYG-D-6680-64CH-10S", "AM754_A030124_flagged", "1052735056"),
-)
+@pmp("ms", ("CYG-ALL-2052-2MHZ", "CYG-D-6680-64CH-10S", "AM754_A030124_flagged"))
 @pmp("with_calib_info", (False, True))
 @pmp("compress", (False, True))
 def test_save_and_load_observation(ms, with_calib_info, compress):
@@ -58,16 +54,20 @@ def test_save_and_load_observation(ms, with_calib_info, compress):
             assert ob == ob1
 
 
-@pmp("slc", [slice(3), slice(14, 15), slice(None, None, None), slice(None, None, 5)])
+@pmp("slc", [slice(3), slice(14, 15), [14, 15], slice(None, None, None), slice(None, None, 5)])
 def test_sliced_readin(slc):
     ms = f"{direc}CYG-D-6680-64CH-10S.ms"
     obs0 = rve.ms2observations(ms, "DATA", False, 0)[0]
-    obs = rve.ms2observations(ms, "DATA", False, 0, channel_slice=slc)[0]
+    obs = rve.ms2observations(ms, "DATA", False, 0, channels=slc)[0]
     ch0 = obs0.weight.val[..., slc]
     ch = obs.weight.val
     assert ch0.ndim == 3
     assert ch0.shape == ch.shape
     np.testing.assert_equal(ch0, ch)
+
+
+def test_legacy_load():
+    rve.Observation.legacy_load(f"{direc}legacy.npz")
 
 
 def test_flag_baseline():
@@ -93,6 +93,8 @@ def try_lh(obs, lh_class, *args):
 
 @pmp("obs", OBS)
 def test_imaging_likelihood(obs):
+    obs = obs.restrict_to_stokesi()
+    op = rve.ImagingLikelihood(obs, sky)
     try_lh(obs, rve.ImagingLikelihood, obs, sky)
 
 
@@ -155,13 +157,13 @@ def test_calibration_likelihood(time_mode):
     npol, nfreq = obs[0].npol, obs[0].nfreq
     total_N = npol * nants * nfreq
     dom = [
-        ift.UnstructuredDomain(npol),
+        obs[0].polarization.space,
         ift.UnstructuredDomain(len(uants)),
         time_domain,
         ift.UnstructuredDomain(nfreq),
     ]
     if time_mode:
-        reshaper = rve.Reshaper([ift.UnstructuredDomain(total_N), time_domain], dom)
+        reshaper = rve.DomainChangerAndReshaper([ift.UnstructuredDomain(total_N), time_domain], dom)
         dct = {"offset_mean": 0, "offset_std": (1, 0.5)}
         dct1 = {
             "fluctuations": (2.0, 1.0),
@@ -222,10 +224,8 @@ def test_calibration_distributor(obs):
     tgt = obs.vis.domain
     utimes = rve.unique_times(obs)
     uants = obs.antenna_positions.unique_antennas()
-    dom = [
-        ift.UnstructuredDomain(nn)
-        for nn in [obs.npol, len(uants), len(utimes), obs.nfreq]
-    ]
+    dom = [obs.polarization.space] + \
+        [ift.UnstructuredDomain(nn) for nn in [len(uants), len(utimes), obs.nfreq]]
     uants = rve.unique_antennas(obs)
     time_dct = {aa: ii for ii, aa in enumerate(utimes)}
     antenna_dct = {aa: ii for ii, aa in enumerate(uants)}
@@ -268,7 +268,7 @@ def test_response_distributor():
     dom = ift.UnstructuredDomain(2), ift.UnstructuredDomain(4)
     op0 = ift.makeOp(ift.makeField(dom, np.arange(8).reshape(2, -1)))
     op1 = ift.makeOp(ift.makeField(dom, 2 * np.arange(8).reshape(2, -1)))
-    op = rve.response.ResponseDistributor(op0, op1)
+    op = rve.response.ResponseDistributor(ift.UnstructuredDomain(2), op0, op1)
     ift.extra.check_linear_operator(op)
 
 
@@ -276,8 +276,7 @@ def test_response_distributor():
 @pmp("facets", FACETS)
 def test_single_response(obs, facets):
     mask = obs.mask.val
-    op = rve.response.SingleResponse(dom, obs.uvw, obs.freq, mask[0],
-                                     facets=facets)
+    op = rve.SingleResponse(dom, obs.uvw, obs.freq, mask[0], facets=facets)
     ift.extra.check_linear_operator(op, np.float64, np.complex64,
                                     only_r_linear=True, rtol=1e-6, atol=1e-6)
 
@@ -287,8 +286,7 @@ def test_facet_consistency():
     res0 = None
     pos = ift.from_random(dom)
     for facets in FACETS:
-        op = rve.response.SingleResponse(dom, obs.uvw, obs.freq, obs.mask.val[0],
-                                         facets=facets)
+        op = rve.SingleResponse(dom, obs.uvw, obs.freq, obs.mask.val[0], facets=facets)
         res = op(pos)
         if res0 is None:
             res0 = res
@@ -312,15 +310,6 @@ def test_randomonmaster():
         finvalid()
 
 
-def test_mfweighting():
-    nrow = 100
-    nchan = 4
-    effuv = ift.random.current_rng().random((nrow, nchan))
-    dom = ift.UnstructuredDomain(nchan), ift.RGSpace(npix, 2 * np.max(effuv) / npix)
-    op = rve.MfWeightingInterpolation(effuv[None], dom)
-    ift.extra.check_linear_operator(op)
-
-
 def test_mf_response():
     ms = join(direc, "CYG-D-6680-64CH-10S.ms")
     obs = rve.ms2observations(ms, "DATA", False, 0, "stokesiavg")[0]
@@ -334,14 +323,6 @@ def test_mf_response():
 def test_intop():
     dom = ift.RGSpace((12, 12))
     op = rve.WienerIntegrations(freqdomain, dom)
-    ift.extra.check_linear_operator(op)
-
-
-def test_prefixer():
-    op = rve.KeyPrefixer(
-        ift.MultiDomain.make({"a": ift.UnstructuredDomain(10), "b": ift.RGSpace(190)}),
-        "invcov_inp",
-    ).adjoint
     ift.extra.check_linear_operator(op)
 
 

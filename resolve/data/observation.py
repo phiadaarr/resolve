@@ -2,22 +2,24 @@
 # Copyright(C) 2019-2021 Max-Planck-Society
 # Author: Philipp Arras
 
+import nifty8 as ift
 import numpy as np
 
-import nifty8 as ift
-
-from .antenna_positions import AntennaPositions
 from ..constants import SPEEDOFLIGHT
-from .direction import Direction, Directions
 from ..mpi import onlymaster
+from ..util import (compare_attributes, my_assert, my_assert_isinstance,
+                    my_asserteq)
+from .antenna_positions import AntennaPositions
+from .auxiliary_table import AuxiliaryTable
+from .direction import Direction, Directions
 from .polarization import Polarization
-from ..util import compare_attributes, my_assert, my_assert_isinstance, my_asserteq
 
 
 class BaseObservation:
     @property
     def _dom(self):
-        dom = [ift.UnstructuredDomain(ss) for ss in self._vis.shape]
+        pol_dom = self.polarization.space
+        dom = [pol_dom] + [ift.UnstructuredDomain(ss) for ss in self._vis.shape[1:]]
         return ift.makeDomain(dom)
 
     @property
@@ -157,7 +159,7 @@ class BaseObservation:
         return NotImplementedError
 
     def __eq__(self, other):
-        if not isinstance(other, self.__class__):
+        if not isinstance(other, type(self)):
             return False
         if (
                 self._vis.dtype != other._vis.dtype
@@ -267,33 +269,28 @@ class Observation(BaseObservation):
         Polarization information of the data set.
     freq : numpy.ndarray
         Contains the measured frequencies. Shape (n_channels)
-    direction : Direction
-        Direction information of the data set.
+    auxiliary_tables : dict
+        Dictionary of auxiliary tables. Default: None.
 
     Note
     ----
     vis and weight must have the same shape.
     """
 
-    def __init__(self, antenna_positions, vis, weight, polarization, freq, direction):
+    def __init__(self, antenna_positions, vis, weight, polarization, freq, auxiliary_tables=None):
         nrows = len(antenna_positions)
-        my_assert_isinstance(direction, Direction)
         my_assert_isinstance(polarization, Polarization)
         my_assert_isinstance(antenna_positions, AntennaPositions)
         my_asserteq(weight.shape, vis.shape)
         my_asserteq(vis.shape, (len(polarization), nrows, len(freq)))
         my_asserteq(nrows, vis.shape[1])
-        if vis.dtype != np.complex64:
-            print(f"Warning: vis.dtype is {vis.dtype}. Casting to np.complex64")
-            vis = vis.astype(np.complex64)
-        if weight.dtype != np.float32:
-            print(f"Warning: weight.dtype is {weight.dtype}. Casting to np.float32")
-            weight = weight.astype(np.float32)
-        my_asserteq(vis.dtype, np.complex64)
-        my_asserteq(weight.dtype, np.float32)
+        #my_asserteq(vis.dtype, np.complex64)
+        #my_asserteq(weight.dtype, np.float32)
         my_assert(np.all(weight >= 0.0))
         my_assert(np.all(np.isfinite(vis[weight > 0.])))
         my_assert(np.all(np.isfinite(weight)))
+
+        my_assert(np.all(np.diff(freq)))
 
         vis.flags.writeable = False
         weight.flags.writeable = False
@@ -303,9 +300,16 @@ class Observation(BaseObservation):
         self._weight = weight
         self._polarization = polarization
         self._freq = freq
-        self._direction = direction
 
-        self._eq_attributes = "_direction", "_polarization", "_freq", "_antpos", "_vis", "_weight"
+        if auxiliary_tables is not None:
+            my_assert_isinstance(auxiliary_tables, dict)
+            for kk, vv in auxiliary_tables.items():
+                my_assert_isinstance(vv, AuxiliaryTable)
+                my_assert_isinstance(kk, str)
+        self._auxiliary_tables = auxiliary_tables
+
+        self._eq_attributes = ("_polarization", "_freq", "_antpos", "_vis", "_weight",
+                               "_auxiliary_tables")
 
     @onlymaster
     def save(self, file_name, compress):
@@ -314,12 +318,15 @@ class Observation(BaseObservation):
             weight=self._weight,
             freq=self._freq,
             polarization=self._polarization.to_list(),
-            direction=self._direction.to_list(),
         )
         for ii, vv in enumerate(self._antpos.to_list()):
             if vv is None:
                 vv = np.array([])
             dct[f"antpos{ii}"] = vv
+        if self._auxiliary_tables is not None:
+            for kk, auxtable in self._auxiliary_tables.items():
+                for ii, elem in enumerate(auxtable.to_list()):
+                    dct[f"auxtable_{kk}_{ii:>04}"] = elem
         f = np.savez_compressed if compress else np.savez
         f(file_name, **dct)
 
@@ -332,9 +339,23 @@ class Observation(BaseObservation):
             if val.size == 0:
                 val = None
             antpos.append(val)
-        antpos = AntennaPositions.from_list(antpos)
+
+        # Load auxtables
+        keys = set(kk[9:-5] for kk in dct.keys() if kk[:9] == "auxtable_")
+        if len(keys) == 0:
+            auxtables = None
+        else:
+            auxtables = {}
+            for kk in keys:
+                ii = 0
+                inp = []
+                while f"auxtable_{kk}_{ii:>04}" in dct.keys():
+                    inp.append(dct[f"auxtable_{kk}_{ii:>04}"])
+                    ii += 1
+                auxtables[kk] = AuxiliaryTable.from_list(inp)
+        # /Load auxtables
+
         pol = Polarization.from_list(dct["polarization"])
-        direction = Direction.from_list(dct["direction"])
         vis = dct["vis"]
         wgt = dct["weight"]
         freq = dct["freq"]
@@ -345,7 +366,32 @@ class Observation(BaseObservation):
             wgt = wgt[..., slc].copy()
             freq = freq[slc].copy()
         del dct
-        return Observation(antpos, vis, wgt, pol, freq, direction)
+        antpos = AntennaPositions.from_list(antpos)
+        return Observation(antpos, vis, wgt, pol, freq, auxtables)
+
+    @staticmethod
+    def legacy_load(file_name, lo_hi_index=None):
+        """Provide potentially incomplete interface for loading legacy npz files."""
+        dct = np.load(file_name)
+        antpos = []
+        for ii in range(4):
+            val = dct[f"antpos{ii}"]
+            if val.size == 0:
+                val = None
+            antpos.append(val)
+        antpos = AntennaPositions.from_list(antpos)
+        pol = Polarization.from_list(dct["polarization"])
+        vis = dct["vis"]
+        wgt = dct["weight"]
+        freq = dct["freq"]
+        if lo_hi_index is not None:
+            slc = slice(*lo_hi_index)
+            # Convert view into its own array
+            vis = vis[..., slc].copy()
+            wgt = wgt[..., slc].copy()
+            freq = freq[slc].copy()
+        del dct
+        return Observation(antpos, vis, wgt, pol, freq)
 
     def flags_to_nan(self):
         if self.fraction_useful == 1.:
@@ -353,7 +399,7 @@ class Observation(BaseObservation):
         vis = self._vis.copy()
         vis[self.flags.val] = np.nan
         return Observation(self._antpos, vis, self._weight, self._polarization, self._freq,
-                           self._direction)
+                           self._auxiliary_tables)
 
     @staticmethod
     def load_mf(file_name, n_imaging_bands, comm=None):
@@ -379,14 +425,15 @@ class Observation(BaseObservation):
         return obs_list, nu0
 
     def __getitem__(self, slc, copy=False):
+        # FIXME Do I need to change something in self._auxiliary_tables?
         ap = self._antpos[slc]
-        vis = self._vis[slc]
+        vis = self._vis[:, slc]
         wgt = self._weight[:, slc]
         if copy:
             ap = ap.copy()
             vis = vis.copy()
             wgt = wgt.copy()
-        return Observation(ap, vis, wgt, self._polarization, self._freq, self._direction)
+        return Observation(ap, vis, wgt, self._polarization, self._freq, self._auxiliary_tables)
 
     def get_freqs(self, frequency_list, copy=False):
         """Return observation that contains a subset of the present frequencies
@@ -401,6 +448,7 @@ class Observation(BaseObservation):
         return self.get_freqs_by_slice(mask, copy)
 
     def get_freqs_by_slice(self, slc, copy=False):
+        # FIXME Do I need to change something in self._auxiliary_tables?
         vis = self._vis[..., slc]
         wgt = self._weight[..., slc]
         freq = self._freq[slc]
@@ -408,9 +456,10 @@ class Observation(BaseObservation):
             vis = vis.copy()
             wgt = wgt.copy()
             freq = freq.copy()
-        return Observation( self._antpos, vis, wgt, self._polarization, freq, self._direction)
+        return Observation( self._antpos, vis, wgt, self._polarization, freq, self._auxiliary_tables)
 
     def average_stokesi(self):
+        # FIXME Do I need to change something in self._auxiliary_tables?
         my_asserteq(self._vis.shape[0], 2)
         my_asserteq(self._polarization.restrict_to_stokes_i(), self._polarization)
         vis = np.sum(self._weight * self._vis, axis=0)[None]
@@ -419,18 +468,43 @@ class Observation(BaseObservation):
         vis /= wgt + np.ones_like(wgt) * invmask
         vis[invmask] = 0.0
         return Observation(
-            self._antpos, vis, wgt, Polarization.trivial(), self._freq, self._direction
+            self._antpos, vis, wgt, Polarization.trivial(), self._freq, self._auxiliary_tables
         )
 
+    def restrict_by_time(self, tmin, tmax, with_index=False):
+        my_assert(all(np.diff(self.time) >= 0))
+        start, stop = np.searchsorted(self.time, [tmin, tmax])
+        ind = slice(start, stop)
+        res = self[ind]
+        if with_index:
+            return res, ind
+        return res
+
+    def restrict_by_freq(self, fmin, fmax, with_index=False):
+        my_assert(all(np.diff(self.freq) > 0))
+        start, stop = np.searchsorted(self.freq, [fmin, fmax])
+        ind = slice(start, stop)
+        res = self.get_freqs_by_slice(ind)
+        if with_index:
+            return res, ind
+        return res
+
     def restrict_to_stokesi(self):
-        my_asserteq(self._vis.shape[0], 4)
+        if self.vis.domain[0].labels == ("I",):
+            return self
+        # FIXME Do I need to change something in self._auxiliary_tables?
         ind = self._polarization.stokes_i_indices()
         vis = self._vis[ind]
         wgt = self._weight[ind]
         pol = self._polarization.restrict_to_stokes_i()
-        return Observation(self._antpos, vis, wgt, pol, self._freq, self._direction)
+        return Observation(self._antpos, vis, wgt, pol, self._freq, self._auxiliary_tables)
+
+    def restrict_to_autocorrelations(self):
+        slc = self._antpos.ant1 == self._antpos.ant2
+        return self[slc]
 
     def move_time(self, t0):
+        # FIXME Do I need to change something in self._auxiliary_tables?
         antpos = self._antpos.move_time(t0)
         return Observation(
             antpos,
@@ -438,8 +512,68 @@ class Observation(BaseObservation):
             self._weight,
             self._polarization,
             self._freq,
-            self._direction,
+            self._auxiliary_tables
         )
+
+    def time_average(self, list_of_timebins):
+        # FIXME check that timebins do not overlap
+        # time, ant1, ant2
+        ts = self._antpos.time
+        row_to_bin_map = np.empty(ts.shape)
+        row_to_bin_map[:] = np.nan
+
+        for ii, (lo, hi) in enumerate(list_of_timebins):
+            ind = np.logical_and(ts >= lo, ts < hi)
+            assert np.all(np.isnan(row_to_bin_map[ind]))
+            row_to_bin_map[ind] = ii
+        assert np.all(np.diff(row_to_bin_map) >= 0)
+
+        assert np.all(~np.isnan(row_to_bin_map))
+        row_to_bin_map = row_to_bin_map.astype(int)
+
+        ant1 = self._antpos.ant1
+        ant2 = self._antpos.ant2
+        assert np.max(ant1) < 1000
+        assert np.max(ant2) < 1000
+        assert np.max(row_to_bin_map) < np.iinfo(np.dtype("int64")).max / 1000000
+        atset = np.array(list(set(zip(ant1, ant2, row_to_bin_map))))
+        atset = atset[np.lexsort(atset.T)]
+        atset = tuple(map(tuple, atset))
+        dct = {aa: ii for ii, aa in enumerate(atset)}
+        dct_inv = {yy: xx for xx, yy in dct.items()}
+        masterindex = np.array([dct[(a1, a2, tt)] for a1, a2, tt in zip(ant1, ant2, row_to_bin_map)])
+
+        vis, wgt = self.vis.val, self.weight.val
+        new_vis = np.empty((self.npol, len(atset), self.nfreq), dtype=self.vis.dtype)
+        new_wgt = np.empty((self.npol, len(atset), self.nfreq), dtype=self.weight.dtype)
+        for pol in range(self.npol):
+            for freq in range(self.nfreq):
+                enum = np.bincount(masterindex, weights=vis[pol, :, freq].real*wgt[pol, :, freq])
+                enum = enum + 1j*np.bincount(masterindex, weights=vis[pol, :, freq].imag*wgt[pol, :, freq])
+                denom = np.bincount(masterindex, weights=wgt[pol, :, freq])
+                if np.min(denom) == 0.:
+                    raise ValueError("Time bin with total weight 0. detected.")
+                new_vis[pol, :, freq] = enum/denom
+                new_wgt[pol, :, freq] = denom
+
+        new_uvw = np.empty((len(atset), 3), dtype=self._antpos.uvw.dtype)
+        new_times = np.empty(len(atset), dtype=self._antpos.time.dtype)
+        new_uvw[()] = new_times[()] = np.nan
+        denom = np.bincount(masterindex)
+        # Assumption: Uvw value for averaged data is average of uvw values of finely binned data
+        for ii in range(3):
+            new_uvw[:, ii] = np.bincount(masterindex, weights=self._antpos.uvw[:, ii]) / denom
+        new_times = np.bincount(row_to_bin_map, weights=self._antpos.time) / np.bincount(row_to_bin_map)
+        assert np.sum(np.isnan(new_uvw)) == 0
+        assert np.sum(np.isnan(new_times)) == 0
+
+        new_times = new_times[np.array([dct_inv[ii][2] for ii in range(len(atset))])]
+        assert np.all(np.diff(new_times) >= 0)
+
+        new_ant1 = np.array([dct_inv[ii][0] for ii in range(len(atset))])
+        new_ant2 = np.array([dct_inv[ii][1] for ii in range(len(atset))])
+        ap = AntennaPositions(new_uvw, new_ant1, new_ant2, new_times)
+        return Observation(ap, new_vis, new_wgt, self._polarization, self._freq, self._auxiliary_tables)
 
     def flag_baseline(self, ant1_index, ant2_index):
         ant1 = self.antenna_positions.ant1
@@ -452,8 +586,19 @@ class Observation(BaseObservation):
         ind = np.logical_and(ant1 == ant1_index, ant2 == ant2_index)
         wgt = self._weight.copy()
         wgt[:, ind] = 0.
-        print(f"INFO: Flag baseline {ant1_index}-{ant2_index}, {np.sum(ind)}/{self.nrow} rows flagged.")
-        return Observation(self._antpos, self._vis, wgt, self._polarization, self._freq, self._direction)
+        antenna_names = self.auxiliary_table("ANTENNA")["STATION"]
+        ant1_name = antenna_names[ant1_index]
+        ant2_name = antenna_names[ant2_index]
+        if np.sum(ind) > 0:
+            print(f"INFO: Flag baseline {ant1_name}-{ant2_name}, {np.sum(ind)}/{self.nrow} rows flagged.")
+        return Observation(self._antpos, self._vis, wgt, self._polarization, self._freq, self._auxiliary_tables)
+
+    @property
+    def nbaselines(self):
+        return len(self.baselines())
+
+    def baselines(self):
+        return set((a1, a2) for a1, a2 in zip(self.ant1, self.ant2))
 
     @property
     def uvw(self):
@@ -462,6 +607,44 @@ class Observation(BaseObservation):
     @property
     def antenna_positions(self):
         return self._antpos
+
+    @property
+    def ant1(self):
+        return self._antpos.ant1
+
+    @property
+    def ant2(self):
+        return self._antpos.ant2
+
+    @property
+    def time(self):
+        return self._antpos.time
+
+    @property
+    def direction(self):
+        if self._auxiliary_tables is not None and "FIELD" in self._auxiliary_tables:
+            equinox = 2000  # FIXME Figure out how to extract this from a measurement set
+            refdir = self._auxiliary_tables["FIELD"]["REFERENCE_DIR"][0]
+            my_asserteq(refdir.shape[0] == 0)
+            return Direction(refdir[0], equinox)
+        return None
+
+    def auxiliary_table(self, name):
+        return self._auxiliary_tables[name]
+
+    @property
+    def source_name(self):
+        if "FIELD" in self._auxiliary_tables:
+            return self._auxiliary_tables["FIELD"]["NAME"][0]
+        raise NotImplementedError("FIELD subtable not available.")
+
+    @property
+    def station_names(self):
+        """The index of the resulting list is the same as in self.ant1 or self.ant2."""
+        if "ANTENNA" in self._auxiliary_tables:
+            tab = self._auxiliary_tables["ANTENNA"]
+            return [f"{a} {b}" for a, b in zip(tab["NAME"], tab["STATION"])]
+        raise NotImplementedError("ANTENNA subtable not available.")
 
     def effective_uvw(self):
         out = np.einsum("ij,k->jik", self.uvw, self._freq / SPEEDOFLIGHT)
