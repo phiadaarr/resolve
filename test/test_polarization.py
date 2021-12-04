@@ -2,22 +2,18 @@
 # Copyright(C) 2021 Max-Planck-Society
 # Author: Philipp Arras
 
-from os.path import join
-
-import numpy as np
-import pytest
-
 import nifty8 as ift
+import pytest
 import resolve as rve
 
 pmp = pytest.mark.parametrize
 
 
-@pmp("with_v", (False, True))
-def test_polarization(with_v):
-    dom = ift.RGSpace([10, 20])
-    op = rve.polarization_matrix_exponential(dom, with_v, False)
-    op_jax = rve.polarization_matrix_exponential(dom, with_v, True)
+@pmp("pol", ("I", ["I", "Q", "U"], ["I", "Q", "U", "V"]))
+def test_polarization(pol):
+    dom = rve.PolarizationSpace(pol), rve.IRGSpace([0]), rve.IRGSpace([0]), ift.RGSpace([10, 20])
+    op = rve.polarization_matrix_exponential(dom, False)
+    op_jax = rve.polarization_matrix_exponential(dom, True)
 
     assert op.domain is op_jax.domain
     assert op.target is op_jax.target

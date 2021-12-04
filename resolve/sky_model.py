@@ -2,6 +2,9 @@
 # Copyright(C) 2021 Max-Planck-Society
 # Author: Philipp Arras
 
+from functools import reduce
+from operator import add
+
 import nifty8 as ift
 import numpy as np
 
@@ -10,17 +13,81 @@ from .integrated_wiener_process import (IntWProcessInitialConditions,
                                         WienerIntegrations)
 from .irg_space import IRGSpace
 from .points import PointInserter
+from .polarization_matrix_exponential import polarization_matrix_exponential
 from .polarization_space import PolarizationSpace
-from .simple_operators import DomainChangerAndReshaper
+from .simple_operators import DomainChangerAndReshaper, MultiFieldStacker
 from .util import assert_sky_domain
 
 
 def single_frequency_sky(cfg_section):
     dom = _spatial_dom(cfg_section)
+    pdom = PolarizationSpace(cfg_section["polarization"].split(","))
 
-    logdiffuse, cfm = cfm_from_cfg(cfg_section, {"space": dom}, "sky diffuse" )
+    additional = {}
+
+    logsky = []
+    for lbl in pdom.labels:
+        pol_lbl = f"stokes{lbl.lower()}"
+        kwargs1 = {
+            "offset_mean": cfg_section.getfloat(f"{pol_lbl} zero mode offset"),
+            "offset_std": (cfg_section.getfloat(f"{pol_lbl} zero mode mean"),
+                           cfg_section.getfloat(f"{pol_lbl} zero mode stddev"))
+        }
+        kwargs2 = {kk: _parse_or_none(cfg_section, f"{pol_lbl} space {kk}")
+                   for kk in ["fluctuations", "loglogavgslope", "flexibility", "asperity"]}
+        op = ift.SimpleCorrelatedField(dom, **kwargs1, **kwargs2)
+        logsky.append(op.ducktape_left(lbl))
+        additional["logdiffuse stokes{lbl} power spectrum"] = op.power_spectrum
+    logsky = reduce(add, logsky)
+    mfs = MultiFieldStacker((pdom, dom), 0, pdom.labels)
+    # print("Run test...", end="", flush=True)
+    # ift.extra.check_linear_operator(mfs)  # FIXME Move to tests
+    # print("done")
+    logsky = mfs @ logsky
+    additional["logdiffuse"] = logsky
+
+    mexp = polarization_matrix_exponential(logsky.target)
+    # print("Run test...", end="", flush=True)
+    # ift.extra.check_operator(mexp, ift.from_random(mexp.domain))  # FIXME Move to tests
+    # print("done")
+    sky = mexp @ logsky
+    additional["diffuse"] = sky
+
+    # Point sources
+    mode = cfg_section["point sources mode"]
+    if mode == "single":
+        ppos = []
+        s = cfg_section["point sources locations"]
+        for xy in s.split(";"):
+            x, y = xy.split(",")
+            ppos.append((str2rad(x), str2rad(y)))
+        inserter = PointInserter(dom, ppos)
+        alpha = cfg_section.getfloat("point sources alpha")
+        q = cfg_section.getfloat("point sources q")
+        points = ift.InverseGammaOperator(inserter.domain, alpha=alpha, q=q/dom.scalar_dvol)
+        points = inserter @ points.ducktape("points")
+        sky = sky + points
+        additional["points"] = points
+
+    elif mode == "disable":
+        additional["points"] = None
+    else:
+        raise ValueError(f"In order to disable point source component, set `point sources mode` to `disable`. Got: {mode}")
+
+    conv = DomainChangerAndReshaper(sky.target, default_sky_domain(sdom=dom, pdom=pdom))
+    sky = conv @ sky
+    if additional["points"] is not None:
+        additional["points"] = conv @ additional["points"]
+    assert_sky_domain(sky.target)
+    return sky, additional
+
+
+def single_frequency_polarized_sky(cfg_section):
+    dom = _spatial_dom(cfg_section)
+
+    logdiffuse, cfm = cfm_from_cfg(cfg_section, {"space": dom}, "sky diffuse")
     sky = logdiffuse.exp()
-    add = {"logdiffuse": logdiffuse, "logdiffuse power spectrum": cfm.power_spectrum}
+    additional = {"logdiffuse": logdiffuse, "logdiffuse power spectrum": cfm.power_spectrum}
 
     # Point sources
     mode = cfg_section["point sources mode"]

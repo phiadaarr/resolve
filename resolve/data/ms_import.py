@@ -227,7 +227,7 @@ def read_ms_i(name, data_column, field, spectral_window, pol_indices, pol_summat
 
                 # Polarization summation
                 assert twgt.ndim == tflags.ndim == 3
-                assert tflags.dtype == np.bool
+                assert tflags.dtype == bool
                 if not ignore_flags:
                     twgt = twgt * (~tflags)
                 if pol_summation:
@@ -292,8 +292,8 @@ def _first_pass(ms, field, spectral_window, channels, pol_indices, pol_summation
     nchan = _ms_nchannels(ms, spectral_window)
     with ms_table(ms) as t:
         nrow = t.nrows()
-        active_rows = np.ones(nrow, dtype=np.bool)
-        active_channels = np.zeros(nchan, dtype=np.bool)
+        active_rows = np.ones(nrow, dtype=bool)
+        active_channels = np.zeros(nchan, dtype=bool)
 
         # Determine which subset of rows/channels we need to input
         start = 0
@@ -311,7 +311,7 @@ def _first_pass(ms, field, spectral_window, channels, pol_indices, pol_summation
                 twgt = np.repeat(twgt[:, None], nchan, axis=1)
             my_asserteq(twgt.ndim, 3)
             if pol_summation:
-                tflags = np.any(tflags.astype(np.bool), axis=2)[..., None]
+                tflags = np.any(tflags.astype(bool), axis=2)[..., None]
                 twgt = np.sum(twgt, axis=2)[..., None]
             tflags[twgt == 0] = True
 

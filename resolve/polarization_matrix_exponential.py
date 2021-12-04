@@ -4,42 +4,49 @@
 
 import nifty8 as ift
 
+from .polarization_space import PolarizationSpace
+from .simple_operators import MultiFieldStacker
 
-def polarization_matrix_exponential(domain, with_v, jax=False):
+
+def polarization_matrix_exponential(domain, jax=False):
     dom = ift.makeDomain(domain)
-    keys = ["i", "q", "u"]
-    if with_v:
-        keys += ["v"]
-    domain = ift.makeDomain({kk: dom for kk in keys})
-    target = ift.makeDomain({kk.upper(): dom for kk in keys})
+    pdom = dom[0]
+    assert isinstance(pdom, PolarizationSpace)
+    if pdom.labels_eq("I"):
+        return ift.ScalingOperator(domain, 1.)
+
+    mfs = MultiFieldStacker(domain, 0, domain[0].labels)
     if jax:
-        return _jax_pol(domain, target)
-    return PolarizationMatrixExponential(domain, target)
+        op = _jax_pol(mfs.domain)
+    else:
+        op = PolarizationMatrixExponential(mfs.domain)
+    return mfs @ op @ mfs.inverse
 
 
 class PolarizationMatrixExponential(ift.Operator):
-    def __init__(self, domain, target):
-        self._domain = ift.makeDomain(domain)
-        self._target = ift.makeDomain(target)
+    def __init__(self, domain):
+        self._domain = self._target = ift.makeDomain(domain)
+        assert set(self._domain.keys()) in [set(["I", "Q", "U"]), set(["I", "Q", "U", "V"])]
 
     def apply(self, x):
         self._check_input(x)
-        with_v = "v" in self.domain.keys()
-        duckI = ift.ducktape(None, self._domain["i"], "I")
-        duckQ = ift.ducktape(None, self._domain["q"], "Q")
-        duckU = ift.ducktape(None, self._domain["u"], "U")
-        tmpi = x["i"].exp()
+        with_v = "V" in self.domain.keys()
+        tmpi = x["I"].exp()
         if with_v:
-            duckV = ift.ducktape(None, self._domain["u"], "V")
-            log_p = (x["q"] ** 2 + x["u"] ** 2 + x["v"] ** 2).sqrt()
+            log_p = (x["Q"] ** 2 + x["U"] ** 2 + x["V"] ** 2).sqrt()
         else:
-            log_p = (x["q"] ** 2 + x["u"] ** 2).sqrt()
-        I = duckI(tmpi * log_p.cosh())
+            log_p = (x["Q"] ** 2 + x["U"] ** 2).sqrt()
+        I = tmpi * log_p.cosh()
         tmp = tmpi * log_p.sinh() * log_p.reciprocal()
-        U = duckU(tmp * x["u"])
-        Q = duckQ(tmp * x["q"])
+        U = tmp * x["U"]
+        Q = tmp * x["Q"]
         if with_v:
-            V = duckV(tmp * x["v"])
+            V = tmp * x["V"]
+        I = ift.ducktape(None, self._domain["I"], "I")(I)
+        Q = ift.ducktape(None, self._domain["Q"], "Q")(Q)
+        U = ift.ducktape(None, self._domain["U"], "U")(U)
+        if with_v:
+            V = ift.ducktape(None, self._domain["V"], "V")(V)
         if ift.is_linearization(x):
             val = I.val.unite(U.val.unite(Q.val))
             jac = I.jac + U.jac + Q.jac
@@ -52,23 +59,23 @@ class PolarizationMatrixExponential(ift.Operator):
         return I.unite(U.unite(Q))
 
 
-def _jax_pol(domain, target):
-    from jax.numpy import sqrt, exp, cosh, sinh
-    with_v = "v" in domain.keys()
+def _jax_pol(domain):
+    from jax.numpy import cosh, exp, sinh, sqrt
+    with_v = "V" in domain.keys()
 
     def func(x):
         res = {}
-        sq = x["q"] ** 2 + x["u"] ** 2
+        sq = x["Q"] ** 2 + x["U"] ** 2
         if with_v:
-            sq = sq + x["v"] ** 2
+            sq = sq + x["V"] ** 2
         log_p = sqrt(sq)
-        tmpi = exp(x["i"])
+        tmpi = exp(x["I"])
         res["I"] = tmpi * cosh(log_p)
         tmp = tmpi * sinh(log_p) / log_p
-        res["U"] = tmp * x["u"]
-        res["Q"] = tmp * x["q"]
+        res["U"] = tmp * x["U"]
+        res["Q"] = tmp * x["Q"]
         if with_v:
-            res["V"] = tmp * x["v"]
+            res["V"] = tmp * x["V"]
         return res
 
-    return ift.JaxOperator(domain, target, func)
+    return ift.JaxOperator(domain, domain, func)

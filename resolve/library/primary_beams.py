@@ -2,13 +2,12 @@
 # Copyright(C) 2019-2021 Max-Planck-Society
 # Author: Philipp Arras
 
+import nifty8 as ift
 import numpy as np
 import scipy.special as sc
 
-import nifty8 as ift
-
 from ..constants import ARCMIN2RAD, SPEEDOFLIGHT
-from ..util import my_assert
+from ..util import assert_sky_domain, my_assert
 from .meerkat_beam import JimBeam
 
 
@@ -217,12 +216,17 @@ def vla_beam_func(freq, x):
     return beam
 
 
-def vla_beam(domain, freq):
+def vla_beam(domain):
     dom = ift.DomainTuple.make(domain)
-    my_assert(len(dom) == 1)
-    dom = dom[0]
-    xx, yy = _get_meshgrid(dom)
-    beam = vla_beam_func(freq, np.sqrt(xx ** 2 + yy ** 2))
+    assert_sky_domain(domain)
+    pdom, tdom, fdom, sdom = dom
+    if not pdom.labels_eq("I"):
+        raise RuntimeError("Only Stokes I supported so far")
+    xx, yy = _get_meshgrid(sdom)
+    beam = np.empty(fdom.shape + sdom.shape)
+    for ii, freq in enumerate(fdom.coordinates):
+        beam[ii] = vla_beam_func(freq, np.sqrt(xx ** 2 + yy ** 2))
+    beam = np.broadcast_to(beam[None, None], dom.shape)
     return ift.makeOp(ift.makeField(dom, beam))
 
 

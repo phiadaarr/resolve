@@ -105,3 +105,43 @@ class DomainChangerAndReshaper(ift.LinearOperator):
         x = x.val
         tgt = self._tgt(mode)
         return ift.makeField(tgt, x.reshape(tgt.shape))
+
+
+class MultiFieldStacker(ift.LinearOperator):
+    def __init__(self, target, space, keys):
+        """
+        Parameters
+        ----------
+        target : DomainTuple
+            Target of the operator.
+        space : int
+            Index behind which the iterated domain shall be in the target
+            domain. target[space] needs to be one-dimensional.
+        keys : list
+            List of keys. Needs to have same length as target[space].
+        """
+        self._target = ift.DomainTuple.make(target)
+        dom = {kk: self._target[:space] + self._target[space + 1:] for kk in keys}
+        self._domain = ift.makeDomain(dom)
+        self._capability = self._all_ops
+        self._keys = tuple(keys)
+        self._space = int(space)
+        assert self.domain.size == self.target.size
+
+    def apply(self, x, mode):
+        self._check_input(x, mode)
+        x = x.val
+        if mode == self.TIMES or mode == self.ADJOINT_INVERSE_TIMES:
+            dtype = x[self._keys[0]].dtype
+            for kk in self._keys:
+                assert x[kk].dtype == dtype
+            res = np.empty(self._target.shape, dtype=dtype)
+            for ii, kk in enumerate(self._keys):
+                res[self._slice(ii)] = x[kk]
+        else:
+            res = {kk: x[self._slice(ii)] for ii, kk in enumerate(self._keys)}
+        return ift.makeField(self._tgt(mode), res)
+
+    def _slice(self, index):
+        ndim = reduce(add, (len(self._target[ii].shape) for ii in range(self._space)), 0)
+        return ndim * (None,) + (index,)

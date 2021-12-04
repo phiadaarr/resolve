@@ -27,15 +27,16 @@ for polmode in ["all", "stokesi", "stokesiavg"]:
     )
 npix, fov = 256, 1 * rve.DEG2RAD
 dom = ift.RGSpace((npix, npix), (fov / npix, fov / npix))
-sky0 = ift.SimpleCorrelatedField(
-    dom, 21, (1, 0.1), (5, 1), (1.2, 0.4), (0.2, 0.2), (-2, 0.5)
-).exp()
+sky0 = ift.SimpleCorrelatedField(dom, 21, (1, 0.1), (5, 1), (1.2, 0.4), (0.2, 0.2), (-2, 0.5)).exp()
 inserter = rve.PointInserter(sky0.target, np.array([[0, 0]]))
 points = ift.InverseGammaOperator(
     inserter.domain, alpha=0.5, q=0.2 / dom.scalar_dvol
 ).ducktape("points")
-sky = rve.vla_beam(dom, np.mean(OBS[0].freq)) @ (sky0 + inserter @ points)
-sky = rve.DomainChangerAndReshaper(sky.target, rve.default_sky_domain(sdom=sky.target[0])) @ sky
+sky = sky0 + inserter @ points
+dom = rve.default_sky_domain(sdom=dom, fdom=rve.IRGSpace([np.mean(OBS[0].freq)]))
+sky = rve.DomainChangerAndReshaper(sky.target, dom) @ sky
+sky = rve.vla_beam(dom) @ sky
+rve.assert_sky_domain(sky.target)
 
 freqdomain = rve.IRGSpace(np.linspace(1000, 1050, num=10))
 FACETS = [(1, 1), (2, 2), (2, 1), (1, 4)]
@@ -275,18 +276,20 @@ def test_response_distributor():
 @pmp("obs", OBS)
 @pmp("facets", FACETS)
 def test_single_response(obs, facets):
+    sdom = dom[-1]
     mask = obs.mask.val
-    op = rve.SingleResponse(dom, obs.uvw, obs.freq, mask[0], facets=facets)
+    op = rve.SingleResponse(sdom, obs.uvw, obs.freq, mask[0], facets=facets)
     ift.extra.check_linear_operator(op, np.float64, np.complex64,
                                     only_r_linear=True, rtol=1e-6, atol=1e-6)
 
 
 def test_facet_consistency():
+    sdom = dom[-1]
     obs = OBS[0]
     res0 = None
-    pos = ift.from_random(dom)
+    pos = ift.from_random(sdom)
     for facets in FACETS:
-        op = rve.SingleResponse(dom, obs.uvw, obs.freq, obs.mask.val[0], facets=facets)
+        op = rve.SingleResponse(sdom, obs.uvw, obs.freq, obs.mask.val[0], facets=facets)
         res = op(pos)
         if res0 is None:
             res0 = res
@@ -311,10 +314,10 @@ def test_randomonmaster():
 
 
 def test_mf_response():
+    pdom, tdom, fdom, sdom = dom
     ms = join(direc, "CYG-D-6680-64CH-10S.ms")
     obs = rve.ms2observations(ms, "DATA", False, 0, "stokesiavg")[0]
-    frequency_domain = rve.IRGSpace(obs.freq)
-    R = rve.MfResponse(obs, frequency_domain, dom)
+    R = rve.MfResponse(obs, fdom, sdom)
     ift.extra.check_linear_operator(
         R, rtol=1e-5, atol=1e-5, target_dtype=np.complex128, only_r_linear=True
     )
