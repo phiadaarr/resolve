@@ -35,6 +35,9 @@ class PolarizationSpace(ift.UnstructuredDomain):
     def labels(self):
         return self._lbl
 
+    def labels_eq(self, lst):
+        return set(lst) == set(self._lbl)
+
 
 def polarization_converter(domain, target):
     from .util import my_assert_isinstance
