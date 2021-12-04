@@ -36,20 +36,20 @@ def single_frequency_sky(cfg_section):
         points = ift.InverseGammaOperator(inserter.domain, alpha=alpha, q=q/dom.scalar_dvol)
         points = inserter @ points.ducktape("points")
         sky = sky + points
-        add["points"] = points
+        additional["points"] = points
 
     elif mode == "disable":
-        add["points"] = None
+        additional["points"] = None
     else:
         raise ValueError(f"In order to disable point source component, set `point sources mode` to `disable`. Got: {mode}")
 
-    add["sky"] = sky
+    additional["sky"] = sky
     conv = DomainChangerAndReshaper(sky.target, default_sky_domain(sdom=dom))
     sky = conv @ sky
-    if add["points"] is not None:
-        add["points"] = conv @ add["points"]
+    if additional["points"] is not None:
+        additional["points"] = conv @ additional["points"]
     assert_sky_domain(sky.target)
-    return sky, add
+    return sky, additional
 
 
 def multi_frequency_sky(cfg):
@@ -57,7 +57,7 @@ def multi_frequency_sky(cfg):
         raise NotImplementedError("Point sources are not supported yet.")
 
     sdom = _spatial_dom(cfg)
-    add = {}
+    additional = {}
 
     if cfg["freq mode"] == "cfm":
         fnpix, df = cfg.getfloat("freq npix"), cfg.getfloat("freq pixel size")
@@ -65,12 +65,12 @@ def multi_frequency_sky(cfg):
         fdom_rg = ift.RGSpace(fnpix, df)
         logdiffuse, cfm = cfm_from_cfg(cfg, {"freq": fdom_rg, "space": sdom}, "sky diffuse")
         sky = logdiffuse.exp()
-        add["logdiffuse"] = logdiffuse
+        additional["logdiffuse"] = logdiffuse
         fampl, sampl = list(cfm.get_normalized_amplitudes())
-        add["freq normalized power spectrum"] = fampl**2
-        add["space normalized power spectrum"] = sampl**2
+        additional["freq normalized power spectrum"] = fampl**2
+        additional["space normalized power spectrum"] = sampl**2
 
-        add["sky"] = sky
+        additional["sky"] = sky
         reshape = DomainChangerAndReshaper(sky.target, default_sky_domain(fdom=fdom, sdom=sdom))
         sky = reshape @ sky
 
@@ -131,10 +131,10 @@ def multi_frequency_sky(cfg):
         logsky = IntWProcessInitialConditions(i_0, alpha, intop @ increments)
 
         sky = logsky.exp()
-        add["sky"] = sky
-        add["logsky"] = logsky
-        add["i0"] = i_0
-        add["alpha"] = alpha
+        additional["sky"] = sky
+        additional["logsky"] = logsky
+        additional["i0"] = i_0
+        additional["alpha"] = alpha
 
         reshape = DomainChangerAndReshaper(sky.target, default_sky_domain(fdom=fdom, sdom=sdom))
         sky = reshape @ sky
@@ -143,7 +143,7 @@ def multi_frequency_sky(cfg):
         raise RuntimeError
 
     assert_sky_domain(sky.target)
-    return sky, add
+    return sky, additional
 
 
 def cfm_from_cfg(cfg_section, domain_dct, prefix):
