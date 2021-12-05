@@ -37,21 +37,24 @@ def single_frequency_sky(cfg_section):
                    for kk in ["fluctuations", "loglogavgslope", "flexibility", "asperity"]}
         op = ift.SimpleCorrelatedField(dom, **kwargs1, **kwargs2)
         logsky.append(op.ducktape_left(lbl))
-        additional["logdiffuse stokes{lbl} power spectrum"] = op.power_spectrum
+        additional[f"logdiffuse stokes{lbl} power spectrum"] = op.power_spectrum
     logsky = reduce(add, logsky)
     mfs = MultiFieldStacker((pdom, dom), 0, pdom.labels)
     # print("Run test...", end="", flush=True)
     # ift.extra.check_linear_operator(mfs)  # FIXME Move to tests
     # print("done")
     logsky = mfs @ logsky
-    additional["logdiffuse"] = logsky
 
     mexp = polarization_matrix_exponential(logsky.target)
     # print("Run test...", end="", flush=True)
     # ift.extra.check_operator(mexp, ift.from_random(mexp.domain))  # FIXME Move to tests
     # print("done")
     sky = mexp @ logsky
-    additional["diffuse"] = sky
+
+    for lbl in pdom.labels:
+        op = ift.DomainTupleFieldInserter(logsky.target, 0, (pdom.label2index(lbl),)).adjoint
+        additional[f"logdiffuse {lbl}"] = op @ logsky
+        additional[f"diffuse {lbl}"] = op @ sky
 
     # Point sources
     mode = cfg_section["point sources mode"]
@@ -75,43 +78,6 @@ def single_frequency_sky(cfg_section):
         raise ValueError(f"In order to disable point source component, set `point sources mode` to `disable`. Got: {mode}")
 
     conv = DomainChangerAndReshaper(sky.target, default_sky_domain(sdom=dom, pdom=pdom))
-    sky = conv @ sky
-    if additional["points"] is not None:
-        additional["points"] = conv @ additional["points"]
-    assert_sky_domain(sky.target)
-    return sky, additional
-
-
-def single_frequency_polarized_sky(cfg_section):
-    dom = _spatial_dom(cfg_section)
-
-    logdiffuse, cfm = cfm_from_cfg(cfg_section, {"space": dom}, "sky diffuse")
-    sky = logdiffuse.exp()
-    additional = {"logdiffuse": logdiffuse, "logdiffuse power spectrum": cfm.power_spectrum}
-
-    # Point sources
-    mode = cfg_section["point sources mode"]
-    if mode == "single":
-        ppos = []
-        s = cfg_section["point sources locations"]
-        for xy in s.split(";"):
-            x, y = xy.split(",")
-            ppos.append((str2rad(x), str2rad(y)))
-        inserter = PointInserter(dom, ppos)
-        alpha = cfg_section.getfloat("point sources alpha")
-        q = cfg_section.getfloat("point sources q")
-        points = ift.InverseGammaOperator(inserter.domain, alpha=alpha, q=q/dom.scalar_dvol)
-        points = inserter @ points.ducktape("points")
-        sky = sky + points
-        additional["points"] = points
-
-    elif mode == "disable":
-        additional["points"] = None
-    else:
-        raise ValueError(f"In order to disable point source component, set `point sources mode` to `disable`. Got: {mode}")
-
-    additional["sky"] = sky
-    conv = DomainChangerAndReshaper(sky.target, default_sky_domain(sdom=dom))
     sky = conv @ sky
     if additional["points"] is not None:
         additional["points"] = conv @ additional["points"]
