@@ -20,7 +20,7 @@ from .util import assert_sky_domain
 
 
 def single_frequency_sky(cfg_section):
-    dom = _spatial_dom(cfg_section)
+    sdom = _spatial_dom(cfg_section)
     pdom = PolarizationSpace(cfg_section["polarization"].split(","))
 
     additional = {}
@@ -35,11 +35,11 @@ def single_frequency_sky(cfg_section):
         }
         kwargs2 = {kk: _parse_or_none(cfg_section, f"{pol_lbl} space {kk}")
                    for kk in ["fluctuations", "loglogavgslope", "flexibility", "asperity"]}
-        op = ift.SimpleCorrelatedField(dom, **kwargs1, **kwargs2)
+        op = ift.SimpleCorrelatedField(sdom, **kwargs1, **kwargs2)
         logsky.append(op.ducktape_left(lbl))
         additional[f"logdiffuse stokes{lbl} power spectrum"] = op.power_spectrum
     logsky = reduce(add, logsky)
-    mfs = MultiFieldStacker((pdom, dom), 0, pdom.labels)
+    mfs = MultiFieldStacker((pdom, sdom), 0, pdom.labels)
     # print("Run test...", end="", flush=True)
     # ift.extra.check_linear_operator(mfs)  # FIXME Move to tests
     # print("done")
@@ -64,10 +64,10 @@ def single_frequency_sky(cfg_section):
         for xy in s.split(";"):
             x, y = xy.split(",")
             ppos.append((str2rad(x), str2rad(y)))
-        inserter = PointInserter(dom, ppos)
+        inserter = PointInserter(sdom, ppos)
         alpha = cfg_section.getfloat("point sources alpha")
         q = cfg_section.getfloat("point sources q")
-        points = ift.InverseGammaOperator(inserter.domain, alpha=alpha, q=q/dom.scalar_dvol)
+        points = ift.InverseGammaOperator(inserter.domain, alpha=alpha, q=q/sdom.scalar_dvol)
         points = inserter @ points.ducktape("points")
         sky = sky + points
         additional["points"] = points
@@ -77,7 +77,7 @@ def single_frequency_sky(cfg_section):
     else:
         raise ValueError(f"In order to disable point source component, set `point sources mode` to `disable`. Got: {mode}")
 
-    conv = DomainChangerAndReshaper(sky.target, default_sky_domain(sdom=dom, pdom=pdom))
+    conv = DomainChangerAndReshaper(sky.target, default_sky_domain(sdom=sdom, pdom=pdom))
     sky = conv @ sky
     if additional["points"] is not None:
         additional["points"] = conv @ additional["points"]
