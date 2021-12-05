@@ -2,6 +2,11 @@
 # Copyright(C) 2020-2021 Max-Planck-Society
 # Author: Philipp Arras
 
+import cProfile
+import io
+import pstats
+from pstats import SortKey
+
 import matplotlib.pyplot as plt
 import nifty8 as ift
 import numpy as np
@@ -161,3 +166,13 @@ def assert_data_domain(dom):
     my_assert_isinstance(pdom, PolarizationSpace)
     my_assert_isinstance(rdom, ift.UnstructuredDomain)
     my_assert_isinstance(fdom, IRGSpace)
+
+
+def profile_function(func, inp, ntries):
+    with cProfile.Profile() as pr:
+        for ii in range(ntries):
+            func(inp)
+    s = io.StringIO()
+    sortby = SortKey.TIME
+    pstats.Stats(pr, stream=s).sort_stats(sortby).print_stats(10)
+    return s.getvalue()
