@@ -51,10 +51,9 @@ def single_frequency_sky(cfg_section):
     # print("done")
     sky = mexp @ logsky
 
-    for lbl in pdom.labels:
-        op = ift.DomainTupleFieldInserter(logsky.target, 0, (pdom.label2index(lbl),)).adjoint
-        additional[f"logdiffuse {lbl}"] = op @ logsky
-        additional[f"diffuse {lbl}"] = op @ sky
+    additional[f"logdiffuse"] = mfs.inverse @ logsky
+    additional[f"diffuse"] = mfs.inverse @ sky
+    # FIXME Add fractional polarization etc
 
     # Point sources
     mode = cfg_section["point sources mode"]
