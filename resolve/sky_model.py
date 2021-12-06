@@ -52,12 +52,7 @@ def single_frequency_sky(cfg_section):
     sky = mexp @ logsky
 
     additional["logdiffuse"] = mfs.inverse @ logsky
-    multifield_sky = mfs.inverse @ sky
-    additional["diffuse"] = multifield_sky
-    if "U" in multifield_sky.keys() and "Q" in multifield_sky.keys():
-        polarized = (multifield_sky["Q"] ** 2 + multifield_sky["U"] ** 2).sqrt()
-        additional["linear polarization"] = polarized
-        additional["fractional polarization"] = polarized * multifield_sky["I"].reciprocal
+    additional["diffuse"] = mfs.inverse @ sky
 
     # Point sources
     mode = cfg_section["point sources mode"]
@@ -67,11 +62,26 @@ def single_frequency_sky(cfg_section):
         for xy in s.split(";"):
             x, y = xy.split(",")
             ppos.append((str2rad(x), str2rad(y)))
-        inserter = PointInserter(sdom, ppos)
         alpha = cfg_section.getfloat("point sources alpha")
         q = cfg_section.getfloat("point sources q")
-        points = ift.InverseGammaOperator(inserter.domain, alpha=alpha, q=q/sdom.scalar_dvol)
-        points = inserter @ points.ducktape("points")
+
+        inserter = PointInserter(sdom, ppos)
+        npoints = len(ppos)
+        if pdom.labels_eq("I"):
+            points = ift.InverseGammaOperator(inserter.domain, alpha=alpha, q=q/sdom.scalar_dvol)
+            points = inserter @ points.ducktape("points")
+        elif pdom.labels_eq(["I", "Q", "U"]):
+            i = ift.InverseGammaOperator(inserter.domain, alpha=alpha, q=q/sdom.scalar_dvol).log().ducktape("points I").ducktape_left("I")
+            q = ift.NormalTransform(cfg_section["point sources stokesq log mean"], cfg_section["point sources stokesq log stddev"], "points Q", npoints).ducktape_left("Q")
+            u = ift.NormalTransform(cfg_section["point sources stokesu log mean"], cfg_section["point sources stokesu log stddev"], "points U", npoints).ducktape_left("U")
+            iqu = MultiFieldStacker((pdom, inserter.domain[0]), 0, pdom.labels) @ (i + q + u)
+            foo = polarization_matrix_exponential(iqu.target) @ iqu
+            exit()
+
+            raise NotImplementedError()
+        else:
+            raise NotImplementedError(f"single_frequency_sky does not support point sources on {pdom.labels} (yet?)")
+
         sky = sky + points
         additional["points"] = points
 
@@ -84,6 +94,13 @@ def single_frequency_sky(cfg_section):
     sky = conv @ sky
     if additional["points"] is not None:
         additional["points"] = conv @ additional["points"]
+
+    multifield_sky = mfs.inverse @ conv.adjoint @ sky
+    if "U" in multifield_sky.target.keys() and "Q" in multifield_sky.target.keys():
+        polarized = (multifield_sky["Q"] ** 2 + multifield_sky["U"] ** 2).sqrt()
+        additional["linear polarization"] = polarized
+        additional["fractional polarization"] = polarized * multifield_sky["I"].reciprocal()
+
     assert_sky_domain(sky.target)
     return sky, additional
 
