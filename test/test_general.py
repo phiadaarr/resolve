@@ -26,15 +26,14 @@ for polmode in ["all", "stokesi", "stokesiavg"]:
         )[0]
     )
 npix, fov = 256, 1 * rve.DEG2RAD
-dom = ift.RGSpace((npix, npix), (fov / npix, fov / npix))
-sky0 = ift.SimpleCorrelatedField(dom, 21, (1, 0.1), (5, 1), (1.2, 0.4), (0.2, 0.2), (-2, 0.5)).exp()
-inserter = rve.PointInserter(sky0.target, np.array([[0, 0]]))
-points = ift.InverseGammaOperator(
-    inserter.domain, alpha=0.5, q=0.2 / dom.scalar_dvol
-).ducktape("points")
-sky = sky0 + inserter @ points
-dom = rve.default_sky_domain(sdom=dom, fdom=rve.IRGSpace([np.mean(OBS[0].freq)]))
+sdom = ift.RGSpace((npix, npix), (fov / npix, fov / npix))
+sky = ift.SimpleCorrelatedField(sdom, 21, (1, 0.1), (5, 1), (1.2, 0.4), (0.2, 0.2), (-2, 0.5)).exp()
+dom = rve.default_sky_domain(sdom=sdom, fdom=rve.IRGSpace([np.mean(OBS[0].freq)]))
 sky = rve.DomainChangerAndReshaper(sky.target, dom) @ sky
+
+inserter = rve.PointInserter(dom, np.array([[0, 0]]))
+points = ift.InverseGammaOperator(inserter.domain, alpha=0.5, q=0.2 / sdom.scalar_dvol).ducktape("points")
+sky = sky + inserter @ points
 sky = rve.vla_beam(dom) @ sky
 rve.assert_sky_domain(sky.target)
 
@@ -243,13 +242,16 @@ def test_calibration_distributor(obs):
 
 
 def test_point_inserter():
-    dom = ift.RGSpace([16, 16], [0.5, 2])
+    sdom = ift.RGSpace([16, 16], [0.5, 2])
+    dom = rve.default_sky_domain(sdom=sdom)
     op = rve.PointInserter(dom, [[0, 4], [0, 0]])
+    op.adjoint(ift.full(op.target, 1)).val_rw()
+    return
     ift.extra.check_linear_operator(op)
     res = op(ift.full(op.domain, 1)).val_rw()
-    assert res[8, 8] == 1
-    assert res[8, 10] == 1
-    res[8, 10] = res[8, 8] = 0
+    assert np.all(res[..., 8, 8] == 1)
+    assert np.all(res[8, 10] == 1)
+    res[..., 8, 10] = res[..., 8, 8] = 0
     assert np.all(res == 0)
 
 
