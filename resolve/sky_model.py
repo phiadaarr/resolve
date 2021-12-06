@@ -22,6 +22,7 @@ from .util import assert_sky_domain
 def single_frequency_sky(cfg_section):
     sdom = _spatial_dom(cfg_section)
     pdom = PolarizationSpace(cfg_section["polarization"].split(","))
+    dom = default_sky_domain(sdom=sdom, pdom=pdom)
 
     additional = {}
 
@@ -54,6 +55,8 @@ def single_frequency_sky(cfg_section):
     additional["logdiffuse"] = mfs.inverse @ logsky
     additional["diffuse"] = mfs.inverse @ sky
 
+    sky = DomainChangerAndReshaper(sky.target, dom) @ sky
+
     # Point sources
     mode = cfg_section["point sources mode"]
     if mode == "single":
@@ -65,37 +68,37 @@ def single_frequency_sky(cfg_section):
         alpha = cfg_section.getfloat("point sources alpha")
         q = cfg_section.getfloat("point sources q")
 
-        inserter = PointInserter(sdom, ppos)
         npoints = len(ppos)
+        inserter = PointInserter(dom, ppos)
+        ift.extra.check_linear_operator(inserter)
+
         if pdom.labels_eq("I"):
             points = ift.InverseGammaOperator(inserter.domain, alpha=alpha, q=q/sdom.scalar_dvol)
             points = inserter @ points.ducktape("points")
         elif pdom.labels_eq(["I", "Q", "U"]):
-            i = ift.InverseGammaOperator(inserter.domain, alpha=alpha, q=q/sdom.scalar_dvol).log().ducktape("points I").ducktape_left("I")
-            q = ift.NormalTransform(cfg_section["point sources stokesq log mean"], cfg_section["point sources stokesq log stddev"], "points Q", npoints).ducktape_left("Q")
-            u = ift.NormalTransform(cfg_section["point sources stokesu log mean"], cfg_section["point sources stokesu log stddev"], "points U", npoints).ducktape_left("U")
-            iqu = MultiFieldStacker((pdom, inserter.domain[0]), 0, pdom.labels) @ (i + q + u)
+            points_domain = ift.UnstructuredDomain(npoints)
+            i = ift.InverseGammaOperator(points_domain, alpha=alpha, q=q/sdom.scalar_dvol).log().ducktape("points I")
+            q = ift.NormalTransform(cfg_section["point sources stokesq log mean"], cfg_section["point sources stokesq log stddev"], "points Q", npoints)
+            u = ift.NormalTransform(cfg_section["point sources stokesu log mean"], cfg_section["point sources stokesu log stddev"], "points U", npoints)
+            conv = DomainChangerAndReshaper(q.target, i.target)
+            q = conv.ducktape_left("Q") @ q
+            u = conv.ducktape_left("U") @ u
+            i = i.ducktape_left("I")
+            iqu = MultiFieldStacker((pdom, points_domain), 0, pdom.labels) @ (i + q + u)
             foo = polarization_matrix_exponential(iqu.target) @ iqu
-            exit()
-
-            raise NotImplementedError()
+            conv = DomainChangerAndReshaper(foo.target, inserter.domain)
+            points = inserter @ conv @ foo
         else:
             raise NotImplementedError(f"single_frequency_sky does not support point sources on {pdom.labels} (yet?)")
 
-        sky = sky + points
         additional["points"] = points
-
+        sky = sky + points
     elif mode == "disable":
         additional["points"] = None
     else:
         raise ValueError(f"In order to disable point source component, set `point sources mode` to `disable`. Got: {mode}")
 
-    conv = DomainChangerAndReshaper(sky.target, default_sky_domain(sdom=sdom, pdom=pdom))
-    sky = conv @ sky
-    if additional["points"] is not None:
-        additional["points"] = conv @ additional["points"]
-
-    multifield_sky = mfs.inverse @ conv.adjoint @ sky
+    multifield_sky = mfs.inverse @ DomainChangerAndReshaper(sky.target, mfs.target) @ sky
     if "U" in multifield_sky.target.keys() and "Q" in multifield_sky.target.keys():
         polarized = (multifield_sky["Q"] ** 2 + multifield_sky["U"] ** 2).sqrt()
         additional["linear polarization"] = polarized

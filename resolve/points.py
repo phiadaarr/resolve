@@ -28,7 +28,7 @@ class PointInserter(ift.LinearOperator):
             res = np.zeros(self._target.shape, dtype=x.dtype)
             res[..., xs, ys] = x
         else:
-            res = np.sum(x, axis=(0, 1, 2))
-            res = res[xs, ys]
-            res = res[None, None, None]
+            res = np.sum(x, axis=(1, 2))
+            res = res[:, xs, ys]
+            res = res[:, None, None]
         return ift.makeField(self._tgt(mode), res)
