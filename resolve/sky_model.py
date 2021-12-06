@@ -51,9 +51,13 @@ def single_frequency_sky(cfg_section):
     # print("done")
     sky = mexp @ logsky
 
-    additional[f"logdiffuse"] = mfs.inverse @ logsky
-    additional[f"diffuse"] = mfs.inverse @ sky
-    # FIXME Add fractional polarization etc
+    additional["logdiffuse"] = mfs.inverse @ logsky
+    multifield_sky = mfs.inverse @ sky
+    additional["diffuse"] = multifield_sky
+    if "U" in multifield_sky.keys() and "Q" in multifield_sky.keys():
+        polarized = (multifield_sky["Q"] ** 2 + multifield_sky["U"] ** 2).sqrt()
+        additional["linear polarization"] = polarized
+        additional["fractional polarization"] = polarized * multifield_sky["I"].reciprocal
 
     # Point sources
     mode = cfg_section["point sources mode"]
