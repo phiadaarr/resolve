@@ -37,8 +37,9 @@ def single_frequency_sky(cfg_section):
         kwargs2 = {kk: _parse_or_none(cfg_section, f"{pol_lbl} space {kk}")
                    for kk in ["fluctuations", "loglogavgslope", "flexibility", "asperity"]}
         op = ift.SimpleCorrelatedField(sdom, **kwargs1, **kwargs2)
-        logsky.append(op.ducktape_left(lbl))
         additional[f"logdiffuse stokes{lbl} power spectrum"] = op.power_spectrum
+        op = op @ ift.PrependKey(op.domain, f"{pol_lbl} ").adjoint
+        logsky.append(op.ducktape_left(lbl))
     logsky = reduce(add, logsky)
     mfs = MultiFieldStacker((pdom, sdom), 0, pdom.labels)
     # print("Run test...", end="", flush=True)
