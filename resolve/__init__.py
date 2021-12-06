@@ -16,7 +16,7 @@ from .library.calibrators import *
 from .library.primary_beams import *
 from .likelihood import *
 from .mosaicing import *
-from .mpi import onlymaster
+from .mpi import onlymaster, barrier
 from .mpi_operators import *
 from .points import PointInserter
 from .polarization_matrix_exponential import *

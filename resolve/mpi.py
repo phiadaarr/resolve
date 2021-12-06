@@ -36,3 +36,9 @@ def onlymaster(func):
         return f
 
     return wrapper
+
+
+def barrier(comm=None):
+    if comm is None:
+        return
+    comm.Barrier()
