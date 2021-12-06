@@ -70,7 +70,9 @@ def single_frequency_sky(cfg_section):
 
         npoints = len(ppos)
         inserter = PointInserter(dom, ppos)
-        ift.extra.check_linear_operator(inserter)
+        # print("Run test...", end="", flush=True)
+        # ift.extra.check_linear_operator(inserter)  # FIXME Move to tests
+        # print("done")
 
         if pdom.labels_eq("I"):
             points = ift.InverseGammaOperator(inserter.domain, alpha=alpha, q=q/sdom.scalar_dvol)
@@ -91,7 +93,7 @@ def single_frequency_sky(cfg_section):
         else:
             raise NotImplementedError(f"single_frequency_sky does not support point sources on {pdom.labels} (yet?)")
 
-        additional["points"] = points
+        additional["points"] = mfs.inverse @ DomainChangerAndReshaper(points.target, mfs.target) @ points
         sky = sky + points
     elif mode == "disable":
         additional["points"] = None
@@ -99,6 +101,7 @@ def single_frequency_sky(cfg_section):
         raise ValueError(f"In order to disable point source component, set `point sources mode` to `disable`. Got: {mode}")
 
     multifield_sky = mfs.inverse @ DomainChangerAndReshaper(sky.target, mfs.target) @ sky
+    additional["sky"] = multifield_sky
     if "U" in multifield_sky.target.keys() and "Q" in multifield_sky.target.keys():
         polarized = (multifield_sky["Q"] ** 2 + multifield_sky["U"] ** 2).sqrt()
         additional["linear polarization"] = polarized
