@@ -2,12 +2,13 @@
 # Copyright(C) 2019-2021 Max-Planck-Society
 # Author: Philipp Arras
 
-import nifty8 as ift
 import numpy as np
 import scipy.special as sc
 
+import nifty8 as ift
+
 from ..constants import ARCMIN2RAD, SPEEDOFLIGHT
-from ..util import assert_sky_domain, my_assert
+from ..util import my_assert
 from .meerkat_beam import JimBeam
 
 
@@ -217,17 +218,34 @@ def vla_beam_func(freq, x):
 
 
 def vla_beam(domain):
-    dom = ift.DomainTuple.make(domain)
+    from ..util import assert_sky_domain
+
     assert_sky_domain(domain)
-    pdom, tdom, fdom, sdom = dom
-    if not pdom.labels_eq("I"):
-        raise RuntimeError("Only Stokes I supported so far")
-    xx, yy = _get_meshgrid(sdom)
-    beam = np.empty(fdom.shape + sdom.shape)
+    pdom, tdom, fdom, sdom = domain
+    res = np.empty(ift.makeDomain((fdom, sdom)).shape)
     for ii, freq in enumerate(fdom.coordinates):
-        beam[ii] = vla_beam_func(freq, np.sqrt(xx ** 2 + yy ** 2))
-    beam = np.broadcast_to(beam[None, None], dom.shape)
-    return ift.makeOp(ift.makeField(dom, beam))
+        res[ii] = _single_freq_vla_beam(sdom, freq)
+    res = np.broadcast_to(res[None, None], domain.shape)
+    return ift.makeOp(ift.makeField(domain, res))
+
+
+def _single_freq_vla_beam(domain, freq):
+    dom = ift.DomainTuple.make(domain)
+    my_assert(len(dom) == 1)
+    dom = dom[0]
+    xx, yy = _get_meshgrid(dom)
+    beam = vla_beam_func(freq, np.sqrt(xx ** 2 + yy ** 2))
+    return beam
+
+
+def alma_beam(domain, freq):
+    domain = ift.makeDomain(domain)
+    assert len(domain) == 1 and len(domain.shape) == 2
+    npix = np.array(domain.shape)[..., None, None]
+    nx, ny = domain.shape
+    dst = np.array(domain[0].distances)[..., None, None]
+    length_arr = np.linalg.norm(dst * (np.mgrid[:nx, :ny] - 0.5*npix), axis=0)
+    return ift.makeField(domain, alma_beam_func(length_arr))
 
 
 def alma_beam_func(D, d, freq, x, use_cache=False):
