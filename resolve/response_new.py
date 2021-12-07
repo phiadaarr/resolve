@@ -10,18 +10,28 @@ from ducc0.wgridder.experimental import dirty2vis, vis2dirty
 
 from .constants import SPEEDOFLIGHT
 from .data.observation import Observation
+from .polarization_space import polarization_converter
 from .global_config import epsilon, np_dtype, nthreads, verbosity, wgridding
 from .util import (assert_sky_domain, my_assert, my_assert_isinstance,
                    my_asserteq)
 
+def InterferometryResponse(observation, domain):
+    R = _InterferometryResponse(observation, domain)
+    pol = polarization_converter(R.target, observation.vis.domain)
+    return pol @ R
 
-class InterferometryResponse(ift.LinearOperator):
+
+class _InterferometryResponse(ift.LinearOperator):
     def __init__(self, observation, domain):
         assert isinstance(observation, Observation)
         domain = ift.DomainTuple.make(domain)
         assert_sky_domain(domain)
 
         pdom, tdom, fdom, sdom = domain
+
+        self._domain = domain
+        self._target = ift.makeDomain((domain[0],) + observation.vis.domain[1:])
+        self._capability = self.TIMES | self.ADJOINT_TIMES
 
         n_time_bins = tdom.shape[0]
         n_freq_bins = fdom.shape[0]
@@ -54,11 +64,7 @@ class InterferometryResponse(ift.LinearOperator):
         self._row_indices = row_indices
         self._freq_indices = freq_indices
 
-        self._domain = domain
-        self._target = ift.makeDomain((domain[0],) + observation.vis.domain[1:])
-        self._capability = self.TIMES | self.ADJOINT_TIMES
-
-        foo = np.zeros(self.target.shape, np.int8)
+        foo = np.zeros(self._target.shape, np.int8)
         for pp in range(self.domain.shape[0]):
             for tt in range(self.domain.shape[1]):
                 for ff in range(self.domain.shape[2]):
@@ -68,12 +74,8 @@ class InterferometryResponse(ift.LinearOperator):
 
     def apply(self, x, mode):
         self._check_input(x, mode)
-        x = x.val
-        if mode == self.TIMES:
-            res = self._times(x)
-        else:
-            res = self._adj_times(x)
-        return ift.makeField(self._tgt(mode), res)
+        tim = mode == self.TIMES
+        return ift.makeField(self._tgt(mode), (self._times if tim else self._adj_times)(x.val))
 
     def _times(self, x):
         res = np.empty(self.target.shape, np.complex128)

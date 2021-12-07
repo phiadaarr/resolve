@@ -142,12 +142,9 @@ def ImagingLikelihood(
         Optional. Target needs to be the same as observation.vis.
 
     """
-    from .polarization_space import polarization_converter
-
     my_assert_isinstance(sky_operator, ift.Operator)
     response = InterferometryResponse(observation, sky_operator.target)
-    pol_conv = polarization_converter(response.target, observation.vis.domain)
-    model_data = pol_conv @ response @ sky_operator
+    model_data = response @ sky_operator
     if calibration_operator is not None:
         model_data = calibration_operator * model_data
     if inverse_covariance_operator is None:
