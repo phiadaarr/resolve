@@ -18,7 +18,10 @@ class PointInserter(ift.LinearOperator):
         dx = np.array(sdom.distances)
         center = np.array(sdom.shape) // 2
         self._inds = np.unique(np.round(positions / dx + center).astype(int).T, axis=1)
-        self._domain = ift.makeDomain((pdom, tdom, fdom, ift.UnstructuredDomain(self._inds.shape[1])))
+        npoints = self._inds.shape[1]
+        if npoints != len(positions):
+            print("WARNING: Resolution not sufficient to assign a unique pixel to every point source.")
+        self._domain = ift.makeDomain((pdom, tdom, fdom, ift.UnstructuredDomain(npoints)))
 
     def apply(self, x, mode):
         self._check_input(x, mode)

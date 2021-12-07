@@ -69,7 +69,6 @@ def single_frequency_sky(cfg_section):
         alpha = cfg_section.getfloat("point sources alpha")
         q = cfg_section.getfloat("point sources q")
 
-        npoints = len(ppos)
         inserter = PointInserter(dom, ppos)
         # print("Run test...", end="", flush=True)
         # ift.extra.check_linear_operator(inserter)  # FIXME Move to tests
@@ -79,7 +78,8 @@ def single_frequency_sky(cfg_section):
             points = ift.InverseGammaOperator(inserter.domain, alpha=alpha, q=q/sdom.scalar_dvol)
             points = inserter @ points.ducktape("points")
         elif pdom.labels_eq(["I", "Q", "U"]):
-            points_domain = ift.UnstructuredDomain(npoints)
+            points_domain = inserter.domain[-1]
+            npoints = points_domain.size
             i = ift.InverseGammaOperator(points_domain, alpha=alpha, q=q/sdom.scalar_dvol).log().ducktape("points I")
             q = ift.NormalTransform(cfg_section["point sources stokesq log mean"], cfg_section["point sources stokesq log stddev"], "points Q", npoints)
             u = ift.NormalTransform(cfg_section["point sources stokesu log mean"], cfg_section["point sources stokesu log stddev"], "points U", npoints)

@@ -99,6 +99,7 @@ class DomainChangerAndReshaper(ift.LinearOperator):
         self._domain = ift.DomainTuple.make(domain)
         self._target = ift.DomainTuple.make(target)
         self._capability = self.TIMES | self.ADJOINT_TIMES
+        assert self._domain.size == self._target.size
 
     def apply(self, x, mode):
         self._check_input(x, mode)
