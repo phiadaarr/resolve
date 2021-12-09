@@ -8,7 +8,7 @@ import scipy.special as sc
 import nifty8 as ift
 
 from ..constants import ARCMIN2RAD, SPEEDOFLIGHT
-from ..util import my_assert
+from ..util import my_assert, assert_sky_domain
 from .meerkat_beam import JimBeam
 
 
@@ -238,14 +238,19 @@ def _single_freq_vla_beam(domain, freq):
     return beam
 
 
-def alma_beam(domain, freq):
+def alma_beam(domain, D, d):
     domain = ift.makeDomain(domain)
-    assert len(domain) == 1 and len(domain.shape) == 2
-    npix = np.array(domain.shape)[..., None, None]
-    nx, ny = domain.shape
-    dst = np.array(domain[0].distances)[..., None, None]
+    assert_sky_domain(domain)
+    _, _, fdom, sdom = domain
+    npix = np.array(sdom.shape)[..., None, None]
+    nx, ny = sdom.shape
+    dst = np.array(sdom.distances)[..., None, None]
     length_arr = np.linalg.norm(dst * (np.mgrid[:nx, :ny] - 0.5*npix), axis=0)
-    return ift.makeField(domain, alma_beam_func(length_arr))
+    beam = np.empty(fdom.shape + sdom.shape)
+    for ff, freq in enumerate(fdom.coordinates):
+        beam[ff] = alma_beam_func(D, d, freq, length_arr)
+    beam = ift.makeField((fdom, sdom), beam)
+    return beam.ducktape_left(domain)
 
 
 def alma_beam_func(D, d, freq, x, use_cache=False):
