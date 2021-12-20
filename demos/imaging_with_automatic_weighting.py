@@ -41,17 +41,11 @@ def main(cfg_file_name):
     # /Data
 
     # Sky model
-    sky, operators = rve.single_frequency_sky(cfg["sky"])
-    raw_sky = operators["sky"]
+    sky, operators = rve.sky_model(cfg["sky"])
     enable_points = operators["points"] is not None
-    operators["logsky"] = raw_sky.log()
-
-    p = ift.Plot()
-    for _ in range(9):
-        p.add(raw_sky(ift.from_random(raw_sky.domain)), norm=LogNorm())
-    if master:
-        p.output(name="sky_prior_samples.png")
     # /Sky model
+    print("SUCCESS")
+    exit()
 
     # Bayesian weighting
     if enable_weighting:
@@ -66,16 +60,25 @@ def main(cfg_file_name):
 
             xs = np.log(obs.effective_uvwlen().val)
             xs -= np.min(xs)
+            maxlen = max(rve.mpi.comm.allgather(np.max(xs)))
+            dom = ift.RGSpace(npix_padded, fac * maxlen / npix)
+
             if not xs.shape[0] == xs.shape[2] == 1:
                 raise RuntimeError
-            dom = ift.RGSpace(npix_padded, fac * np.max(xs) / npix)
-            logwgt, cfm = rve.cfm_from_cfg(subcfg, dom, "invcov")
-            li = ift.LinearInterpolator(dom, xs[0].T)
-            conv = rve.DomainChangerAndReshaper(li.target, obs.weight.domain)
-            weightop = ift.makeOp(obs.weight) @ (conv @ li @ logwgt).exp() ** (-2)
-            operators["logweights"] = logwgt
-            operators["weights"] = logwgt.exp()
-            operators["logweights power spectrum"] = cfm.power_spectrum
+
+            wgt_log_correction, cfm = rve.cfm_from_cfg(subcfg, dom, "invcov", N_total=n_imaging_bands)
+            mfs = rve.MultiFieldStacker(log_weights.target, 0, [str(ii) for ii in range(sky.target[2].size)])
+            mfs1 = rve.MultiFieldStacker(obs.vis.domain[1:], 1, [str(ii) for ii in range(sky.target[2].size)])
+            assert obs.npol == 1
+            op = []
+            for ii in range(sky.target[2].size):
+                foo = ift.LinearInterpolator(dom, xs[0, :, ii][None])
+                op.append(foo.ducktape(str(ii)).ducktape_left(str(ii)))
+            log_weights = (mfs1 @ reduce(add, op) @ mfs.inverse @ log_weights).ducktape_left(obs.vis.domain)
+            weightop = ift.makeOp(obs.weight) @ log_weights.scale(-2).exp()
+            #operators["log_sigma_correction"] = log_weights
+            #operators["sigma_correction"] = log_weights.exp()
+            #operators["log_sigma_correction power spectrum"] = cfm.power_spectrum
         else:
             raise NotImplementedError
     else:
@@ -129,11 +132,12 @@ def main(cfg_file_name):
     if True:
         _, position = ift.optimize_kl(get_lh, 7, get_n_samples, get_mini, get_sampling, None,
                                       constants=get_cst, point_estimates=get_cst,
+                                      initial_index=0 if enable_points else 1,
                                       initial_position=position, comm=get_comm, callback=callback,
                                       output_directory=cfg["output"]["directory"] + "_initial",
                                       **common)
     else:
-        position = ift.ResidualSampleList.load_mean("Cygnus_A_2052MHz_initial/pickle/last")
+        position = ift.ResidualSampleList.load_mean(cfg["output"]["directory"] + "_initial/pickle/last")
 
     # Reset diffuse component
     position = ift.MultiField.union([position, 0.1*ift.from_random(operators["logdiffuse"].domain)])

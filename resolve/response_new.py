@@ -173,7 +173,7 @@ class SingleResponse(ift.LinearOperator):
         return dirty2vis(dirty=x, verbosity=verbosity(), **self._args)
 
     def _adjoint(self, x):
-        my_assert(x.flags["C_CONTIGUOUS"])
+        #my_assert(x.flags["C_CONTIGUOUS"])
         nx, ny = self._domain.shape
         if verbosity():
             print(f"\nINFO: Oversampling factors in response: {self.oversampling_factors()}\n")

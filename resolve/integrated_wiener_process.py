@@ -73,7 +73,6 @@ def IntWProcessInitialConditions(a0, b0, wpop, irg_space=None):
     factors[1:] = np.cumsum(sdom.distances)
     factors = ift.makeField(sdom, factors)
     res = bc @ a0 + ift.DiagonalOperator(factors, tgt, 0) @ bc @ b0
-
     if wpop is None:
         return res
     else:

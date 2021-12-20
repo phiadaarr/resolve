@@ -16,14 +16,17 @@ np.seterr(all="raise")
 def test_build_multi_frequency_skymodel():
     cfg = configparser.ConfigParser()
     cfg.read("test/mf_sky.cfg")
-    op, _ = rve.multi_frequency_sky(cfg["sky"])
+    op, _ = rve.sky_model(cfg["sky"])
     op(ift.from_random(op.domain))
+    assert op.target[0].size == 1
+    assert op.target[1].size == 1
+    assert op.target[2].size == 10
 
     cfg.read("test/mf_sky_wiener_process.cfg")
-    op, _ = rve.multi_frequency_sky(cfg["sky"])
+    op, _ = rve.sky_model(cfg["sky"])
     op(ift.from_random(op.domain))
 
     cfg["sky"]["freq asperity mean"] = "0.1"
     cfg["sky"]["freq asperity stddev"] = "0.1"
-    op, _ = rve.multi_frequency_sky(cfg["sky"])
+    op, _ = rve.sky_model(cfg["sky"])
     op(ift.from_random(op.domain))

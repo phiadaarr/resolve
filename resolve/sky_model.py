@@ -19,214 +19,201 @@ from .simple_operators import DomainChangerAndReshaper, MultiFieldStacker
 from .util import assert_sky_domain
 
 
-def single_frequency_sky(cfg_section):
-    sdom = _spatial_dom(cfg_section)
-    pdom = PolarizationSpace(cfg_section["polarization"].split(","))
-    dom = default_sky_domain(sdom=sdom, pdom=pdom)
+def sky_model(cfg):
+    sdom = _spatial_dom(cfg)
+    pdom = PolarizationSpace(cfg["polarization"].split(","))
 
     additional = {}
 
     logsky = []
     for lbl in pdom.labels:
-        pol_lbl = f"stokes{lbl.lower()}"
-        kwargs1 = {
-            "offset_mean": cfg_section.getfloat(f"{pol_lbl} zero mode offset"),
-            "offset_std": (cfg_section.getfloat(f"{pol_lbl} zero mode mean"),
-                           cfg_section.getfloat(f"{pol_lbl} zero mode stddev")),
-            "prefix": f"{pol_lbl} "
-        }
-        kwargs2 = {kk: _parse_or_none(cfg_section, f"{pol_lbl} space {kk}")
-                   for kk in ["fluctuations", "loglogavgslope", "flexibility", "asperity"]}
-        op = ift.SimpleCorrelatedField(sdom, **kwargs1, **kwargs2)
-        additional[f"logdiffuse stokes{lbl} power spectrum"] = op.power_spectrum
-        logsky.append(op.ducktape_left(lbl))
+        pol_lbl = f"{lbl.upper()}"
+        if cfg["freq mode"] == "single":
+            op, aa = _single_freq_logsky(cfg, pol_lbl)
+        elif cfg["freq mode"] == "cfm":
+            op, aa = _multi_freq_logsky_cfm(cfg, sdom, pol_lbl)
+        elif cfg["freq mode"] == "iwp":
+            op, aa = _multi_freq_logsky_integrated_wiener_process(cfg, sdom, pol_lbl)
+        else:
+            raise RuntimeError
+        logsky.append(op.ducktape_left(pol_lbl))
+        additional = {**additional, **aa}
+        fdom = op.target[0]
+    tgt = default_sky_domain(pdom=pdom, fdom=fdom, sdom=sdom)
     logsky = reduce(add, logsky)
-    mfs = MultiFieldStacker((pdom, sdom), 0, pdom.labels)
-    # print("Run test...", end="", flush=True)
-    # ift.extra.check_linear_operator(mfs)  # FIXME Move to tests
-    # print("done")
-    logsky = mfs @ logsky
+    additional["logdiffuse"] = logsky
 
-    mexp = polarization_matrix_exponential(logsky.target)
-    # print("Run test...", end="", flush=True)
-    # ift.extra.check_operator(mexp, ift.from_random(mexp.domain))  # FIXME Move to tests
-    # print("done")
-    sky = mexp @ logsky
+    mfs = MultiFieldStacker((pdom, fdom, sdom), 0, pdom.labels)
+    mfs1 = MultiFieldStacker(tgt, 0, pdom.labels)
+    mexp = polarization_matrix_exponential(tgt)
 
-    additional["logdiffuse"] = mfs.inverse @ logsky
-    additional["diffuse"] = mfs.inverse @ sky
-
-    sky = DomainChangerAndReshaper(sky.target, dom) @ sky
+    sky = mexp @ (mfs @ logsky).ducktape_left(tgt)
+    additional["diffuse"] = mfs1.inverse @ sky
 
     # Point sources
-    mode = cfg_section["point sources mode"]
-    if mode == "single":
-        ppos = []
-        s = cfg_section["point sources locations"]
-        for xy in s.split(";"):
-            x, y = xy.split(",")
-            ppos.append((str2rad(x), str2rad(y)))
-        alpha = cfg_section.getfloat("point sources alpha")
-        q = cfg_section.getfloat("point sources q")
-
-        inserter = PointInserter(dom, ppos)
-        # print("Run test...", end="", flush=True)
-        # ift.extra.check_linear_operator(inserter)  # FIXME Move to tests
-        # print("done")
-
-        if pdom.labels_eq("I"):
-            points = ift.InverseGammaOperator(inserter.domain, alpha=alpha, q=q/sdom.scalar_dvol)
-            points = inserter @ points.ducktape("points")
-        elif pdom.labels_eq(["I", "Q", "U"]):
-            points_domain = inserter.domain[-1]
-            npoints = points_domain.size
-            i = ift.InverseGammaOperator(points_domain, alpha=alpha, q=q/sdom.scalar_dvol).log().ducktape("points I")
-            q = ift.NormalTransform(cfg_section["point sources stokesq log mean"], cfg_section["point sources stokesq log stddev"], "points Q", npoints)
-            u = ift.NormalTransform(cfg_section["point sources stokesu log mean"], cfg_section["point sources stokesu log stddev"], "points U", npoints)
-            conv = DomainChangerAndReshaper(q.target, i.target)
-            q = conv.ducktape_left("Q") @ q
-            u = conv.ducktape_left("U") @ u
-            i = i.ducktape_left("I")
-            iqu = MultiFieldStacker((pdom, points_domain), 0, pdom.labels) @ (i + q + u)
-            foo = polarization_matrix_exponential(iqu.target) @ iqu
-            conv = DomainChangerAndReshaper(foo.target, inserter.domain)
-            points = inserter @ conv @ foo
-        else:
-            raise NotImplementedError(f"single_frequency_sky does not support point sources on {pdom.labels} (yet?)")
-
-        additional["points"] = mfs.inverse @ DomainChangerAndReshaper(points.target, mfs.target) @ points
-        sky = sky + points
-    elif mode == "disable":
-        additional["points"] = None
-    else:
-        raise ValueError(f"In order to disable point source component, set `point sources mode` to `disable`. Got: {mode}")
-
-    multifield_sky = mfs.inverse @ DomainChangerAndReshaper(sky.target, mfs.target) @ sky
-    additional["sky"] = multifield_sky
-    if "U" in multifield_sky.target.keys() and "Q" in multifield_sky.target.keys():
-        polarized = (multifield_sky["Q"] ** 2 + multifield_sky["U"] ** 2).sqrt()
-        additional["linear polarization"] = polarized
-        additional["fractional polarization"] = polarized * multifield_sky["I"].reciprocal()
-
-    assert_sky_domain(sky.target)
-    return sky, additional
-
-
-def multi_frequency_sky(cfg):
-    if "point sources mode" in cfg:
+    if cfg.getboolean("point sources enable") and sky.target[2].size > 1:
         raise NotImplementedError("Point sources are not supported yet.")
+    if cfg.getboolean("point sources enable"):
+        if cfg["point sources mode"] == "single":
+            ppos = []
+            s = cfg["point sources locations"]
+            for xy in s.split(";"):
+                x, y = xy.split(",")
+                ppos.append((str2rad(x), str2rad(y)))
+            alpha = cfg.getfloat("point sources alpha")
+            q = cfg.getfloat("point sources q")
 
-    sdom = _spatial_dom(cfg)
-    additional = {}
+            inserter = PointInserter(sky.target, ppos)
 
-    if cfg["freq mode"] == "cfm":
-        fnpix, df = cfg.getfloat("freq npix"), cfg.getfloat("freq pixel size")
-        fdom = IRGSpace(cfg.getfloat("freq start") + np.arange(fnpix)*df)
-        fdom_rg = ift.RGSpace(fnpix, df)
-        logdiffuse, cfm = cfm_from_cfg(cfg, {"freq": fdom_rg, "space": sdom}, "sky diffuse")
-        sky = logdiffuse.exp()
-        additional["logdiffuse"] = logdiffuse
-        fampl, sampl = list(cfm.get_normalized_amplitudes())
-        additional["freq normalized power spectrum"] = fampl**2
-        additional["space normalized power spectrum"] = sampl**2
+            if pdom.labels_eq("I"):
+                points = ift.InverseGammaOperator(inserter.domain, alpha=alpha, q=q/sdom.scalar_dvol)
+                points = inserter @ points.ducktape("points")
+            elif pdom.labels_eq(["I", "Q", "U"]):
+                points_domain = inserter.domain[-1]
+                npoints = points_domain.size
+                i = ift.InverseGammaOperator(points_domain, alpha=alpha, q=q/sdom.scalar_dvol).log().ducktape("points I")
+                q = ift.NormalTransform(cfg["point sources stokesq log mean"], cfg["point sources stokesq log stddev"], "points Q", npoints)
+                u = ift.NormalTransform(cfg["point sources stokesu log mean"], cfg["point sources stokesu log stddev"], "points U", npoints)
+                conv = DomainChangerAndReshaper(q.target, i.target)
+                q = conv.ducktape_left("Q") @ q
+                u = conv.ducktape_left("U") @ u
+                i = i.ducktape_left("I")
+                iqu = MultiFieldStacker((pdom, points_domain), 0, pdom.labels) @ (i + q + u)
+                foo = polarization_matrix_exponential(iqu.target) @ iqu
+                conv = DomainChangerAndReshaper(foo.target, inserter.domain)
+                points = inserter @ conv @ foo
+            else:
+                raise NotImplementedError(f"single_frequency_sky does not support point sources on {pdom.labels} (yet?)")
 
-        additional["sky"] = sky
-        reshape = DomainChangerAndReshaper(sky.target, default_sky_domain(fdom=fdom, sdom=sdom))
-        sky = reshape @ sky
-
-    elif cfg["freq mode"] == "integrated wiener process":
-        prefix = "sky"
-
-        freq = np.sort(np.array(list(map(float, cfg["frequencies"].split(",")))))
-        fdom = IRGSpace(freq)
-        log_fdom = IRGSpace(np.log(freq / freq.mean()))
-
-        # Base sky brightness distribution for mean frequency \nu_0
-        i_0, i_0_cfm = cfm_from_cfg(cfg, {"space i0": sdom}, "space i0")
-
-        # simple spectral index that is frequency independent
-        alpha, alpha_cfm = cfm_from_cfg(cfg, {"space alpha": sdom}, "space alpha")
-
-        flexibility = _parse_or_none(cfg, "freq flexibility")
-        if flexibility is None:
-            raise RuntimeError("freq flexibility cannot be None")
-        asperity = _parse_or_none(cfg, "freq asperity")
-
-        # IDEA Try to use individual power spectra
-        n_freq_xi_fields = 2 * (log_fdom.size - 1)
-        cfm = ift.CorrelatedFieldMaker(f"{prefix}freq_xi", total_N=n_freq_xi_fields)
-        cfm.set_amplitude_total_offset(0.0, None)
-        # FIXME Support fixed fluctuations
-        cfm.add_fluctuations(sdom, (1, 1e-6), (1.2, 0.4), (0.2, 0.2), (-2, 0.5), dofdex=n_freq_xi_fields * [0])
-        freq_xi = cfm.finalize(0)
-
-        # Integrate over excitation fields
-        intop = WienerIntegrations(log_fdom, sdom)
-        freq_xi = DomainChangerAndReshaper(freq_xi.target, intop.domain) @ freq_xi
-        broadcast = ift.ContractionOperator(intop.domain[0], None).adjoint
-        broadcast_full = ift.ContractionOperator(intop.domain, 1).adjoint
-        vol = log_fdom.distances
-
-        flex = ift.LognormalTransform(*flexibility, prefix + "flexibility", 0)
-
-        dom = intop.domain[0]
-        vflex = np.empty(dom.shape)
-        vflex[0] = vflex[1] = np.sqrt(vol)
-        sig_flex = ift.makeOp(ift.makeField(dom, vflex)) @ broadcast @ flex
-        sig_flex = broadcast_full @ sig_flex
-        shift = np.ones(dom.shape)
-        shift[0] = vol * vol / 12.0
-        if asperity is None:
-            shift = ift.DiagonalOperator(ift.makeField(dom, shift).sqrt(), intop.domain, 0)
-            increments = shift @ (freq_xi * sig_flex)
+            additional["points"] = mfs.inverse @ DomainChangerAndReshaper(points.target, mfs.target) @ points
+            sky = sky + points
         else:
-            asp = ift.LognormalTransform(*asperity, prefix + "asperity", 0)
-            vasp = np.empty(dom.shape)
-            vasp[0] = 1
-            vasp[1] = 0
-            vasp = ift.DiagonalOperator(ift.makeField(dom, vasp), domain=broadcast.target, spaces=0)
-            sig_asp = broadcast_full @ vasp @ broadcast @ asp
-            shift = ift.makeField(intop.domain, np.broadcast_to(shift[..., None, None], intop.domain.shape))
-            increments = freq_xi * sig_flex * (ift.Adder(shift) @ sig_asp).ptw("sqrt")
-        logsky = IntWProcessInitialConditions(i_0, alpha, intop @ increments)
-
-        sky = logsky.exp()
-        additional["sky"] = sky
-        additional["logsky"] = logsky
-        additional["i0"] = i_0
-        additional["alpha"] = alpha
+            raise RuntimeError
+    else:
         additional["points"] = None
 
-        reshape = DomainChangerAndReshaper(sky.target, default_sky_domain(fdom=fdom, sdom=sdom))
-        sky = reshape @ sky
-
-    else:
-        raise RuntimeError
+    if not sky.target[0].labels_eq("I"):
+        multifield_sky = mfs.inverse @ DomainChangerAndReshaper(sky.target, mfs.target) @ sky
+        additional["sky"] = multifield_sky
+        if "U" in multifield_sky.target.keys() and "Q" in multifield_sky.target.keys():
+            polarized = (multifield_sky["Q"] ** 2 + multifield_sky["U"] ** 2).sqrt()
+            additional["linear polarization"] = polarized
+            additional["fractional polarization"] = polarized * multifield_sky["I"].reciprocal()
 
     assert_sky_domain(sky.target)
     return sky, additional
 
 
-def cfm_from_cfg(cfg_section, domain_dct, prefix):
-    if not isinstance(domain_dct, dict):
-        domain_dct = {"": domain_dct}
-    cfm = ift.CorrelatedFieldMaker(_append_to_nonempty_string(prefix, " "))
+def _single_freq_logsky(cfg, pol_label):
+    sdom = _spatial_dom(cfg)
+    cfm = cfm_from_cfg(cfg, {"space i0": sdom}, f"stokes{pol_label} diffuse")
+    op = cfm.finalize(0)
+    additional = {
+        f"logdiffuse stokes{pol_label} power spectrum": cfm.power_spectrum,
+        f"logdiffuse stokes{pol_label}": op,
+    }
+    return op, additional
+
+
+def _multi_freq_logsky_cfm(cfg, sdom, pol_label):
+    fnpix, df = cfg.getfloat("freq npix"), cfg.getfloat("freq pixel size")
+    fdom = IRGSpace(cfg.getfloat("freq start") + np.arange(fnpix)*df)
+    fdom_rg = ift.RGSpace(fnpix, df)
+
+    cfm = cfm_from_cfg(cfg, {"freq": fdom_rg, "space": sdom}, f"stokes{pol_label} diffuse")
+    op = cfm.finalize(0)
+
+    fampl, sampl = list(cfm.get_normalized_amplitudes())
+    additional = {
+        f"logdiffuse stokes{pol_label}": op,
+        f"freq normalized power spectrum stokes{pol_label}": fampl**2,
+        f"space normalized power spectrum stokes{pol_label}": sampl**2
+    }
+    return op.ducktape_left((fdom, sdom)), additional
+
+
+def _multi_freq_logsky_integrated_wiener_process(cfg, sdom, pol_label):
+    freq = np.sort(np.array(list(map(float, cfg["frequencies"].split(",")))))
+    fdom = IRGSpace(freq)
+
+    prefix = f"stokes{pol_label} diffuse"
+    i0_cfm = cfm_from_cfg(cfg, {"": sdom}, prefix + " space i0")
+    alpha_cfm = cfm_from_cfg(cfg, {"": sdom}, prefix + " space alpha")
+    i0 = i0_cfm.finalize()
+    alpha = alpha_cfm.finalize()
+
+    log_fdom = IRGSpace(np.log(freq / freq.mean()))
+    n_freq_xi_fields = 2 * (log_fdom.size - 1)
+    override = {
+        f"stokes{pol_label} diffuse wp increments zero mode offset": 0.,
+        f"stokes{pol_label} diffuse wp increments zero mode": (None, None),
+        # FIXME NIFTy cfm: support fixed fluctuations
+        f"stokes{pol_label} diffuse wp increments fluctuations": (1, 1e-6),
+    }
+    # IDEA Try to use individual power spectra
+    cfm = cfm_from_cfg(cfg, {"": sdom}, prefix + " wp increments",
+                       total_N=n_freq_xi_fields, dofdex=n_freq_xi_fields * [0],
+                       override=override)
+    freq_xi = cfm.finalize(0)
+
+    # Integrate over excitation fields
+    intop = WienerIntegrations(log_fdom, sdom)
+    freq_xi = DomainChangerAndReshaper(freq_xi.target, intop.domain) @ freq_xi
+    broadcast = ift.ContractionOperator(intop.domain[0], None).adjoint
+    broadcast_full = ift.ContractionOperator(intop.domain, 1).adjoint
+    vol = log_fdom.distances
+
+    flexibility = _parse_or_none(cfg, "freq flexibility")
+    if flexibility is None:
+        raise RuntimeError("freq flexibility cannot be None")
+    flex = ift.LognormalTransform(*flexibility, prefix + " flexibility", 0)
+    dom = intop.domain[0]
+    vflex = np.empty(dom.shape)
+    vflex[0] = vflex[1] = np.sqrt(vol)
+    sig_flex = ift.makeOp(ift.makeField(dom, vflex)) @ broadcast @ flex
+    sig_flex = broadcast_full @ sig_flex
+    shift = np.ones(dom.shape)
+    shift[0] = vol * vol / 12.0
+    asperity = _parse_or_none(cfg, "freq asperity")
+    if asperity is None:
+        shift = ift.DiagonalOperator(ift.makeField(dom, shift).sqrt(), intop.domain, 0)
+        increments = shift @ (freq_xi * sig_flex)
+    else:
+        asp = ift.LognormalTransform(*asperity, prefix + " asperity", 0)
+        vasp = np.empty(dom.shape)
+        vasp[0] = 1
+        vasp[1] = 0
+        vasp = ift.DiagonalOperator(ift.makeField(dom, vasp), domain=broadcast.target, spaces=0)
+        sig_asp = broadcast_full @ vasp @ broadcast @ asp
+        shift = ift.makeField(intop.domain, np.broadcast_to(shift[..., None, None], intop.domain.shape))
+        increments = freq_xi * sig_flex * (ift.Adder(shift) @ sig_asp).ptw("sqrt")
+    op = IntWProcessInitialConditions(i0, alpha, intop @ increments)
+
+    additional = {
+        f"stokes{pol_label} i0": i0,
+        f"stokes{pol_label} alpha": alpha,
+    }
+    return op, additional
+
+
+def cfm_from_cfg(cfg, domain_dct, prefix, total_N=0, dofdex=None, override={}):
+    assert len(prefix) > 0
+    product_spectrum = len(domain_dct) > 1
+    cfm = ift.CorrelatedFieldMaker(f"{prefix}", total_N=total_N)
     for key_prefix, dom in domain_dct.items():
-        foo = _append_to_nonempty_string(key_prefix, " ")
-        kwargs = {kk: _parse_or_none(cfg_section, f"{foo}{kk}") for kk in ["fluctuations", "loglogavgslope", "flexibility", "asperity"]}
-        kwargs["prefix"] = key_prefix
-        cfm.add_fluctuations(dom, **kwargs)
-    foo = _append_to_nonempty_string(prefix, " ")
-    if f"{foo}zero mode offset" not in cfg_section:
-        foo = ""
+        ll = _append_to_nonempty_string(key_prefix, " ")
+        kwargs = {kk: _parse_or_none(cfg, f"{prefix} {ll}{kk}", override)
+                  for kk in ["fluctuations", "loglogavgslope", "flexibility", "asperity"]}
+        cfm.add_fluctuations(dom, **kwargs, prefix=key_prefix, dofdex=dofdex)
+    foo = str(prefix)
+    if not product_spectrum and len(key_prefix) != 0:
+        foo += f" {key_prefix}"
     kwargs = {
-        "offset_mean": cfg_section.getfloat(f"{foo}zero mode offset"),
-        "offset_std": (cfg_section.getfloat(f"{foo}zero mode mean"),
-                       cfg_section.getfloat(f"{foo}zero mode stddev"))
+        "offset_mean": _parse_or_none(cfg, f"{foo} zero mode offset", override=override, single_value=True),
+        "offset_std": _parse_or_none(cfg, f"{foo} zero mode", override=override)
     }
     cfm.set_amplitude_total_offset(**kwargs)
-    op = cfm.finalize(prior_info=0)
-    return op, cfm
+    return cfm
 
 
 def _append_to_nonempty_string(s, append):
@@ -243,9 +230,21 @@ def _spatial_dom(cfg):
     return ift.RGSpace([nx, ny], [dx, dy])
 
 
-def _parse_or_none(cfg, key):
+def _parse_or_none(cfg, key, override={}, single_value=False):
+    print(key)
+    if single_value:
+        if key in override:
+            return override[key]
+        if cfg[key] == "None":
+            return None
+        return cfg.getfloat(key)
     key0 = f"{key} mean"
     key1 = f"{key} stddev"
+    if key in override:
+        a, b = override[key]
+        if a is None and b is None:
+            return None
+        return a, b
     if cfg[key0] == "None" and cfg[key1] == "None":
         return None
     if key0 in cfg:
