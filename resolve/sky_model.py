@@ -195,6 +195,7 @@ def multi_frequency_sky(cfg):
         additional["logsky"] = logsky
         additional["i0"] = i_0
         additional["alpha"] = alpha
+        additional["points"] = None
 
         reshape = DomainChangerAndReshaper(sky.target, default_sky_domain(fdom=fdom, sdom=sdom))
         sky = reshape @ sky
