@@ -460,6 +460,8 @@ class Observation(BaseObservation):
 
     def average_stokesi(self):
         # FIXME Do I need to change something in self._auxiliary_tables?
+        if self.vis.domain[0].labels_eq("I"):
+            return self
         my_asserteq(self._vis.shape[0], 2)
         my_asserteq(self._polarization.restrict_to_stokes_i(), self._polarization)
         vis = np.sum(self._weight * self._vis, axis=0)[None]
