@@ -215,10 +215,13 @@ def cfm_from_cfg(cfg_section, domain_dct, prefix):
         kwargs = {kk: _parse_or_none(cfg_section, f"{foo}{kk}") for kk in ["fluctuations", "loglogavgslope", "flexibility", "asperity"]}
         kwargs["prefix"] = key_prefix
         cfm.add_fluctuations(dom, **kwargs)
+    foo = _append_to_nonempty_string(prefix, " ")
+    if f"{foo}zero mode offset" not in cfg_section:
+        foo = ""
     kwargs = {
-        "offset_mean": cfg_section.getfloat("zero mode offset"),
-        "offset_std": (cfg_section.getfloat("zero mode mean"),
-                       cfg_section.getfloat("zero mode stddev"))
+        "offset_mean": cfg_section.getfloat(f"{foo}zero mode offset"),
+        "offset_std": (cfg_section.getfloat(f"{foo}zero mode mean"),
+                       cfg_section.getfloat(f"{foo}zero mode stddev"))
     }
     cfm.set_amplitude_total_offset(**kwargs)
     op = cfm.finalize(prior_info=0)
