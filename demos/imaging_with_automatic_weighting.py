@@ -68,7 +68,7 @@ def main(cfg_file_name):
             xs -= np.min(xs)
             if not xs.shape[0] == xs.shape[2] == 1:
                 raise RuntimeError
-            dom = ift.RGSpace(npix_padded, np.max(xs) / npix)
+            dom = ift.RGSpace(npix_padded, fac * np.max(xs) / npix)
             logwgt, cfm = rve.cfm_from_cfg(subcfg, dom, "invcov")
             li = ift.LinearInterpolator(dom, xs[0].T)
             conv = rve.DomainChangerAndReshaper(li.target, obs.weight.domain)
