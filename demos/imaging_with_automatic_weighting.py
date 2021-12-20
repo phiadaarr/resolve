@@ -72,7 +72,7 @@ def main(cfg_file_name):
             logwgt, cfm = rve.cfm_from_cfg(subcfg, dom, "invcov")
             li = ift.LinearInterpolator(dom, xs[0].T)
             conv = rve.DomainChangerAndReshaper(li.target, obs.weight.domain)
-            weightop = ift.makeOp(obs.weight) @ (conv @ li @ logwgt.exp()) ** (-2)
+            weightop = ift.makeOp(obs.weight) @ (conv @ li @ logwgt).exp() ** (-2)
             operators["logweights"] = logwgt
             operators["weights"] = logwgt.exp()
             operators["logweights power spectrum"] = cfm.power_spectrum
