@@ -6,11 +6,12 @@ import configparser
 import os
 import sys
 from distutils.util import strtobool
+from functools import reduce
+from operator import add
 
 import nifty8 as ift
 import numpy as np
 import resolve as rve
-from matplotlib.colors import LogNorm
 from resolve.mpi import master
 
 
@@ -44,12 +45,10 @@ def main(cfg_file_name):
     sky, operators = rve.sky_model(cfg["sky"])
     enable_points = operators["points"] is not None
     # /Sky model
-    print("SUCCESS")
-    exit()
 
     # Bayesian weighting
     if enable_weighting:
-        assert obs.nfreq == obs.npol == 1
+        assert obs.npol == 1
         subcfg = cfg["weighting"]
         if subcfg["model"] == "cfm":
             import ducc0
@@ -66,7 +65,8 @@ def main(cfg_file_name):
             if not xs.shape[0] == xs.shape[2] == 1:
                 raise RuntimeError
 
-            wgt_log_correction, cfm = rve.cfm_from_cfg(subcfg, dom, "invcov", N_total=n_imaging_bands)
+            cfm = rve.cfm_from_cfg(subcfg, {"": dom}, "invcov", total_N=sky.target[2].size)
+            log_weights = cfm.finalize(0)
             mfs = rve.MultiFieldStacker(log_weights.target, 0, [str(ii) for ii in range(sky.target[2].size)])
             mfs1 = rve.MultiFieldStacker(obs.vis.domain[1:], 1, [str(ii) for ii in range(sky.target[2].size)])
             assert obs.npol == 1

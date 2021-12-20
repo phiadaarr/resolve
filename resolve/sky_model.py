@@ -38,12 +38,16 @@ def sky_model(cfg):
             raise RuntimeError
         logsky.append(op.ducktape_left(pol_lbl))
         additional = {**additional, **aa}
+    if cfg["freq mode"] == "single":
+        tgt = default_sky_domain(pdom=pdom, sdom=sdom)
+        mfs = MultiFieldStacker((pdom, sdom), 0, pdom.labels)
+    else:
         fdom = op.target[0]
-    tgt = default_sky_domain(pdom=pdom, fdom=fdom, sdom=sdom)
+        tgt = default_sky_domain(pdom=pdom, fdom=fdom, sdom=sdom)
+        mfs = MultiFieldStacker((pdom, fdom, sdom), 0, pdom.labels)
     logsky = reduce(add, logsky)
     additional["logdiffuse"] = logsky
 
-    mfs = MultiFieldStacker((pdom, fdom, sdom), 0, pdom.labels)
     mfs1 = MultiFieldStacker(tgt, 0, pdom.labels)
     mexp = polarization_matrix_exponential(tgt)
 
@@ -231,7 +235,6 @@ def _spatial_dom(cfg):
 
 
 def _parse_or_none(cfg, key, override={}, single_value=False):
-    print(key)
     if single_value:
         if key in override:
             return override[key]
