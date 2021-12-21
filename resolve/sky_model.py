@@ -46,13 +46,13 @@ def sky_model(cfg):
         tgt = default_sky_domain(pdom=pdom, fdom=fdom, sdom=sdom)
         mfs = MultiFieldStacker((pdom, fdom, sdom), 0, pdom.labels)
     logsky = reduce(add, logsky)
-    additional["logdiffuse"] = logsky
+    # additional["logdiffuse"] = logsky
 
     mfs1 = MultiFieldStacker(tgt, 0, pdom.labels)
     mexp = polarization_matrix_exponential(tgt)
 
     sky = mexp @ (mfs @ logsky).ducktape_left(tgt)
-    additional["diffuse"] = mfs1.inverse @ sky
+    # additional["diffuse"] = mfs1.inverse @ sky
 
     # Point sources
     if cfg.getboolean("point sources enable") and sky.target[2].size > 1:
@@ -167,10 +167,10 @@ def _multi_freq_logsky_integrated_wiener_process(cfg, sdom, pol_label):
     broadcast_full = ift.ContractionOperator(intop.domain, 1).adjoint
     vol = log_fdom.distances
 
-    flexibility = _parse_or_none(cfg, "freq flexibility")
+    flexibility = _parse_or_none(cfg, prefix + " wp flexibility")
     if flexibility is None:
         raise RuntimeError("freq flexibility cannot be None")
-    flex = ift.LognormalTransform(*flexibility, prefix + " flexibility", 0)
+    flex = ift.LognormalTransform(*flexibility, prefix + " wp flexibility", 0)
     dom = intop.domain[0]
     vflex = np.empty(dom.shape)
     vflex[0] = vflex[1] = np.sqrt(vol)
@@ -178,12 +178,12 @@ def _multi_freq_logsky_integrated_wiener_process(cfg, sdom, pol_label):
     sig_flex = broadcast_full @ sig_flex
     shift = np.ones(dom.shape)
     shift[0] = vol * vol / 12.0
-    asperity = _parse_or_none(cfg, "freq asperity")
+    asperity = _parse_or_none(cfg, prefix + " wp asperity")
     if asperity is None:
         shift = ift.DiagonalOperator(ift.makeField(dom, shift).sqrt(), intop.domain, 0)
         increments = shift @ (freq_xi * sig_flex)
     else:
-        asp = ift.LognormalTransform(*asperity, prefix + " asperity", 0)
+        asp = ift.LognormalTransform(*asperity, prefix + " wp asperity", 0)
         vasp = np.empty(dom.shape)
         vasp[0] = 1
         vasp[1] = 0
@@ -197,6 +197,7 @@ def _multi_freq_logsky_integrated_wiener_process(cfg, sdom, pol_label):
         f"stokes{pol_label} i0": i0,
         f"stokes{pol_label} alpha": alpha,
     }
+    op = op.ducktape_left((fdom, sdom))
     return op, additional
 
 

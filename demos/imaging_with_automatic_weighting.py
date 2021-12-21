@@ -6,11 +6,8 @@ import configparser
 import os
 import sys
 from distutils.util import strtobool
-from functools import reduce
-from operator import add
 
 import nifty8 as ift
-import numpy as np
 import resolve as rve
 from resolve.mpi import master
 
@@ -25,8 +22,6 @@ def main(cfg_file_name):
     rve.set_wgridding(strtobool(cfg["response"]["wgridding"]))
     rve.set_double_precision(True)
     rve.set_nthreads(cfg["technical"].getint("nthreads"))
-
-    enable_weighting = cfg["weighting"].getboolean("enable")
 
     # Data
     obs_file_name = cfg["data"]["path"]
@@ -47,45 +42,11 @@ def main(cfg_file_name):
     # /Sky model
 
     # Bayesian weighting
-    if enable_weighting:
-        assert obs.npol == 1
-        subcfg = cfg["weighting"]
-        if subcfg["model"] == "cfm":
-            import ducc0
-
-            npix = subcfg.getint("npix")
-            fac = subcfg.getfloat("zeropadding factor")
-            npix_padded = ducc0.fft.good_size(int(np.round(npix*fac)))
-
-            xs = np.log(obs.effective_uvwlen().val)
-            xs -= np.min(xs)
-            maxlen = max(rve.mpi.comm.allgather(np.max(xs)))
-            dom = ift.RGSpace(npix_padded, fac * maxlen / npix)
-
-            if not xs.shape[0] == xs.shape[2] == 1:
-                raise RuntimeError
-
-            cfm = rve.cfm_from_cfg(subcfg, {"": dom}, "invcov", total_N=sky.target[2].size)
-            log_weights = cfm.finalize(0)
-            mfs = rve.MultiFieldStacker(log_weights.target, 0, [str(ii) for ii in range(sky.target[2].size)])
-            mfs1 = rve.MultiFieldStacker(obs.vis.domain[1:], 1, [str(ii) for ii in range(sky.target[2].size)])
-            assert obs.npol == 1
-            op = []
-            for ii in range(sky.target[2].size):
-                foo = ift.LinearInterpolator(dom, xs[0, :, ii][None])
-                op.append(foo.ducktape(str(ii)).ducktape_left(str(ii)))
-            log_weights = (mfs1 @ reduce(add, op) @ mfs.inverse @ log_weights).ducktape_left(obs.vis.domain)
-            weightop = ift.makeOp(obs.weight) @ log_weights.scale(-2).exp()
-            #operators["log_sigma_correction"] = log_weights
-            #operators["sigma_correction"] = log_weights.exp()
-            #operators["log_sigma_correction power spectrum"] = cfm.power_spectrum
-        else:
-            raise NotImplementedError
-    else:
-        weightop = None
+    weights, additional = rve.weighting_model(cfg["weighting"], obs, sky.target)
+    operators = {**operators, **additional}
     # /Bayesian weighting
 
-    full_lh = rve.ImagingLikelihood(obs, sky, inverse_covariance_operator=weightop)
+    full_lh = rve.ImagingLikelihood(obs, sky, inverse_covariance_operator=weights)
     position = 0.1 * ift.from_random(full_lh.domain)
 
     common = {"plottable_operators": operators, "overwrite": True, "return_final_position": True}

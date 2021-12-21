@@ -27,3 +27,4 @@ from .simple_operators import *
 from .sky_model import *
 from .util import *
 from .config_utils import *
+from .weighting_model import *
