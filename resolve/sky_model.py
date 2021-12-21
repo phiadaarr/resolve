@@ -114,6 +114,7 @@ def sky_model(cfg, data_freq=None):
             additional["mf sky"] = MultiFieldStacker(sky.target[2:], 0,
                                                      [f"{cc*1e-9:.3} GHz" for cc in sky.target[2].coordinates]).inverse \
                                        @ sky.ducktape_left(sky.target[2:])
+            additional["mf logsky"] = additional["mf sky"].log()
 
     assert_sky_domain(sky.target)
     return sky, additional, keys
