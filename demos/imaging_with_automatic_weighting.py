@@ -103,8 +103,8 @@ def main(cfg_file_name):
         if iglobal in [0, 1]:
             return 0
         if iglobal < 7:
-            return 3
-        return 6
+            return 4
+        return 4
 
     def get_comm(iglobal):
         return rve.mpi.comm
