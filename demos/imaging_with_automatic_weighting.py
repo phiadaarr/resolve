@@ -37,10 +37,15 @@ def main(cfg_file_name):
     # /Data
 
     # Model operators
-    sky, ops_sky = rve.sky_model(cfg["sky"], data_freq=obs.freq)
-    enable_points = ops_sky["points"] is not None
+    sky, ops_sky, keys = rve.sky_model(cfg["sky"], data_freq=obs.freq)
+    enable_points = len(keys["points"]) > 0
     weights, ops_weights = rve.weighting_model(cfg["weighting"], obs, sky.target)
     operators = {**ops_sky, **ops_weights}
+    keys["weights"] = weights.domain.keys()
+    keys["sky"] = sky.domain.keys()
+
+    for kk in keys:
+        keys[kk] = tuple(keys[kk])
     # /Model operators
 
     # Likelihoods
@@ -78,12 +83,9 @@ def main(cfg_file_name):
         if iglobal in [0, 1]:
             return []
         if iglobal < 7:
-            return sky.domain.keys()
+            return keys["sky"]
         if iglobal < 14:
-            res = list(weights.domain.keys())
-            if not enable_points:
-                return res
-            return res + list(operators["points"].domain.keys())
+            return keys["weights"] + keys["points"]
         return []
 
     def get_lh(iglobal):
@@ -110,7 +112,8 @@ def main(cfg_file_name):
             print(s)
         # Reset diffuse component
         if iglobal == 6:
-            return ift.MultiField.union([position, 0.1*ift.from_random(operators["logdiffuse"].domain)])
+            diffuse_domain = {kk: vv for kk, vv in full_lh.domain if kk in keys["diffuse"]}
+            return ift.MultiField.union([position, 0.1*ift.from_random(diffuse_domain)])
 
     ift.optimize_kl(get_lh, 40, get_n_samples, get_mini, get_sampling, None,
                     constants=get_cst, point_estimates=get_cst,

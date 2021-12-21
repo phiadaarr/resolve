@@ -24,6 +24,7 @@ def sky_model(cfg, data_freq=None):
     pdom = PolarizationSpace(cfg["polarization"].split(","))
 
     additional = {}
+    keys = {}
 
     logsky = []
     for lbl in pdom.labels:
@@ -52,12 +53,14 @@ def sky_model(cfg, data_freq=None):
     mexp = polarization_matrix_exponential(tgt)
 
     sky = mexp @ (mfs @ logsky).ducktape_left(tgt)
+    keys["diffuse"] = sky.domain.keys()
     # additional["diffuse"] = mfs1.inverse @ sky
 
     # Point sources
-    if cfg.getboolean("point sources enable") and sky.target[2].size > 1:
+    enable_points = cfg.getboolean("point sources enable")
+    if enable_points and sky.target[2].size > 1:
         raise NotImplementedError("Point sources are not supported yet.")
-    if cfg.getboolean("point sources enable"):
+    if enable_points:
         if cfg["point sources mode"] == "single":
             ppos = []
             s = cfg["point sources locations"]
@@ -90,11 +93,12 @@ def sky_model(cfg, data_freq=None):
                 raise NotImplementedError(f"single_frequency_sky does not support point sources on {pdom.labels} (yet?)")
 
             additional["points"] = mfs.inverse @ DomainChangerAndReshaper(points.target, mfs.target) @ points
+            keys["points"] = points.domain.keys()
             sky = sky + points
         else:
             raise RuntimeError
     else:
-        additional["points"] = None
+        keys["points"] = []
 
     if not sky.target[0].labels_eq("I"):
         multifield_sky = mfs.inverse @ DomainChangerAndReshaper(sky.target, mfs.target) @ sky
@@ -105,7 +109,7 @@ def sky_model(cfg, data_freq=None):
             additional["fractional polarization"] = polarized * multifield_sky["I"].reciprocal()
 
     assert_sky_domain(sky.target)
-    return sky, additional
+    return sky, additional, keys
 
 
 def _single_freq_logsky(cfg, pol_label):
