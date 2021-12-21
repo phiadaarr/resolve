@@ -50,6 +50,8 @@ def sky_model(cfg, data_freq=None):
     # additional["logdiffuse"] = logsky
 
     mfs1 = MultiFieldStacker(tgt, 0, pdom.labels)
+    ift.extra.check_linear_operator(mfs)
+    ift.extra.check_linear_operator(mfs1)
     mexp = polarization_matrix_exponential(tgt)
 
     sky = mexp @ (mfs @ logsky).ducktape_left(tgt)

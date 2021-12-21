@@ -16,6 +16,7 @@ def polarization_matrix_exponential(domain, jax=False):
         return ift.ScalingOperator(domain, 1.).exp()
 
     mfs = MultiFieldStacker(domain, 0, domain[0].labels)
+    ift.extra.check_linear_operator(mfs)
     if jax:
         op = _jax_pol(mfs.domain)
     else:
