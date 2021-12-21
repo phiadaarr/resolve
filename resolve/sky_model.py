@@ -110,7 +110,7 @@ def sky_model(cfg, data_freq=None):
             additional["linear polarization"] = polarized
             additional["fractional polarization"] = polarized * multifield_sky["I"].reciprocal()
     else:
-        if sky.target[1].size == 1:
+        if sky.target[1].size == 1 and sky.target[2].size > 1:
             additional["mf sky"] = MultiFieldStacker(sky.target[2:], 0,
                                                      [f"{cc*1e-9:.3} GHz" for cc in sky.target[2].coordinates]).inverse \
                                        @ sky.ducktape_left(sky.target[2:])
