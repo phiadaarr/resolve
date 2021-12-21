@@ -13,7 +13,7 @@ def polarization_matrix_exponential(domain, jax=False):
     pdom = dom[0]
     assert isinstance(pdom, PolarizationSpace)
     if pdom.labels_eq("I"):
-        return ift.ScalingOperator(domain, 1.)
+        return ift.ScalingOperator(domain, 1.).exp()
 
     mfs = MultiFieldStacker(domain, 0, domain[0].labels)
     if jax:
