@@ -19,7 +19,7 @@ from .simple_operators import DomainChangerAndReshaper, MultiFieldStacker
 from .util import assert_sky_domain
 
 
-def sky_model(cfg):
+def sky_model(cfg, data_freq=None):
     sdom = _spatial_dom(cfg)
     pdom = PolarizationSpace(cfg["polarization"].split(","))
 
@@ -33,7 +33,7 @@ def sky_model(cfg):
         elif cfg["freq mode"] == "cfm":
             op, aa = _multi_freq_logsky_cfm(cfg, sdom, pol_lbl)
         elif cfg["freq mode"] == "iwp":
-            op, aa = _multi_freq_logsky_integrated_wiener_process(cfg, sdom, pol_lbl)
+            op, aa = _multi_freq_logsky_integrated_wiener_process(cfg, sdom, pol_lbl, data_freq=data_freq)
         else:
             raise RuntimeError
         logsky.append(op.ducktape_left(pol_lbl))
@@ -136,8 +136,12 @@ def _multi_freq_logsky_cfm(cfg, sdom, pol_label):
     return op.ducktape_left((fdom, sdom)), additional
 
 
-def _multi_freq_logsky_integrated_wiener_process(cfg, sdom, pol_label):
-    freq = np.sort(np.array(list(map(float, cfg["frequencies"].split(",")))))
+def _multi_freq_logsky_integrated_wiener_process(cfg, sdom, pol_label, data_freq=None):
+    if cfg["frequencies"] == "data":
+        freq = data_freq
+        assert freq is not None
+    else:
+        freq = np.sort(np.array(list(map(float, cfg["frequencies"].split(",")))))
     fdom = IRGSpace(freq)
 
     prefix = f"stokes{pol_label} diffuse"

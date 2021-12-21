@@ -26,7 +26,11 @@ def test_build_multi_frequency_skymodel():
     op, _ = rve.sky_model(cfg["sky"])
     op(ift.from_random(op.domain))
 
-    cfg["sky"]["freq asperity mean"] = "0.1"
-    cfg["sky"]["freq asperity stddev"] = "0.1"
+    cfg["sky"]["stokesI diffuse wp asperity mean"] = "0.1"
+    cfg["sky"]["stokesI diffuse wp asperity stddev"] = "0.1"
+    op, _ = rve.sky_model(cfg["sky"])
+    op(ift.from_random(op.domain))
+
+    cfg["sky"]["freq"] = "data"
     op, _ = rve.sky_model(cfg["sky"])
     op(ift.from_random(op.domain))
