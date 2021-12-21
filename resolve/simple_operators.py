@@ -145,4 +145,4 @@ class MultiFieldStacker(ift.LinearOperator):
 
     def _slice(self, index):
         ndim = reduce(add, (len(self._target[ii].shape) for ii in range(self._space)), 0)
-        return ndim * (None,) + (index,)
+        return ndim * (slice(None),) + (index,)
