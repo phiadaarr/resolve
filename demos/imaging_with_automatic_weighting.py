@@ -40,6 +40,7 @@ def main(cfg_file_name):
     sky, ops_sky, keys = rve.sky_model(cfg["sky"], data_freq=obs.freq)
     enable_points = len(keys["points"]) > 0
     weights, ops_weights = rve.weighting_model(cfg["weighting"], obs, sky.target)
+    # FIXME Add plots for weights
     operators = {**ops_sky, **ops_weights}
     keys["weights"] = weights.domain.keys()
     keys["sky"] = sky.domain.keys()
