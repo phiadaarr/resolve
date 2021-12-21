@@ -57,6 +57,9 @@ def main(cfg_file_name):
 
     # Initial position
     position = 0.1 * ift.from_random(full_lh.domain)
+    s = rve.profile_function(full_lh, position, 1)
+    if master:
+        print(s)
     # /Initial position
 
     # Optimization
@@ -112,7 +115,7 @@ def main(cfg_file_name):
             print(s)
         # Reset diffuse component
         if iglobal == 6:
-            diffuse_domain = {kk: vv for kk, vv in full_lh.domain if kk in keys["diffuse"]}
+            diffuse_domain = {kk: vv for kk, vv in full_lh.domain.items() if kk in keys["diffuse"]}
             return ift.MultiField.union([position, 0.1*ift.from_random(diffuse_domain)])
 
     ift.optimize_kl(get_lh, 40, get_n_samples, get_mini, get_sampling, None,

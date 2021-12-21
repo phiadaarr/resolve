@@ -151,8 +151,8 @@ def _multi_freq_logsky_integrated_wiener_process(cfg, sdom, pol_label, data_freq
     prefix = f"stokes{pol_label} diffuse"
     i0_cfm = cfm_from_cfg(cfg, {"": sdom}, prefix + " space i0")
     alpha_cfm = cfm_from_cfg(cfg, {"": sdom}, prefix + " space alpha")
-    i0 = i0_cfm.finalize()
-    alpha = alpha_cfm.finalize()
+    i0 = i0_cfm.finalize(0)
+    alpha = alpha_cfm.finalize(0)
 
     log_fdom = IRGSpace(np.log(freq / freq.mean()))
     n_freq_xi_fields = 2 * (log_fdom.size - 1)
