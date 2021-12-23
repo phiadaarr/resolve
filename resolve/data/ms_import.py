@@ -26,7 +26,8 @@ def _pol_id(ms_path, spectral_window):
 
 
 def ms2observations(ms, data_column, with_calib_info, spectral_window,
-                    polarizations="all", channels=slice(None), ignore_flags=False):
+                    polarizations="all", channels=slice(None), ignore_flags=False,
+                    field=None):
     """Read and convert a given measurement set into an array of :class:`Observation`
 
     If WEIGHT_SPECTRUM is available this column is used for weighting.
@@ -55,6 +56,8 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window,
     ignore_flags : bool
         If True, the whole measurement set is imported irrespective of the
         flags. Default is false.
+    field : str or None
+        Field that is imported. If None, all fields are imported. Default: None.
 
     Returns
     -------
@@ -116,7 +119,10 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window,
             observations.append(None)
             continue
         auxtables = {**auxtables, **sf}
-        print(f"Work on Field {ifield}: {auxtables['SOURCE']['NAME'][0]}")
+        source_name = auxtables['SOURCE']['NAME'][0]
+        if field is not None and source_name != field:
+            continue
+        print(f"Work on Field {ifield}: {source_name}")
 
         mm = read_ms_i(ms, data_column, ifield, spectral_window, pol_ind, pol_summation,
                        with_calib_info, channels, ignore_flags)

@@ -5,11 +5,12 @@
 import configparser
 import os
 import sys
-from distutils.util import strtobool
 
 import nifty8 as ift
 import resolve as rve
 from resolve.mpi import master
+
+
 
 
 def main(cfg_file_name):
@@ -18,23 +19,9 @@ def main(cfg_file_name):
     if master:
         print(f"Load {cfg_file_name}")
 
-    rve.set_epsilon(cfg["response"].getfloat("epsilon"))
-    rve.set_wgridding(strtobool(cfg["response"]["wgridding"]))
-    rve.set_double_precision(True)
-    rve.set_nthreads(cfg["technical"].getint("nthreads"))
-
-    # Data
-    obs_file_name = cfg["data"]["path"]
-    if os.path.splitext(obs_file_name)[1] == ".npz":
-        obs = rve.Observation.load(obs_file_name).restrict_to_stokesi().average_stokesi()
-    elif os.path.splitext(obs_file_name)[1] == ".ms":
-        obs = rve.ms2observations(obs_file_name, "DATA", False, 0, "stokesiavg")
-        assert len(obs) == 1
-        obs = obs[0]
-    else:
-        raise RuntimeError(
-            f"Do not understand file name ending of {obs_file_name}. Supported: ms, npz.")
-    # /Data
+    obs_calib_flux, obs_calib_phase, obs_science = rve.parse_data_config(cfg)
+    print("SUCCESS")
+    exit()
 
     # Model operators
     sky, ops_sky, keys = rve.sky_model(cfg["sky"], data_freq=obs.freq)

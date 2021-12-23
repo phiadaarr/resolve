@@ -2,7 +2,40 @@
 # Copyright(C) 2021 Max-Planck-Society
 # Author: Philipp Arras
 
+import numpy as np
+import os
 import nifty8 as ift
+from distutils.util import strtobool
+
+from .global_config import set_epsilon, set_wgridding, set_double_precision, set_nthreads
+from .data.observation import Observation
+from .data.ms_import import ms2observations
+
+
+def parse_data_config(cfg):
+    set_epsilon(cfg["response"].getfloat("epsilon"))
+    set_wgridding(strtobool(cfg["response"]["wgridding"]))
+    set_double_precision(cfg["response"].getboolean("double precision"))
+    set_nthreads(cfg["response"].getint("nthreads"))
+
+    obs_calib_phase = _cfg_to_observations(cfg["data"]["phase calibrator"])
+    obs_calib_flux = _cfg_to_observations(cfg["data"]["flux calibrator"])
+    obs_science = _cfg_to_observations(cfg["data"]["science target"])
+
+    s = "number of randomly sampled rows"
+    if s in cfg["data"]:
+        nvis = cfg["data"].getint(s)
+        np.random.seed(42)
+        print("Set numpy random seed to 42.")
+        for oo in [obs_calib_phase, obs_calib_flux, obs_science]:
+            for ii in range(len(oo)):
+                inds = np.random.choice(np.arange(obs_science[0].nrow), (nvis,),
+                                        replace=False)
+                oo[ii] = oo[ii][inds]
+        print(f"Select {nvis} random rows")
+        assert all(oo.vis.shape[1] == nvis for oo in obs_science)
+
+    return obs_calib_flux, obs_calib_phase, obs_science
 
 
 def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}):
@@ -66,6 +99,31 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}):
     constants_dct[None] = ift.MultiDomain.make({})
     res["point_estimates"] = res["constants"] = lambda ii: constants_dct[cstlst[ii]].keys()
 
+    return res
+
+
+def _cfg_to_observations(cfg):
+    res = []
+    for cc in cfg.split(","):
+        cc = cc.split(":")
+        file_name = cc.pop(0)
+        if file_name == "":
+            continue
+        if len(cc) == 0:  # npz
+            obs = Observation.load(file_name)
+        elif len(cc) == 1:  # ms
+            print(cc)
+            cc = cc[0]
+            assert cc[0] == "("
+            assert cc[-1] == ")"
+            cc = cc[1:-1]
+            source, spectral_window, data_column = cc.split("$")
+            obs = ms2observations(file_name, data_column, True, int(spectral_window), field=source)
+            assert len(obs) == 1
+            obs = obs[0]
+        else:
+            raise RuntimeError("Paths with ':' and ',' are not allowed")
+        res.append(obs)
     return res
 
 
