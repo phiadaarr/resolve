@@ -23,17 +23,18 @@ def parse_data_config(cfg):
     obs_science = _cfg_to_observations(cfg["data"]["science target"])
 
     s = "number of randomly sampled rows"
+    comm = ift.utilities.get_MPI_params()[0]
     if s in cfg["data"]:
         nvis = cfg["data"].getint(s)
-        np.random.seed(42)
-        print("Set numpy random seed to 42.")
+
+        ift.utilities.check_MPI_synced_random_state(comm)
         for oo in [obs_calib_phase, obs_calib_flux, obs_science]:
             for ii in range(len(oo)):
-                inds = np.random.choice(np.arange(obs_science[0].nrow), (nvis,),
-                                        replace=False)
+                inds = ift.random.current_rng().choice(np.arange(obs_science[0].nrow), (nvis,),
+                                                       replace=False)
                 oo[ii] = oo[ii][inds]
-        print(f"Select {nvis} random rows")
         assert all(oo.vis.shape[1] == nvis for oo in obs_science)
+        ift.utilities.check_MPI_synced_random_state(comm)
 
     return obs_calib_flux, obs_calib_phase, obs_science
 

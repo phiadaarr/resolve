@@ -21,7 +21,6 @@ def wgridding():
 def set_wgridding(val):
     global _wgridding
     _wgridding = bool(val)
-    print(f"Set wgridding to {wgridding()}")
 
 
 def epsilon():
@@ -33,7 +32,6 @@ def epsilon():
 def set_epsilon(val):
     global _epsilon
     _epsilon = float(val)
-    print(f"Set epsilon to {epsilon()}")
 
 
 def nthreads():
@@ -44,16 +42,11 @@ def set_nthreads(val):
     global _nthreads
     _nthreads = int(val)
     ift.set_nthreads(int(val))
-    print(f"Set nthreads to {nthreads()}")
 
 
 def set_verbosity(val):
     global _verbosity
     _verbosity = bool(val)
-    if _verbosity:
-        print("Activate verbose mode")
-    else:
-        print("Deactivate verbose mode")
 
 
 def verbosity():
@@ -76,5 +69,3 @@ def np_dtype(cplx=False):
 def set_double_precision(val):
     global _double_precision
     _double_precision = bool(val)
-    s = "double" if _double_precision else "single"
-    print(f"Likelihoods are computed in {s} precision.")

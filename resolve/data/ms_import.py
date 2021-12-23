@@ -7,6 +7,7 @@ from os.path import isdir, join
 import numpy as np
 
 from ..util import my_assert, my_assert_isinstance, my_asserteq
+from ..global_config import verbosity
 from .antenna_positions import AntennaPositions
 from .auxiliary_table import AuxiliaryTable
 from .observation import Observation
@@ -122,15 +123,15 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window,
         source_name = auxtables['SOURCE']['NAME'][0]
         if field is not None and source_name != field:
             continue
-        print(f"Work on Field {ifield}: {source_name}")
-
+        if verbosity():
+            print(f"Work on Field {ifield}: {source_name}")
         mm = read_ms_i(ms, data_column, ifield, spectral_window, pol_ind, pol_summation,
                        with_calib_info, channels, ignore_flags)
         if mm is None:
             print(f"{ms}, field #{ifield} is empty or fully flagged")
             observations.append(None)
             continue
-        print("WARNING: POINTING table is ignored for now")
+        # POINTING table is ignored for now
         antpos = AntennaPositions(mm["uvw"], mm["ant1"], mm["ant2"], mm["time"])
         obs = Observation(antpos, mm["vis"], mm["wgt"], polobj, mm["freq"],
                           auxiliary_tables=auxtables)
@@ -173,8 +174,9 @@ def read_ms_i(name, data_column, field, spectral_window, pol_indices, pol_summat
     with ms_table(name) as t:
         nmspol = t.getcol(data_column, startrow=0, nrow=3).shape[2]
         nrow = t.nrows()
-    print("Measurement set visibilities:")
-    print(f"  shape: ({nrow}, {_ms_nchannels(name, spectral_window)}, {nmspol})")
+    if verbosity():
+        print("Measurement set visibilities:")
+        print(f"  shape: ({nrow}, {_ms_nchannels(name, spectral_window)}, {nmspol})")
 
     active_rows, active_channels = _first_pass(name, field, spectral_window, channels, pol_indices,
                                                pol_summation, ignore_flags)
@@ -203,7 +205,8 @@ def read_ms_i(name, data_column, field, spectral_window, pol_indices, pol_summat
         # Read in data
         start, realstart = 0, 0
         while start < nrow:
-            print("Second pass:", f"{(start/nrow*100):.1f}%", end="\r")
+            if verbosity():
+                print("Second pass:", f"{(start/nrow*100):.1f}%", end="\r")
             stop = _ms_stop(start, nrow)
             realstop = realstart + np.sum(active_rows[start:stop])
             if realstop > realstart:
@@ -247,9 +250,10 @@ def read_ms_i(name, data_column, field, spectral_window, pol_indices, pol_summat
                 wgt[realstart:realstop] = twgt
 
             start, realstart = stop, realstop
-    print("Selected:", 10 * " ")
-    print(f"  shape: {vis.shape}")
-    print(f"  flagged: {(1.0-np.sum(wgt!=0)/wgt.size)*100:.1f} %")
+    if verbosity():
+        print("Selected:", 10 * " ")
+        print(f"  shape: {vis.shape}")
+        print(f"  flagged: {(1.0-np.sum(wgt!=0)/wgt.size)*100:.1f} %")
 
     # UVW
     with ms_table(name) as t:
@@ -272,7 +276,8 @@ def read_ms_i(name, data_column, field, spectral_window, pol_indices, pol_summat
             ptg = np.empty((nrealrows, 1, 2), dtype=np.float64)
             start, realstart = 0, 0
             while start < nrow:
-                print("Second pass:", f"{(start/nrow*100):.1f}%", end="\r")
+                if verbosity():
+                    print("Second pass:", f"{(start/nrow*100):.1f}%", end="\r")
                 stop = _ms_stop(start, nrow)
                 realstop = realstart + np.sum(active_rows[start:stop])
                 if realstop > realstart:
@@ -304,7 +309,8 @@ def _first_pass(ms, field, spectral_window, channels, pol_indices, pol_summation
         # Determine which subset of rows/channels we need to input
         start = 0
         while start < nrow:
-            print("First pass:", f"{(start/nrow*100):.1f}%", end="\r")
+            if verbosity():
+                print("First pass:", f"{(start/nrow*100):.1f}%", end="\r")
             stop = _ms_stop(start, nrow)
             tflags = _conditional_flags(t, start, stop, pol_indices, ignore_flags)
             twgt = t.getcol(weightcol, startrow=start, nrow=stop - start)[..., pol_indices]
