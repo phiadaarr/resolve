@@ -29,7 +29,7 @@ npix, fov = 256, 1 * rve.DEG2RAD
 sdom = ift.RGSpace((npix, npix), (fov / npix, fov / npix))
 sky = ift.SimpleCorrelatedField(sdom, 21, (1, 0.1), (5, 1), (1.2, 0.4), (0.2, 0.2), (-2, 0.5)).exp()
 dom = rve.default_sky_domain(sdom=sdom, fdom=rve.IRGSpace([np.mean(OBS[0].freq)]))
-sky = rve.DomainChangerAndReshaper(sky.target, dom) @ sky
+sky = sky.ducktape_left(dom)
 
 inserter = rve.PointInserter(dom, np.array([[0, 0]]))
 points = ift.InverseGammaOperator(inserter.domain, alpha=0.5, q=0.2 / sdom.scalar_dvol).ducktape("points")
@@ -163,7 +163,6 @@ def test_calibration_likelihood(time_mode):
         ift.UnstructuredDomain(nfreq),
     ]
     if time_mode:
-        reshaper = rve.DomainChangerAndReshaper([ift.UnstructuredDomain(total_N), time_domain], dom)
         dct = {"offset_mean": 0, "offset_std": (1, 0.5)}
         dct1 = {
             "fluctuations": (2.0, 1.0),
@@ -174,7 +173,7 @@ def test_calibration_likelihood(time_mode):
         cfm = ift.CorrelatedFieldMaker("calibration_phases", total_N=total_N)
         cfm.add_fluctuations(time_domain, **dct1)
         cfm.set_amplitude_total_offset(**dct)
-        phase = reshaper @ cfm.finalize(0)
+        phase = cfm.finalize(0).ducktape_left(dom)
         dct = {
             "offset_mean": 0,
             "offset_std": (1e-3, 1e-6),
@@ -188,21 +187,16 @@ def test_calibration_likelihood(time_mode):
         cfm = ift.CorrelatedFieldMaker("calibration_logamplitudes", total_N=total_N)
         cfm.add_fluctuations(time_domain, **dct1)
         cfm.set_amplitude_total_offset(**dct)
-        logampl = reshaper @ cfm.finalize(0)
+        logampl = cfm.finalize(0).ducktape_left(dom)
     lh, constantshape = None, (obs[0].vis.shape[0], obs[0].vis.shape[2])
     for ii, oo in enumerate(obs):
         oo = obs.pop(0)
         assert constantshape == (oo.vis.shape[0], oo.vis.shape[2])
         if not time_mode:
             mean, std = 0, np.pi / 2
-            phase = ift.Adder(mean, domain=dom) @ ift.ducktape(
-                dom, None, "calibration_phases"
-            ).scale(std)
+            phase = ift.Adder(mean, domain=dom) @ ift.ducktape(dom, None, "calibration_phases").scale(std)
             mean, std = 0, 1
-            logampl = ift.Adder(mean, domain=dom) @ ift.ducktape(
-                dom, None, "calibration_logamplitudes"
-            ).scale(std)
-
+            logampl = ift.Adder(mean, domain=dom) @ ift.ducktape(dom, None, "calibration_logamplitudes").scale(std)
         abc = rve.calibration_distribution(oo, phase, logampl, antenna_dct, time_dct)
         if ii in [1, 2]:
             model_visibilities = ift.full(oo.vis.domain, 1)
@@ -211,12 +205,6 @@ def test_calibration_likelihood(time_mode):
             op = rve.ImagingLikelihood(oo, sky, calibration_operator=abc)
         lh = op if lh is None else lh + op
     try_operator(lh)
-
-
-@pmp("dtype", [np.float64, np.complex128])
-def test_simple_operator(dtype):
-    op = rve.AddEmptyDimension(ift.UnstructuredDomain(10))
-    ift.extra.check_linear_operator(op, dtype, dtype)
 
 
 @pmp("obs", OBS)

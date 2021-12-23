@@ -45,7 +45,6 @@ class PolarizationSpace(ift.UnstructuredDomain):
 
 def polarization_converter(domain, target):
     from .util import my_assert_isinstance
-    from .simple_operators import DomainChangerAndReshaper
 
     domain = ift.DomainTuple.make(domain)
     target = ift.DomainTuple.make(target)
@@ -58,7 +57,7 @@ def polarization_converter(domain, target):
         if target[0].labels in [("LL", "RR"), ("XX", "YY")]:
             # Convention: Stokes I 1Jy source leads to 1Jy in LL and 1Jy in RR
             op = ift.ContractionOperator(target, 0).adjoint
-            return op @ DomainChangerAndReshaper(domain, op.domain)
+            return op.ducktape(domain)
     if domain[0].labels_eq(["I", "Q", "U"]):
         if target[0].labels_eq(["LL", "RR", "LR", "RL"]):
             op = _PolarizationConverter(domain, target, 0)

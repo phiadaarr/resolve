@@ -15,11 +15,11 @@ from .irg_space import IRGSpace
 from .points import PointInserter
 from .polarization_matrix_exponential import polarization_matrix_exponential
 from .polarization_space import PolarizationSpace
-from .simple_operators import DomainChangerAndReshaper, MultiFieldStacker
+from .simple_operators import MultiFieldStacker
 from .util import assert_sky_domain
 
 
-def sky_model(cfg, observations):
+def sky_model(cfg, observations=[]):
     sdom = _spatial_dom(cfg)
     pdom = PolarizationSpace(cfg["polarization"].split(","))
 
@@ -85,18 +85,16 @@ def sky_model(cfg, observations):
                 i = ift.InverseGammaOperator(points_domain, alpha=alpha, q=q/sdom.scalar_dvol).log().ducktape("points I")
                 q = ift.NormalTransform(cfg["point sources stokesq log mean"], cfg["point sources stokesq log stddev"], "points Q", npoints)
                 u = ift.NormalTransform(cfg["point sources stokesu log mean"], cfg["point sources stokesu log stddev"], "points U", npoints)
-                conv = DomainChangerAndReshaper(q.target, i.target)
-                q = conv.ducktape_left("Q") @ q
-                u = conv.ducktape_left("U") @ u
+                q = conv.ducktape_left("Q") @ q.ducktape_left(i.target).ducktape_left("Q")
+                u = conv.ducktape_left("U") @ u.ducktape_left(i.target).ducktape_left("U")
                 i = i.ducktape_left("I")
                 iqu = MultiFieldStacker((pdom, points_domain), 0, pdom.labels) @ (i + q + u)
                 foo = polarization_matrix_exponential(iqu.target) @ iqu
-                conv = DomainChangerAndReshaper(foo.target, inserter.domain)
-                points = inserter @ conv @ foo
+                points = inserter.ducktape(inserter.domain) @ foo
             else:
                 raise NotImplementedError(f"single_frequency_sky does not support point sources on {pdom.labels} (yet?)")
 
-            additional["points"] = mfs.inverse @ DomainChangerAndReshaper(points.target, mfs.target) @ points
+            additional["points"] = mfs.inverse.ducktape(mfs.target) @ points
             keys["points"] = points.domain.keys()
             sky = sky + points
         else:
@@ -105,7 +103,7 @@ def sky_model(cfg, observations):
         keys["points"] = []
 
     if not sky.target[0].labels_eq("I"):
-        multifield_sky = mfs.inverse @ DomainChangerAndReshaper(sky.target, mfs.target) @ sky
+        multifield_sky = mfs.inverse.ducktape(sky.target) @ sky
         additional["sky"] = multifield_sky
         if "U" in multifield_sky.target.keys() and "Q" in multifield_sky.target.keys():
             polarized = (multifield_sky["Q"] ** 2 + multifield_sky["U"] ** 2).sqrt()
@@ -180,7 +178,7 @@ def _multi_freq_logsky_integrated_wiener_process(cfg, sdom, pol_label, data_freq
 
     # Integrate over excitation fields
     intop = WienerIntegrations(log_fdom, sdom)
-    freq_xi = DomainChangerAndReshaper(freq_xi.target, intop.domain) @ freq_xi
+    freq_xi = freq_xi.ducktape_left(intop.domain)
     broadcast = ift.ContractionOperator(intop.domain[0], None).adjoint
     broadcast_full = ift.ContractionOperator(intop.domain, 1).adjoint
     vol = log_fdom.distances

@@ -12,63 +12,6 @@ import nifty8 as ift
 from .util import my_assert, my_assert_isinstance, my_asserteq
 
 
-class AddEmptyDimension(ift.LinearOperator):
-    def __init__(self, domain):
-        self._domain = ift.makeDomain(domain)
-        my_asserteq(len(self._domain), 1)
-        my_asserteq(len(self._domain.shape), 1)
-        my_assert_isinstance(self._domain[0], ift.UnstructuredDomain)
-        tmp = ift.UnstructuredDomain(1)
-        self._target = ift.makeDomain(
-            (tmp, ift.UnstructuredDomain((self._domain.shape[0])), tmp)
-        )
-        self._capability = self._all_ops
-
-    def apply(self, x, mode):
-        self._check_input(x, mode)
-        if mode in [self.TIMES, self.ADJOINT_INVERSE_TIMES]:
-            x = x.val[None, :, None]
-        else:
-            x = x.val[0, :, 0]
-        return ift.makeField(self._tgt(mode), x)
-
-
-class LinearOperatorOverAxis(ift.LinearOperator):
-    def __init__(self, operator, domain):
-        self._domain = ift.makeDomain(domain)
-        assert isinstance(self._domain[0], ift.UnstructuredDomain)
-        assert len(self._domain[0].shape) == 1
-        n = self._domain.shape[0]
-        assert ift.makeDomain(self._domain[1:]) == operator.domain
-        tgt = [ift.UnstructuredDomain(n)] + list(operator.target)
-        self._target = ift.makeDomain(tgt)
-        self._capability = self.TIMES | self.ADJOINT_TIMES
-        self._op = operator
-
-    def apply(self, x, mode):
-        self._check_input(x, mode)
-        res = np.empty(self._tgt(mode).shape)
-        op = self._op if mode == self.TIMES else self._op.adjoint
-        for ii in range(x.shape[0]):
-            res[ii] = op(ift.makeField(op.domain, x.val[ii])).val
-        return ift.makeField(self._tgt(mode), res)
-
-
-class AddEmptyDimensionAtEnd(ift.LinearOperator):
-    def __init__(self, domain):
-        self._domain = ift.makeDomain(domain)
-        self._target = ift.makeDomain(list(self._domain) + [ift.UnstructuredDomain(1)])
-        self._capability = self.TIMES | self.ADJOINT_TIMES
-
-    def apply(self, x, mode):
-        self._check_input(x, mode)
-        if mode == self.TIMES:
-            x = x.val[..., None]
-        else:
-            x = x.val[..., 0]
-        return ift.makeField(self._tgt(mode), x)
-
-
 def MultiDomainVariableCovarianceGaussianEnergy(data, signal_response, invcov):
     from .likelihood import get_mask_multi_field
 
@@ -94,20 +37,6 @@ def MultiDomainVariableCovarianceGaussianEnergy(data, signal_response, invcov):
     return reduce(add, res) @ (resi + invcov)
 
 
-class DomainChangerAndReshaper(ift.LinearOperator):
-    def __init__(self, domain, target):
-        self._domain = ift.DomainTuple.make(domain)
-        self._target = ift.DomainTuple.make(target)
-        self._capability = self.TIMES | self.ADJOINT_TIMES
-        assert self._domain.size == self._target.size
-
-    def apply(self, x, mode):
-        self._check_input(x, mode)
-        x = x.val
-        tgt = self._tgt(mode)
-        return ift.makeField(tgt, x.reshape(tgt.shape))
-
-
 class MultiFieldStacker(ift.LinearOperator):
     def __init__(self, target, space, keys):
         """
@@ -127,6 +56,7 @@ class MultiFieldStacker(ift.LinearOperator):
         self._capability = self._all_ops
         self._keys = tuple(keys)
         self._space = int(space)
+        assert tuple([len(self._keys)]) == target[self._space].shape
         assert self.domain.size == self.target.size
 
     def apply(self, x, mode):

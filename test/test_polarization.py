@@ -13,12 +13,15 @@ pmp = pytest.mark.parametrize
 def test_polarization(pol):
     dom = rve.PolarizationSpace(pol), rve.IRGSpace([0]), rve.IRGSpace([0]), ift.RGSpace([10, 20])
     op = rve.polarization_matrix_exponential(dom, False)
-    op_jax = rve.polarization_matrix_exponential(dom, True)
-
-    assert op.domain is op_jax.domain
-    assert op.target is op_jax.target
     pos = ift.from_random(op.domain)
-    ift.extra.assert_allclose(op(pos), op_jax(pos))
+    ift.extra.check_operator(op, pos, ntries=5)
+    try:
+        op_jax = rve.polarization_matrix_exponential(dom, True)
 
-    ift.extra.check_operator(op, pos, ntries=5)
-    ift.extra.check_operator(op, pos, ntries=5)
+        assert op.domain is op_jax.domain
+        assert op.target is op_jax.target
+
+        ift.extra.assert_allclose(op(pos), op_jax(pos))
+        ift.extra.check_operator(op_jax, pos, ntries=5)
+    except ImportError:
+        pass
