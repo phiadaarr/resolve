@@ -18,100 +18,43 @@ def main(cfg_file_name):
 
     obs_calib_flux, obs_calib_phase, obs_science = rve.parse_data_config(cfg)
 
+    if cfg["sky"]["polarization"] == "I":
+        obs_science = [oo.restrict_to_stokesi().average_stokesi() for oo in obs_science]
     assert len(obs_calib_flux) == len(obs_calib_phase) == 0
 
     # Model operators
-    sky, ops_sky, keys = rve.sky_model(cfg["sky"], obs_science)
-    enable_points = len(keys["points"]) > 0
+    sky, ops_sky, domains = rve.sky_model(cfg["sky"], obs_science)
+    enable_points = "points" in domains
     assert len(obs_science) == 1
     weights, ops_weights = rve.weighting_model(cfg["weighting"], obs_science[0], sky.target)
-    exit()
     # FIXME Add plots for weights
     operators = {**ops_sky, **ops_weights}
-    keys["weights"] = weights.domain.keys()
-    keys["sky"] = sky.domain.keys()
-
-    for kk in keys:
-        keys[kk] = tuple(keys[kk])
+    domains["weights"] = weights.domain
     # /Model operators
 
     # Likelihoods
-    full_lh = rve.ImagingLikelihood(obs, sky, inverse_covariance_operator=weights)
+    assert len(obs_science) == 1
+    lhs = {}
+    lhs["full"] = rve.ImagingLikelihood(obs_science[0], sky, inverse_covariance_operator=weights)
     if enable_points:
-        point_lh = rve.ImagingLikelihood(obs, operators["points"])
-    sky_lh = rve.ImagingLikelihood(obs, sky)
+        lhs["points"] = rve.ImagingLikelihood(obs_science[0], operators["points"])
+    lhs["data weights"] = rve.ImagingLikelihood(obs_science[0], sky)
     # /Likelihoods
 
     # Initial position
-    position = 0.1 * ift.from_random(full_lh.domain)
-    s = rve.profile_function(full_lh, position, 1)
+    position = 0.1 * ift.from_random(lhs["full"].domain)
+    rve.mpi.barrier(rve.mpi.comm)
+    s = rve.profile_function(lhs["full"], position, 1)
     if master:
         print(s)
+    del position
+    rve.mpi.barrier(rve.mpi.comm)
     # /Initial position
 
-    # Optimization
-    common = {"plottable_operators": operators, "overwrite": True}
-
-    def get_mini(iglobal):
-        if iglobal == 0:
-            return ift.NewtonCG(ift.GradientNormController(name="hamiltonian", iteration_limit=4))
-        if iglobal == 1:
-            return ift.NewtonCG(ift.GradientNormController(name="hamiltonian", iteration_limit=20))
-        if iglobal < 7:
-            return ift.VL_BFGS(ift.GradientNormController(name="bfgs", iteration_limit=20))
-        if iglobal < 12:
-            return ift.VL_BFGS(ift.GradientNormController(name="kl", iteration_limit=15))
-        return ift.NewtonCG(ift.GradientNormController(name="kl", iteration_limit=15))
-
-    def get_sampling(iglobal):
-        if iglobal in [0, 1]:
-            return None
-        return ift.AbsDeltaEnergyController(deltaE=0.5, convergence_level=3, iteration_limit=500,
-                                            name="Sampling")
-
-    def get_cst(iglobal):
-        if iglobal in [0, 1]:
-            return []
-        if iglobal < 7:
-            return keys["sky"]
-        if iglobal < 14:
-            return keys["weights"] + keys["points"]
-        return []
-
-    def get_lh(iglobal):
-        if iglobal == 0:
-            return point_lh
-        if iglobal == 1:
-            return sky_lh
-        return full_lh
-
-    def get_n_samples(iglobal):
-        if iglobal in [0, 1]:
-            return 0
-        if iglobal < 7:
-            return 4
-        return 4
-
-    def get_comm(iglobal):
-        return rve.mpi.comm
-
-    def callback(sl, iglobal, position):
-        lh = get_lh(iglobal)
-        s = ift.extra.minisanity(lh.data, lh.metric_at_pos, lh.model_data, sl)
-        if rve.mpi.master:
-            print(s)
-        # Reset diffuse component
-        if iglobal == 6:
-            diffuse_domain = {kk: vv for kk, vv in full_lh.domain.items() if kk in keys["diffuse"]}
-            return ift.MultiField.union([position, 0.1*ift.from_random(diffuse_domain)])
-
-    ift.optimize_kl(get_lh, 40, get_n_samples, get_mini, get_sampling, None,
-                    constants=get_cst, point_estimates=get_cst,
-                    initial_index=0 if enable_points else 1,
-                    initial_position=position, comm=get_comm, callback=callback,
-                    output_directory=cfg["output"]["directory"],
-                    **common)
-    # /Optimization
+    # Assumption: likelihood is not MPI distributed
+    get_comm = rve.mpi.comm
+    ift.optimize_kl(**rve.parse_optimize_kl_config(cfg["optimization"], lhs, domains),
+                    plottable_operators=operators, comm=get_comm, overwrite=True)
 
 
 if __name__ == "__main__":

@@ -24,7 +24,7 @@ def sky_model(cfg, observations=[]):
     pdom = PolarizationSpace(cfg["polarization"].split(","))
 
     additional = {}
-    keys = {}
+    domains = {}
 
     data_freq = np.array([oo.freq for oo in observations]).flatten()
 
@@ -57,7 +57,7 @@ def sky_model(cfg, observations=[]):
     mexp = polarization_matrix_exponential(tgt)
 
     sky = mexp @ (mfs @ logsky).ducktape_left(tgt)
-    keys["diffuse"] = sky.domain.keys()
+    domains["diffuse"] = sky.domain
     # additional["diffuse"] = mfs1.inverse @ sky
 
     # Point sources
@@ -95,12 +95,10 @@ def sky_model(cfg, observations=[]):
                 raise NotImplementedError(f"single_frequency_sky does not support point sources on {pdom.labels} (yet?)")
 
             additional["points"] = mfs.inverse.ducktape(mfs.target) @ points
-            keys["points"] = points.domain.keys()
+            domains["points"] = points.domain
             sky = sky + points
         else:
             raise RuntimeError
-    else:
-        keys["points"] = []
 
     if not sky.target[0].labels_eq("I"):
         multifield_sky = mfs.inverse.ducktape(sky.target) @ sky
@@ -112,12 +110,12 @@ def sky_model(cfg, observations=[]):
     else:
         if sky.target[1].size == 1 and sky.target[2].size > 1:
             additional["mf sky"] = MultiFieldStacker(sky.target[2:], 0,
-                                                     [f"{cc*1e-9:.3} GHz" for cc in sky.target[2].coordinates]).inverse \
+                                                     [f"{cc*1e-9:.6} GHz" for cc in sky.target[2].coordinates]).inverse \
                                        @ sky.ducktape_left(sky.target[2:])
             additional["mf logsky"] = additional["mf sky"].log()
 
     assert_sky_domain(sky.target)
-    return sky, additional, keys
+    return sky, additional, domains
 
 
 def _single_freq_logsky(cfg, pol_label):

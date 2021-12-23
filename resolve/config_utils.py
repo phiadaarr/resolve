@@ -96,6 +96,17 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}):
     lhlst = _comma_separated_str_to_list(cfg["likelihood"], total_iterations)
     res["likelihood_energy"] = lambda ii: likelihood_dct[lhlst[ii]]
 
+    def callback(sl, iglobal, position):
+        lh = res["likelihood_energy"](iglobal)
+        s = ift.extra.minisanity(lh.data, lh.metric_at_pos, lh.model_data, sl)
+        if rve.mpi.master:
+            print(s)
+
+        # FIXME Reset diffuse component
+        # if iglobal == 6:
+            # diffuse_domain = {kk: vv for kk, vv in full_lh.domain.items() if kk in keys["diffuse"]}
+            # return ift.MultiField.union([position, 0.1*ift.from_random(diffuse_domain)])
+
     cstlst = _comma_separated_str_to_list(cfg["constants"], total_iterations, allow_none=True)
     constants_dct[None] = ift.MultiDomain.make({})
     res["point_estimates"] = res["constants"] = lambda ii: constants_dct[cstlst[ii]].keys()
@@ -152,6 +163,7 @@ def _comma_separated_str_to_list(cfg, length, allow_none=False, output_type=None
     if output_type is not None:
         lst = list(map(lambda x: _to_type(x, output_type), lst))
 
+    assert len(lst) == length
     return lst
 
 
