@@ -112,7 +112,6 @@ def _cfg_to_observations(cfg):
         if len(cc) == 0:  # npz
             obs = Observation.load(file_name)
         elif len(cc) == 1:  # ms
-            print(cc)
             cc = cc[0]
             assert cc[0] == "("
             assert cc[-1] == ")"

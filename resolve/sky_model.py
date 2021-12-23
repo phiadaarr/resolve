@@ -19,12 +19,14 @@ from .simple_operators import DomainChangerAndReshaper, MultiFieldStacker
 from .util import assert_sky_domain
 
 
-def sky_model(cfg, data_freq=None):
+def sky_model(cfg, observations):
     sdom = _spatial_dom(cfg)
     pdom = PolarizationSpace(cfg["polarization"].split(","))
 
     additional = {}
     keys = {}
+
+    data_freq = np.array([oo.freq for oo in observations]).flatten()
 
     logsky = []
     for lbl in pdom.labels:

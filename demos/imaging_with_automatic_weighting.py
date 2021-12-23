@@ -11,8 +11,6 @@ import resolve as rve
 from resolve.mpi import master
 
 
-
-
 def main(cfg_file_name):
     cfg = configparser.ConfigParser()
     cfg.read(cfg_file_name)
@@ -20,12 +18,12 @@ def main(cfg_file_name):
         print(f"Load {cfg_file_name}")
 
     obs_calib_flux, obs_calib_phase, obs_science = rve.parse_data_config(cfg)
-    print("SUCCESS")
-    exit()
 
     # Model operators
-    sky, ops_sky, keys = rve.sky_model(cfg["sky"], data_freq=obs.freq)
+    sky, ops_sky, keys = rve.sky_model(cfg["sky"], obs_science)
     enable_points = len(keys["points"]) > 0
+    print("SUCCESS")
+    exit()
     weights, ops_weights = rve.weighting_model(cfg["weighting"], obs, sky.target)
     # FIXME Add plots for weights
     operators = {**ops_sky, **ops_weights}
