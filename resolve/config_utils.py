@@ -145,6 +145,17 @@ def _comma_separated_str_to_list(cfg, length, allow_none=False, output_type=None
 
     if len(lst) == 1:
         lst = length * lst
+    # Parse multiplication
+    tmp = []
+    for ii, ll in enumerate(lst):
+        if ll is not None and len(ll) > 1 and "*" in ll:
+            ind = ll.index("*")
+            tmp.extend(int(ll[:ind]) * [ll[ind+1:]])
+        else:
+            tmp.append(ll)
+    lst = tmp
+    # /Parse multiplication
+
     # Parse *
     if lst.count("*") > 1:
         raise ValueError("Only one * allowed")

@@ -115,6 +115,7 @@ def sky_model(cfg, observations=[]):
             additional["mf logsky"] = additional["mf sky"].log()
 
     assert_sky_domain(sky.target)
+    domains["sky"] = sky.domain
     return sky, additional, domains
 
 
