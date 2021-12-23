@@ -37,8 +37,8 @@ def weighting_model(cfg, obs, sky_domain):
             log_weights = cfm.finalize(0)
             mfs = MultiFieldStacker(log_weights.target, 0, [str(ii) for ii in range(n_imaging_bands)])
             mfs1 = MultiFieldStacker(obs.vis.domain[1:], 1, [str(ii) for ii in range(n_imaging_bands)])
-            ift.extra.check_linear_operator(mfs)
-            ift.extra.check_linear_operator(mfs1)
+            #ift.extra.check_linear_operator(mfs)
+            #ift.extra.check_linear_operator(mfs1)
             op = []
             for ii in range(n_imaging_bands):
                 foo = ift.LinearInterpolator(dom, xs[0, :, ii][None])

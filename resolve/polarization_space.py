@@ -62,7 +62,7 @@ def polarization_converter(domain, target):
     if domain[0].labels_eq(["I", "Q", "U"]):
         if target[0].labels_eq(["LL", "RR", "LR", "RL"]):
             op = _PolarizationConverter(domain, target, 0)
-            ift.extra.check_linear_operator(op, complex, complex)
+            #ift.extra.check_linear_operator(op, complex, complex)
             return op
     raise NotImplementedError(f"Polarization converter\ndomain:\n{domain[0]}\ntarget\n{target[0]}\n")
 
