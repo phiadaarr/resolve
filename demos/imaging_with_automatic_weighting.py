@@ -7,6 +7,7 @@ import os
 import sys
 
 import nifty8 as ift
+
 import resolve as rve
 from resolve.mpi import master
 
@@ -17,11 +18,14 @@ def main(cfg_file_name):
 
     obs_calib_flux, obs_calib_phase, obs_science = rve.parse_data_config(cfg)
 
+    assert len(obs_calib_flux) == len(obs_calib_phase) == 0
+
     # Model operators
     sky, ops_sky, keys = rve.sky_model(cfg["sky"], obs_science)
     enable_points = len(keys["points"]) > 0
+    assert len(obs_science) == 1
+    weights, ops_weights = rve.weighting_model(cfg["weighting"], obs_science[0], sky.target)
     exit()
-    weights, ops_weights = rve.weighting_model(cfg["weighting"], obs, sky.target)
     # FIXME Add plots for weights
     operators = {**ops_sky, **ops_weights}
     keys["weights"] = weights.domain.keys()

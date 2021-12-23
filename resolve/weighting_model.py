@@ -14,12 +14,12 @@ from .util import assert_sky_domain
 
 
 def weighting_model(cfg, obs, sky_domain):
+    """Assumes independent weighting for every imaging band and for every polarization"""
     assert_sky_domain((sky_domain))
     n_imaging_bands = sky_domain[2].size
+    n_data_pol = obs.npol
 
     if cfg.getboolean("enable"):
-        if obs.npol > 1:
-            raise NotImplementedError("Weighting not supported for multiple polarizations yet")
         if cfg["model"] == "cfm":
             import ducc0
 
@@ -33,17 +33,23 @@ def weighting_model(cfg, obs, sky_domain):
 
             dom = ift.RGSpace(npix_padded, fac * maxlen / npix)
 
-            cfm = cfm_from_cfg(cfg, {"": dom}, "invcov", total_N=n_imaging_bands)
+            cfm = cfm_from_cfg(cfg, {"": dom}, "invcov", total_N=n_imaging_bands*n_data_pol)
             log_weights = cfm.finalize(0)
-            mfs = MultiFieldStacker(log_weights.target, 0, [str(ii) for ii in range(n_imaging_bands)])
-            mfs1 = MultiFieldStacker(obs.vis.domain[1:], 1, [str(ii) for ii in range(n_imaging_bands)])
+            keys = [f"pol{pp}freqband{ii}" for pp in range(n_data_pol) for ii in range(n_imaging_bands)]
+            mfs = MultiFieldStacker(log_weights.target, 0, keys)
+            #mfs1 = MultiFieldStacker(obs.vis.domain[1:], 1, [str(ii) for ii in range(n_imaging_bands)])
             #ift.extra.check_linear_operator(mfs)
             #ift.extra.check_linear_operator(mfs1)
             op = []
-            for ii in range(n_imaging_bands):
-                foo = ift.LinearInterpolator(dom, xs[0, :, ii][None])
-                op.append(foo.ducktape(str(ii)).ducktape_left(str(ii)))
-            log_weights = (mfs1 @ reduce(add, op) @ mfs.inverse @ log_weights).ducktape_left(obs.vis.domain)
+            for pp in range(n_data_pol):
+                for ii in range(n_imaging_bands):
+                    foo = ift.LinearInterpolator(dom, xs[0, :, ii][None])
+                    key = f"pol{pp}freqband{ii}"
+                    op.append(foo.ducktape(key).ducktape_left(key))
+            linear_interpolation = reduce(add, op)
+            restructure = _CustomRestructure(linear_interpolation.target, obs.vis.domain)
+            ift.extra.check_linear_operator(restructure)
+            log_weights = restructure @ linear_interpolation @ mfs.inverse @ log_weights
             op = ift.makeOp(obs.weight) @ log_weights.scale(-2).exp()
             additional = {
                 # "weights power spectrum": cfm.power_spectrum
@@ -54,3 +60,25 @@ def weighting_model(cfg, obs, sky_domain):
         else:
             raise NotImplementedError
     return None, {}
+
+
+class _CustomRestructure(ift.LinearOperator):
+    def __init__(self, domain, target):
+        self._domain = ift.MultiDomain.make(domain)
+        self._target = ift.DomainTuple.make(target)
+        self._capability = self.TIMES | self.ADJOINT_TIMES
+
+    def apply(self, x, mode):
+        self._check_input(x, mode)
+        x = x.val
+        if mode == self.TIMES:
+            res = np.empty(self.target.shape)
+            for pp in range(self.target.shape[0]):
+                for ii in range(self.target.shape[2]):
+                    res[pp, :, ii] = x[f"pol{pp}freqband{ii}"]
+        else:
+            res = {}
+            for pp in range(self.target.shape[0]):
+                for ii in range(self.target.shape[2]):
+                    res[f"pol{pp}freqband{ii}"] = x[pp, :, ii]
+        return ift.makeField(self._tgt(mode), res)
