@@ -61,44 +61,38 @@ def sky_model(cfg, observations=[]):
     # additional["diffuse"] = mfs1.inverse @ sky
 
     # Point sources
-    enable_points = cfg.getboolean("point sources enable")
-    if enable_points and sky.target[2].size > 1:
-        raise NotImplementedError("Point sources are not supported yet.")
-    if enable_points:
-        if cfg["point sources mode"] == "single":
-            ppos = []
-            s = cfg["point sources locations"]
-            for xy in s.split(";"):
-                x, y = xy.split(",")
-                ppos.append((str2rad(x), str2rad(y)))
-            alpha = cfg.getfloat("point sources alpha")
-            q = cfg.getfloat("point sources q")
+    if cfg["point sources mode"] == "single":
+        ppos = []
+        s = cfg["point sources locations"]
+        for xy in s.split(","):
+            x, y = xy.split("$")
+            ppos.append((str2rad(x), str2rad(y)))
+        alpha = cfg.getfloat("point sources alpha")
+        q = cfg.getfloat("point sources q")
 
-            inserter = PointInserter(sky.target, ppos)
+        inserter = PointInserter(sky.target, ppos)
 
-            if pdom.labels_eq("I"):
-                points = ift.InverseGammaOperator(inserter.domain, alpha=alpha, q=q/sdom.scalar_dvol)
-                points = inserter @ points.ducktape("points")
-            elif pdom.labels_eq(["I", "Q", "U"]):
-                points_domain = inserter.domain[-1]
-                npoints = points_domain.size
-                i = ift.InverseGammaOperator(points_domain, alpha=alpha, q=q/sdom.scalar_dvol).log().ducktape("points I")
-                q = ift.NormalTransform(cfg["point sources stokesq log mean"], cfg["point sources stokesq log stddev"], "points Q", npoints)
-                u = ift.NormalTransform(cfg["point sources stokesu log mean"], cfg["point sources stokesu log stddev"], "points U", npoints)
-                q = conv.ducktape_left("Q") @ q.ducktape_left(i.target).ducktape_left("Q")
-                u = conv.ducktape_left("U") @ u.ducktape_left(i.target).ducktape_left("U")
-                i = i.ducktape_left("I")
-                iqu = MultiFieldStacker((pdom, points_domain), 0, pdom.labels) @ (i + q + u)
-                foo = polarization_matrix_exponential(iqu.target) @ iqu
-                points = inserter.ducktape(inserter.domain) @ foo
-            else:
-                raise NotImplementedError(f"single_frequency_sky does not support point sources on {pdom.labels} (yet?)")
-
-            additional["points"] = mfs.inverse.ducktape(mfs.target) @ points
-            domains["points"] = points.domain
-            sky = sky + points
+        if pdom.labels_eq("I"):
+            points = ift.InverseGammaOperator(inserter.domain, alpha=alpha, q=q/sdom.scalar_dvol)
+            points = inserter @ points.ducktape("points")
+        elif pdom.labels_eq(["I", "Q", "U"]):
+            points_domain = inserter.domain[-1]
+            npoints = points_domain.size
+            i = ift.InverseGammaOperator(points_domain, alpha=alpha, q=q/sdom.scalar_dvol).log().ducktape("points I")
+            q = ift.NormalTransform(cfg["point sources stokesq log mean"], cfg["point sources stokesq log stddev"], "points Q", npoints)
+            u = ift.NormalTransform(cfg["point sources stokesu log mean"], cfg["point sources stokesu log stddev"], "points U", npoints)
+            q = conv.ducktape_left("Q") @ q.ducktape_left(i.target).ducktape_left("Q")
+            u = conv.ducktape_left("U") @ u.ducktape_left(i.target).ducktape_left("U")
+            i = i.ducktape_left("I")
+            iqu = MultiFieldStacker((pdom, points_domain), 0, pdom.labels) @ (i + q + u)
+            foo = polarization_matrix_exponential(iqu.target) @ iqu
+            points = inserter.ducktape(inserter.domain) @ foo
         else:
-            raise RuntimeError
+            raise NotImplementedError(f"single_frequency_sky does not support point sources on {pdom.labels} (yet?)")
+
+        additional["points"] = points
+        domains["points"] = points.domain
+        sky = sky + points
 
     if not sky.target[0].labels_eq("I"):
         multifield_sky = mfs.inverse.ducktape(sky.target) @ sky

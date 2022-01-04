@@ -96,16 +96,17 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}):
     lhlst = _comma_separated_str_to_list(cfg["likelihood"], total_iterations)
     res["likelihood_energy"] = lambda ii: likelihood_dct[lhlst[ii]]
 
+    reset = _comma_separated_str_to_list(cfg["reset"], total_iterations, allow_none=True)
+
     def callback(sl, iglobal, position):
         lh = res["likelihood_energy"](iglobal)
         s = ift.extra.minisanity(lh.data, lh.metric_at_pos, lh.model_data, sl)
         if rve.mpi.master:
             print(s)
 
-        # FIXME Reset diffuse component
-        # if iglobal == 6:
-            # diffuse_domain = {kk: vv for kk, vv in full_lh.domain.items() if kk in keys["diffuse"]}
-            # return ift.MultiField.union([position, 0.1*ift.from_random(diffuse_domain)])
+        if reset[iglobal] is not None:
+            reset_domain = constants_dct[reset[iglobal]]
+            return ift.MultiField.union([position, 0.1*ift.from_random(reset_domain)])
 
     cstlst = _comma_separated_str_to_list(cfg["constants"], total_iterations, allow_none=True)
     constants_dct[None] = ift.MultiDomain.make({})
@@ -154,6 +155,7 @@ def _comma_separated_str_to_list(cfg, length, allow_none=False, output_type=None
         else:
             tmp.append(ll)
     lst = tmp
+    lst = list(map(_nonestr_to_none, lst))
     # /Parse multiplication
 
     # Parse *
@@ -179,7 +181,7 @@ def _comma_separated_str_to_list(cfg, length, allow_none=False, output_type=None
 
 
 def _nonestr_to_none(s):
-    if s.lower() in ["none", ""]:
+    if s is None or s.lower() in ["none", ""]:
         return None
     return s
 
