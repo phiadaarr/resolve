@@ -16,6 +16,13 @@ try:
     rank = comm.Get_rank()
     master = rank == 0
     mpi = ntask > 1
+
+    if ntask == 1:
+        master = True
+        mpi = False
+        comm = None
+        comm_self = None
+        rank = 0
 except ImportError:
     master = True
     mpi = False
