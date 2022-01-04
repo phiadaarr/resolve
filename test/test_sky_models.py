@@ -12,25 +12,12 @@ import resolve as rve
 pmp = pytest.mark.parametrize
 np.seterr(all="raise")
 
+obs = rve.ms2observations("/data/CYG-D-6680-64CH-10S.ms", "DATA", True, 0, polarizations="all")
 
-def test_build_multi_frequency_skymodel():
+
+@pmp("fname", ["demos/cygnusa.cfg", "demos/cygnusa_polarization.cfg", "demos/mf.cfg"])
+def test_build_multi_frequency_skymodel(fname):
     cfg = configparser.ConfigParser()
-    cfg.read("test/mf_sky.cfg")
-    op, _, _ = rve.sky_model(cfg["sky"])
-    op(ift.from_random(op.domain))
-    assert op.target[0].size == 1
-    assert op.target[1].size == 1
-    assert op.target[2].size == 10
-
-    cfg.read("test/mf_sky_wiener_process.cfg")
-    op, _, _ = rve.sky_model(cfg["sky"])
-    op(ift.from_random(op.domain))
-
-    cfg["sky"]["stokesI diffuse wp asperity mean"] = "0.1"
-    cfg["sky"]["stokesI diffuse wp asperity stddev"] = "0.1"
-    op, _, _ = rve.sky_model(cfg["sky"])
-    op(ift.from_random(op.domain))
-
-    cfg["sky"]["freq"] = "data"
-    op, _, _ = rve.sky_model(cfg["sky"])
+    cfg.read(fname)
+    op, _, _ = rve.sky_model(cfg["sky"], obs)
     op(ift.from_random(op.domain))

@@ -26,8 +26,6 @@ def sky_model(cfg, observations=[]):
     additional = {}
     domains = {}
 
-    data_freq = np.array([oo.freq for oo in observations]).flatten()
-
     logsky = []
     for lbl in pdom.labels:
         pol_lbl = f"{lbl.upper()}"
@@ -36,7 +34,12 @@ def sky_model(cfg, observations=[]):
         elif cfg["freq mode"] == "cfm":
             op, aa = _multi_freq_logsky_cfm(cfg, sdom, pol_lbl)
         elif cfg["freq mode"] == "iwp":
-            op, aa = _multi_freq_logsky_integrated_wiener_process(cfg, sdom, pol_lbl, data_freq=data_freq)
+            if cfg["frequencies"] == "data":
+                freq = np.array([oo.freq for oo in observations]).flatten()
+            else:
+                freq = map(float, cfg["frequencies"].split(","))
+            freq = np.sort(np.array(list(freq)))
+            op, aa = _multi_freq_logsky_integrated_wiener_process(cfg, sdom, pol_lbl, freq)
         else:
             raise RuntimeError
         logsky.append(op.ducktape_left(pol_lbl))
@@ -81,12 +84,12 @@ def sky_model(cfg, observations=[]):
             i = ift.InverseGammaOperator(points_domain, alpha=alpha, q=q/sdom.scalar_dvol).log().ducktape("points I")
             q = ift.NormalTransform(cfg["point sources stokesq log mean"], cfg["point sources stokesq log stddev"], "points Q", npoints)
             u = ift.NormalTransform(cfg["point sources stokesu log mean"], cfg["point sources stokesu log stddev"], "points U", npoints)
-            q = conv.ducktape_left("Q") @ q.ducktape_left(i.target).ducktape_left("Q")
-            u = conv.ducktape_left("U") @ u.ducktape_left(i.target).ducktape_left("U")
             i = i.ducktape_left("I")
+            q = q.ducktape_left("Q")
+            u = u.ducktape_left("U")
             iqu = MultiFieldStacker((pdom, points_domain), 0, pdom.labels) @ (i + q + u)
             foo = polarization_matrix_exponential(iqu.target) @ iqu
-            points = inserter.ducktape(inserter.domain) @ foo
+            points = inserter.ducktape(foo.target) @ foo
         else:
             raise NotImplementedError(f"single_frequency_sky does not support point sources on {pdom.labels} (yet?)")
 
@@ -141,12 +144,9 @@ def _multi_freq_logsky_cfm(cfg, sdom, pol_label):
     return op.ducktape_left((fdom, sdom)), additional
 
 
-def _multi_freq_logsky_integrated_wiener_process(cfg, sdom, pol_label, data_freq=None):
-    if cfg["frequencies"] == "data":
-        freq = data_freq
-        assert freq is not None
-    else:
-        freq = np.sort(np.array(list(map(float, cfg["frequencies"].split(",")))))
+def _multi_freq_logsky_integrated_wiener_process(cfg, sdom, pol_label, freq):
+    assert len(freq) > 0
+
     fdom = IRGSpace(freq)
 
     prefix = f"stokes{pol_label} diffuse"
@@ -264,8 +264,8 @@ def _parse_or_none(cfg, key, override={}, single_value=False):
         return (cfg.getfloat(key0), cfg.getfloat(key1))
 
 
-def default_sky_domain(pdom=PolarizationSpace("I"), tdom=IRGSpace([np.nan]), fdom=IRGSpace([np.nan]),
-                       sdom=ift.RGSpace([1, 1])):
+def default_sky_domain(pdom=PolarizationSpace("I"), tdom=IRGSpace([0.]),
+                       fdom=IRGSpace([1.]), sdom=ift.RGSpace([1, 1])):
     from .util import my_assert_isinstance
 
     for dd in [pdom, tdom, fdom, sdom]:
