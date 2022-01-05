@@ -32,7 +32,6 @@ def main():
     enable_points = "points" in domains
     assert len(obs_science) == 1
     weights, ops_weights = weighting_model(cfg["weighting"], obs_science[0], sky.target)
-    # FIXME Add plots for weights
     operators = {**ops_sky, **ops_weights}
     domains["weights"] = weights.domain
     # /Model operators
@@ -58,6 +57,8 @@ def main():
 
     # Assumption: likelihood is not MPI distributed
     get_comm = comm
+    if "points" in operators:
+        del operators["points"]
     ift.optimize_kl(**parse_optimize_kl_config(cfg["optimization"], lhs, domains),
                     plottable_operators=operators, comm=get_comm, overwrite=True)
 

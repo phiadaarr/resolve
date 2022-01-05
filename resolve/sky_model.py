@@ -52,16 +52,12 @@ def sky_model(cfg, observations=[]):
         tgt = default_sky_domain(pdom=pdom, fdom=fdom, sdom=sdom)
         mfs = MultiFieldStacker((pdom, fdom, sdom), 0, pdom.labels)
     logsky = reduce(add, logsky)
-    # additional["logdiffuse"] = logsky
 
-    mfs1 = MultiFieldStacker(tgt, 0, pdom.labels)
     #ift.extra.check_linear_operator(mfs)
-    #ift.extra.check_linear_operator(mfs1)
     mexp = polarization_matrix_exponential(tgt)
 
     sky = mexp @ (mfs @ logsky).ducktape_left(tgt)
     domains["diffuse"] = sky.domain
-    # additional["diffuse"] = mfs1.inverse @ sky
 
     # Point sources
     if cfg["point sources mode"] == "single":
@@ -77,7 +73,7 @@ def sky_model(cfg, observations=[]):
 
         if pdom.labels_eq("I"):
             points = ift.InverseGammaOperator(inserter.domain, alpha=alpha, q=q/sdom.scalar_dvol)
-            points = inserter @ points.ducktape("points")
+            points = points.ducktape("points")
         elif pdom.labels_eq(["I", "Q", "U"]):
             points_domain = inserter.domain[-1]
             npoints = points_domain.size
@@ -88,14 +84,14 @@ def sky_model(cfg, observations=[]):
             q = q.ducktape_left("Q")
             u = u.ducktape_left("U")
             iqu = MultiFieldStacker((pdom, points_domain), 0, pdom.labels) @ (i + q + u)
-            foo = polarization_matrix_exponential(iqu.target) @ iqu
-            points = inserter.ducktape(foo.target) @ foo
+            points = (polarization_matrix_exponential(iqu.target) @ iqu).ducktape_left(inserter.domain)
         else:
             raise NotImplementedError(f"single_frequency_sky does not support point sources on {pdom.labels} (yet?)")
 
-        additional["points"] = points
+        additional["point_list"] = points
+        additional["points"] = inserter @ points
         domains["points"] = points.domain
-        sky = sky + points
+        sky = sky + inserter @ points
 
     if not sky.target[0].labels_eq("I"):
         multifield_sky = mfs.inverse.ducktape(sky.target) @ sky
@@ -105,7 +101,10 @@ def sky_model(cfg, observations=[]):
             additional["linear polarization"] = polarized
             additional["fractional polarization"] = polarized * multifield_sky["I"].reciprocal()
     else:
-        if sky.target[1].size == 1 and sky.target[2].size > 1:
+        if sky.target[1].size == 1 and sky.target[2].size == 1:  # single-time, single-freq
+            tmpsky = sky.ducktape_left((sky.target[0], sky.target[-1]))
+            additional["sky"] = MultiFieldStacker(tmpsky.target, 0, tmpsky.target[0].labels).inverse @ tmpsky
+        if sky.target[0].size == 1 and sky.target[1].size == 1 and sky.target[2].size > 1:  # single-pol, single-time, multi-frequency
             additional["mf sky"] = MultiFieldStacker(sky.target[2:], 0,
                                                      [f"{cc*1e-9:.6} GHz" for cc in sky.target[2].coordinates]).inverse \
                                        @ sky.ducktape_left(sky.target[2:])
