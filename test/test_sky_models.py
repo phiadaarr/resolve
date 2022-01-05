@@ -15,7 +15,8 @@ np.seterr(all="raise")
 obs = rve.ms2observations("/data/CYG-D-6680-64CH-10S.ms", "DATA", True, 0, polarizations="all")
 
 
-@pmp("fname", ["demos/cygnusa.cfg", "demos/cygnusa_polarization.cfg", "demos/mf.cfg"])
+@pmp("fname", ["cfg/cygnusa.cfg", "cfg/cygnusa_polarization.cfg", "cfg/mf.cfg",
+               "cfg/cygnusa_mf.cfg"])
 def test_build_multi_frequency_skymodel(fname):
     cfg = configparser.ConfigParser()
     cfg.read(fname)
