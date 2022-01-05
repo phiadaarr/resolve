@@ -17,17 +17,18 @@ class PolarizationSpace(ift.UnstructuredDomain):
         Must be sorted and strictly ascending.
     """
 
-    _needed_for_hash = ["_shape", "_lbl"]
+    _needed_for_hash = ["_hash_lbl"]
+    _allowed = ["I", "Q", "U", "V", "LL", "LR", "RL", "RR", "XX", "XY", "YX", "YY"]
 
     def __init__(self, polarization_labels):
         if isinstance(polarization_labels, str):
             polarization_labels = [polarization_labels]
-        lbl = list(polarization_labels)
-        lbl.sort()
         self._lbl = tuple(polarization_labels)
         for ll in self._lbl:
-            my_assert(ll in ["I", "Q", "U", "V", "LL", "LR", "RL", "RR", "XX", "XY", "YX", "YY"])
+            my_assert(ll in PolarizationSpace._allowed)
         super(PolarizationSpace, self).__init__(len(self._lbl))
+        # Note: hash of string is not reproducible accross runs
+        self._hash_lbl = tuple(PolarizationSpace._allowed.index(ll) for ll in self._lbl)
 
     def __repr__(self):
         return f"PolarizationSpace(polarization_labels={self._lbl})"
