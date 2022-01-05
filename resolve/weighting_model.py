@@ -35,31 +35,34 @@ def weighting_model(cfg, obs, sky_domain):
 
             cfm = cfm_from_cfg(cfg, {"": dom}, "invcov", total_N=n_imaging_bands*n_data_pol)
             log_weights = cfm.finalize(0)
-            keys = [f"pol{pp}freqband{ii}" for pp in range(n_data_pol) for ii in range(n_imaging_bands)]
+            keys = [_polfreq_key(pp, ii) for pp in range(n_data_pol) for ii in range(n_imaging_bands)]
             mfs = MultiFieldStacker(log_weights.target, 0, keys)
-            #mfs1 = MultiFieldStacker(obs.vis.domain[1:], 1, [str(ii) for ii in range(n_imaging_bands)])
+            pspecs = MultiFieldStacker(cfm.power_spectrum.target, 0, keys).inverse @ cfm.power_spectrum
             #ift.extra.check_linear_operator(mfs)
-            #ift.extra.check_linear_operator(mfs1)
             op = []
             for pp in range(n_data_pol):
                 for ii in range(n_imaging_bands):
                     foo = ift.LinearInterpolator(dom, xs[0, :, ii][None])
-                    key = f"pol{pp}freqband{ii}"
+                    key = _polfreq_key(pp, ii)
                     op.append(foo.ducktape(key).ducktape_left(key))
             linear_interpolation = reduce(add, op)
             restructure = _CustomRestructure(linear_interpolation.target, obs.vis.domain)
             ift.extra.check_linear_operator(restructure)
-            log_weights = restructure @ linear_interpolation @ mfs.inverse @ log_weights
-            op = ift.makeOp(obs.weight) @ log_weights.scale(-2).exp()
+            log_weights = mfs.inverse @ log_weights
+            op = ift.makeOp(obs.weight) @ (restructure @ linear_interpolation @ log_weights).scale(-2).exp()
             additional = {
-                # "weights power spectrum": cfm.power_spectrum
-                #operators["log_sigma_correction"] = log_weights
-                #operators["sigma_correction"] = log_weights.exp()
+                "weights_power_spectrum": pspecs,
+                "log_sigma_correction": log_weights,
+                "sigma_correction": log_weights.exp()
             }
             return op, additional
         else:
             raise NotImplementedError
     return None, {}
+
+
+def _polfreq_key(stokes_label, freq):
+    return f"Stokes {stokes_label}, freqband {freq}"
 
 
 class _CustomRestructure(ift.LinearOperator):
@@ -75,10 +78,10 @@ class _CustomRestructure(ift.LinearOperator):
             res = np.empty(self.target.shape)
             for pp in range(self.target.shape[0]):
                 for ii in range(self.target.shape[2]):
-                    res[pp, :, ii] = x[f"pol{pp}freqband{ii}"]
+                    res[pp, :, ii] = x[_polfreq_key(pp, ii)]
         else:
             res = {}
             for pp in range(self.target.shape[0]):
                 for ii in range(self.target.shape[2]):
-                    res[f"pol{pp}freqband{ii}"] = x[pp, :, ii]
+                    res[_polfreq_key(pp, ii)] = x[pp, :, ii]
         return ift.makeField(self._tgt(mode), res)
