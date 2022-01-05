@@ -1,5 +1,0 @@
-#!/bin/sh
-
-for file in *cfg
-    do python3 imaging_with_automatic_weighting.py $file
-done
