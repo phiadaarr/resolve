@@ -22,3 +22,22 @@ In the likely case that you encounter bugs, please contact me via [email](mailto
 - The variable shadow of M87* ([arXiv](https://arxiv.org/abs/2002.05218)).
 - Unified radio interferometric calibration and imaging with joint uncertainty quantification ([doi](https://doi.org/10.1051/0004-6361/201935555), [arXiv](https://arxiv.org/abs/1903.11169)).
 - Radio imaging with information field theory ([doi](https://doi.org/10.23919/EUSIPCO.2018.8553533), [arXiv](https://arxiv.org/abs/1803.02174v1)).
+
+## How to run the demos
+### Basic imaging with automatic weighting
+
+- Download the [data](https://www.philipp-arras.de/assets/CYG-ALL-2052-2MHZ.ms.tar.gz) and unpack it.
+- Change the path under `[data]` in `cygnusa.cfg` to the path where the data is located.
+- Run
+```sh
+resolve cygnusa.cfg
+```
+or, if you have `mpi4py` installed:
+
+``` sh
+mpirun -np <ntasks> resolve cygnusa.cfg
+```
+which should speed up the computation. The number of threads used *per task* can be set in the configuration file `cygnusa.cfg` in the section `[technical]/nthreads`. The number threads multiplied by the number of MPI tasks should not exceed the number CPU cores available on the machine.
+
+### Multi-frequency imaging
+- Download the [data](https://www.philipp-arras.de/assets/mf_test_data.npz) and unpack it.
