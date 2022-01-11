@@ -60,7 +60,7 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}):
     res = {}
 
     total_iterations = cfg.getint("total iterations")
-    res["global_iterations"] = total_iterations
+    res["total_iterations"] = total_iterations
     f_int = lambda s: _comma_separated_str_to_list(s, total_iterations, output_type=int)
     f = lambda s: _comma_separated_str_to_list(s, total_iterations)
     fnone = lambda s: _comma_separated_str_to_list(s, total_iterations, allow_none=True)
@@ -111,6 +111,9 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}):
     cstlst = _comma_separated_str_to_list(cfg["constants"], total_iterations, allow_none=True)
     constants_dct[None] = ift.MultiDomain.make({})
     res["point_estimates"] = res["constants"] = lambda ii: constants_dct[cstlst[ii]].keys()
+
+    res["resume"] = cfg.getboolean("resume")
+    res["save_strategy"] = cfg.get("save strategy")
 
     return res
 

@@ -61,7 +61,7 @@ def main():
         del operators["points"]
     ift.optimize_kl(**parse_optimize_kl_config(cfg["optimization"], lhs, domains),
                     plottable_operators=operators, comm=get_comm, overwrite=True,
-                    resume=cfg["optimization"].getboolean("resume"))
+                    plot_latent=True)
 
 
 if __name__ == "__main__":
