@@ -2,7 +2,7 @@
 # Copyright(C) 2019-2021 Max-Planck-Society
 
 import os
-from os.path import isdir, join
+from os.path import isdir, join, expanduser
 
 import numpy as np
 
@@ -72,6 +72,7 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window,
     baselines are present in all spectral windows.
     """
     # Input checks
+    ms = expanduser(ms)
     if ms[-1] == "/":
         ms = ms[:-1]
     if not isdir(ms):
