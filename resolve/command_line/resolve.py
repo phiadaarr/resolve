@@ -30,19 +30,17 @@ def main():
     # Model operators
     sky, ops_sky, domains = sky_model(cfg["sky"], obs_science)
     enable_points = "points" in domains
-    assert len(obs_science) == 1
-    weights, ops_weights = weighting_model(cfg["weighting"], obs_science[0], sky.target)
+    weights, ops_weights = weighting_model(cfg["weighting"], obs_science, sky.target)
     operators = {**ops_sky, **ops_weights}
-    domains["weights"] = weights.domain
+    domains["weights"] = ift.MultiDomain.union([ww.domain for ww in weights])
     # /Model operators
 
     # Likelihoods
-    assert len(obs_science) == 1
     lhs = {}
-    lhs["full"] = ImagingLikelihood(obs_science[0], sky, inverse_covariance_operator=weights)
+    lhs["full"] = ImagingLikelihood(obs_science, sky, inverse_covariance_operator=weights)
     if enable_points:
-        lhs["points"] = ImagingLikelihood(obs_science[0], operators["points"])
-    lhs["data weights"] = ImagingLikelihood(obs_science[0], sky)
+        lhs["points"] = ImagingLikelihood(obs_science, operators["points"])
+    lhs["data weights"] = ImagingLikelihood(obs_science, sky)
     # /Likelihoods
 
     # Initial position

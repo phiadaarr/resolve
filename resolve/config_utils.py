@@ -125,9 +125,12 @@ def _cfg_to_observations(cfg):
         file_name = cc.pop(0)
         if file_name == "":
             continue
-        if len(cc) == 0:  # npz
+        ext = os.path.splitext(file_name)[1]
+        if ext == ".npz":
+            assert len(cc) == 0
             obs = Observation.load(file_name)
-        elif len(cc) == 1:  # ms
+        elif ext == ".ms":  # ms
+            assert len(cc) == 1
             cc = cc[0]
             assert cc[0] == "("
             assert cc[-1] == ")"

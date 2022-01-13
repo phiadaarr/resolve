@@ -176,3 +176,17 @@ def profile_function(func, inp, ntries):
     sortby = SortKey.TIME
     pstats.Stats(pr, stream=s).sort_stats(sortby).print_stats(10)
     return s.getvalue()
+
+
+def _obj2list(obj, cls):
+    if isinstance(obj, cls) or obj is None:
+        return [obj]
+    return list(obj)
+
+
+def _duplicate(lst, n):
+    if len(lst) == n:
+        return lst
+    if len(lst) == 1:
+        return n*lst
+    raise RuntimeError

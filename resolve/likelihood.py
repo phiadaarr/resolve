@@ -10,7 +10,7 @@ import numpy as np
 
 from .data.observation import Observation
 from .response_new import InterferometryResponse
-from .util import my_assert, my_assert_isinstance, my_asserteq
+from .util import my_assert, my_assert_isinstance, my_asserteq, _obj2list, _duplicate
 
 
 def _get_mask(observation):
@@ -59,42 +59,17 @@ def _build_gauss_lh_nres(op, mean, invcov):
 
 
 def _varcov(observation, Rs, inverse_covariance_operator):
-    mosaicing = isinstance(observation, dict)
     s0, s1 = "residual", "inverse covariance"
-    if mosaicing:
-        lhs = []
-        vis = {}
-        masks = []
-        for kk, oo in observation.items():
-            mask = oo.mask_operator
-            masks.append(mask.ducktape(kk).ducktape_left(kk))
-            tgt = mask.target
-            vis[kk] = mask(oo.vis)
-            dtype = oo.vis.dtype
-            a = ift.Adder(vis[kk], neg=True).ducktape_left(s0).ducktape("modeld" + kk)
-            b = ift.ScalingOperator(mask.target, 1.).ducktape_left(s1).ducktape("icov"+kk)
-            e = ift.VariableCovarianceGaussianEnergy(tgt, s0, s1, dtype)
-            lhs.append(e @ (a+b))
-        masks = reduce(add, masks)
-
-        a = ift.PrependKey(masks.target, "modeld") @ masks @ Rs
-        b = ift.PrependKey(masks.target, "icov") @ masks @ inverse_covariance_operator
-        lh = reduce(add, lhs) @ (a + b)
-
-        vis = ift.MultiField.from_dict(vis)
-        model_data = masks @ Rs
-        icov_at = lambda x: ift.makeOp((masks @ inverse_covariance_operator).force(x))
-    else:
-        my_assert_isinstance(inverse_covariance_operator, ift.Operator)
-        my_asserteq(Rs.target, observation.vis.domain, inverse_covariance_operator.target)
-        mask, vis, _ = _get_mask(observation)
-        residual = ift.Adder(vis, neg=True) @ mask @ Rs
-        inverse_covariance_operator = mask @ inverse_covariance_operator
-        dtype = observation.vis.dtype
-        op = residual.ducktape_left(s0) + inverse_covariance_operator.ducktape_left(s1)
-        lh = ift.VariableCovarianceGaussianEnergy(residual.target, s0, s1, dtype) @ op
-        model_data = mask @ Rs
-        icov_at = lambda x: ift.makeOp(inverse_covariance_operator.force(x))
+    my_assert_isinstance(inverse_covariance_operator, ift.Operator)
+    my_asserteq(Rs.target, observation.vis.domain, inverse_covariance_operator.target)
+    mask, vis, _ = _get_mask(observation)
+    residual = ift.Adder(vis, neg=True) @ mask @ Rs
+    inverse_covariance_operator = mask @ inverse_covariance_operator
+    dtype = observation.vis.dtype
+    op = residual.ducktape_left(s0) + inverse_covariance_operator.ducktape_left(s1)
+    lh = ift.VariableCovarianceGaussianEnergy(residual.target, s0, s1, dtype) @ op
+    model_data = mask @ Rs
+    icov_at = lambda x: ift.makeOp(inverse_covariance_operator.force(x))
     return _Likelihood(lh, vis, icov_at, model_data)
 
 
@@ -122,9 +97,9 @@ def ImagingLikelihood(
 
     Parameters
     ----------
-    observation : Observation or dict(Observation)
-        Observation object from which observation.vis and potentially
-        observation.weight is used for computing the likelihood.
+    observation : Observation or list of Observation
+        Observation objects from which vis, uvw, freq and potentially weight
+        are used for computing the likelihood.
 
     sky_operator : Operator
         Operator that generates sky. Needs to have as target:
@@ -134,23 +109,59 @@ def ImagingLikelihood(
         where `pdom` is a `PolarizationSpace`, `tdom` and `fdom` are an
         `IRGSpace`, and `sdom` is a two-dimensional `RGSpace`.
 
-    inverse_covariance_operator : Operator
-        Optional. Target needs to be the same space as observation.vis. If it is
-        not specified, observation.wgt is taken as covariance.
+    inverse_covariance_operator : Operator or list of Operator
+        Optional. Target needs to be the same space as observation.vis. If it
+        is not specified, observation.wgt is taken as covariance.
 
-    calibration_operator : Operator
+    calibration_operator : Operator or list of Operator
         Optional. Target needs to be the same as observation.vis.
 
     """
     my_assert_isinstance(sky_operator, ift.Operator)
-    response = InterferometryResponse(observation, sky_operator.target)
-    model_data = response @ sky_operator
-    if calibration_operator is not None:
-        model_data = calibration_operator * model_data
-    if inverse_covariance_operator is None:
-        mask, vis, weight = _get_mask(observation)
-        return _build_gauss_lh_nres(mask @ model_data, vis, weight)
-    return _varcov(observation, model_data, inverse_covariance_operator)
+    obs = _obj2list(observation, Observation)
+    cops = _duplicate(_obj2list(calibration_operator, ift.Operator), len(obs))
+    icovs = _duplicate(_obj2list(inverse_covariance_operator, ift.Operator),
+                       len(obs))
+
+    energy = []
+    data, model_data, icov_at = [], [], []
+    used_keys = []
+    for ii, (oo, cop, icov) in enumerate(zip(obs, cops, icovs)):
+        virtual_key = f"_{ii} {oo.source_name}"
+        assert virtual_key not in used_keys
+        mask, vis, weight = _get_mask(oo)
+        dtype = oo.vis.dtype
+
+        R = InterferometryResponse(oo, sky_operator.target).ducktape("_sky")
+        if cop is not None:
+            R = cop*R  # Apply calibration solutions
+        R = mask @ R  # Apply flags
+
+        if icov is None:
+            icov = ift.makeOp(weight, sampling_dtype=dtype)
+            ee = ift.GaussianEnergy(mean=vis, inverse_covariance=icov) @ R
+            icov_at.append(lambda x: icov.ducktape(virtual_key))
+        else:
+            s0, s1 = "_resi", "_icov"
+            resi = ift.Adder(vis, neg=True) @ R
+            icov = mask @ icov
+            op = resi.ducktape_left(s0) + icov.ducktape_left(s1)
+            ee = ift.VariableCovarianceGaussianEnergy(resi.target, s0, s1, dtype) @ \
+                    (resi.ducktape_left(s0) + icov.ducktape_left(s1))
+            icov_at.append(lambda x: icov.ducktape_left(virtual_key).force(x))
+
+        energy.append(ee)
+        data.append(vis.ducktape_left(virtual_key))
+        model_data.append(R.ducktape_left(virtual_key))
+
+        used_keys.append(virtual_key)
+
+    sky_operator = sky_operator.ducktape_left("_sky")
+    energy = reduce(add, energy).partial_insert(sky_operator)
+    data = ift.MultiField.union(data)
+    model_data = reduce(add, model_data) @ sky_operator
+    total_icov_at = lambda x: reduce(add, (iicc(x) for iicc in icov_at))
+    return _Likelihood(energy, data, total_icov_at, model_data)
 
 
 def CalibrationLikelihood(
@@ -172,27 +183,32 @@ def CalibrationLikelihood(
 
     Parameters
     ----------
-    observation : Observation
+    observation : Observation or list of Observations
         Observation object from which observation.vis and potentially
         observation.weight is used for computing the likelihood.
 
-    calibration_operator : Operator
+    calibration_operator : Operator or list of Operators
         Target needs to be the same as observation.vis.
 
-    model_visibilities : Field or MultiField
+    model_visibilities : Field or list of Fields
         Known model visiblities that are used for calibration. Needs to be
         defined on the same domain as `observation.vis`.
 
-    inverse_covariance_operator : Operator
+    inverse_covariance_operator : Operator or list of Operators
         Optional. Target needs to be the same space as observation.vis. If it is
         not specified, observation.wgt is taken as covariance.
     """
-    my_assert_isinstance(observation, Observation)
-    my_assert(ift.is_fieldlike(model_visibilities))
-    my_assert_isinstance(calibration_operator, ift.Operator)
-    model_data = ift.makeOp(model_visibilities) @ calibration_operator
-    if inverse_covariance_operator is None:
-        mask, vis, wgt = _get_mask(observation)
-        return _build_gauss_lh_nres(mask @ model_data, vis, wgt)
-    my_assert_isinstance(inverse_covariance_operator, ift.Operator)
-    return _varcov(observation, model_data, inverse_covariance_operator)
+    my_assert_isinstance(sky_operator, ift.Operator)
+    obs = _obj2list(observation, Observation)
+    cops = _duplicate(_obj2list(calibration_operator, ift.Operator), len(obs))
+    icovs = _duplicate(_obj2list(inverse_covariance_operator, ift.Operator),
+                       len(obs))
+    model_d = _duplicate(_obj2list(model_visibilities, ift.Field), len(obs))
+    model_d = [ift.makeOp(mm) @ cop for mm, cop in zip(model_d, cops)]
+
+    if len(obs) > 1:
+        raise NotImplementedError
+    if icovs[0] is None:
+        mask, vis, wgt = _get_mask(obs[0])
+        return _build_gauss_lh_nres(mask @ model_d[0], vis, wgt)
+    return _varcov(obs[0], model_d[0], icov[0])

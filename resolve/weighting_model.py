@@ -5,60 +5,64 @@
 from functools import reduce
 from operator import add
 
+import ducc0
 import nifty8 as ift
 import numpy as np
 
 from .simple_operators import MultiFieldStacker
 from .sky_model import cfm_from_cfg
-from .util import assert_sky_domain
+from .util import assert_sky_domain, _obj2list
+from .data.observation import Observation
 
 
 def weighting_model(cfg, obs, sky_domain):
     """Assumes independent weighting for every imaging band and for every polarization"""
-    assert_sky_domain((sky_domain))
-    n_imaging_bands = sky_domain[2].size
-    n_data_pol = obs.npol
+    assert_sky_domain(sky_domain)
 
-    if cfg.getboolean("enable"):
-        if cfg["model"] == "cfm":
-            import ducc0
+    if not cfg.getboolean("enable"):
+        return None, {}
 
-            npix = cfg.getint("npix")
-            fac = cfg.getfloat("zeropadding factor")
-            npix_padded = ducc0.fft.good_size(int(np.round(npix*fac)))
+    obs = _obj2list(obs, Observation)
 
-            xs = np.log(obs.effective_uvwlen().val)
+    if cfg["model"] == "cfm":
+        npix = cfg.getint("npix")
+        fac = cfg.getfloat("zeropadding factor")
+        npix_padded = ducc0.fft.good_size(int(np.round(npix*fac)))
+
+        op = []
+        for iobs, oo in enumerate(obs):
+            xs = np.log(oo.effective_uvwlen().val)
             minlen, maxlen = np.min(xs), np.max(xs)
             xs -= minlen
-
             dom = ift.RGSpace(npix_padded, fac * maxlen / npix)
 
-            cfm = cfm_from_cfg(cfg, {"": dom}, "invcov", total_N=n_imaging_bands*n_data_pol)
+            cfm = cfm_from_cfg(cfg, {"": dom}, "invcov", total_N=oo.nfreq*oo.npol, domain_prefix=f"Observation {iobs}, invcov")
             log_weights = cfm.finalize(0)
-            keys = [_polfreq_key(pp, ii) for pp in range(n_data_pol) for ii in range(n_imaging_bands)]
+
+            keys = [_polfreq_key(pp, ii) for pp in range(oo.npol)
+                                         for ii in range(oo.nfreq)]
             mfs = MultiFieldStacker(log_weights.target, 0, keys)
+            log_weights = mfs.inverse @ log_weights
             pspecs = MultiFieldStacker(cfm.power_spectrum.target, 0, keys).inverse @ cfm.power_spectrum
+            additional = {
+                    f"observation {iobs}: weights_power_spectrum": pspecs,
+                    f"observation {iobs}: log_sigma_correction": log_weights,
+                    f"observation {iobs}: sigma_correction": log_weights.exp()
+            }
             #ift.extra.check_linear_operator(mfs)
-            op = []
-            for pp in range(n_data_pol):
-                for ii in range(n_imaging_bands):
+            tmpop = []
+            for pp in range(oo.npol):
+                for ii in range(oo.nfreq):
                     foo = ift.LinearInterpolator(dom, xs[0, :, ii][None])
                     key = _polfreq_key(pp, ii)
-                    op.append(foo.ducktape(key).ducktape_left(key))
-            linear_interpolation = reduce(add, op)
-            restructure = _CustomRestructure(linear_interpolation.target, obs.vis.domain)
+                    tmpop.append(foo.ducktape(key).ducktape_left(key))
+            linear_interpolation = reduce(add, tmpop)
+            restructure = _CustomRestructure(linear_interpolation.target, oo.vis.domain)
             ift.extra.check_linear_operator(restructure)
-            log_weights = mfs.inverse @ log_weights
-            op = ift.makeOp(obs.weight) @ (restructure @ linear_interpolation @ log_weights).scale(-2).exp()
-            additional = {
-                "weights_power_spectrum": pspecs,
-                "log_sigma_correction": log_weights,
-                "sigma_correction": log_weights.exp()
-            }
-            return op, additional
-        else:
-            raise NotImplementedError
-    return None, {}
+            tmpop = ift.makeOp(oo.weight) @ (restructure @ linear_interpolation @ log_weights).scale(-2).exp()
+            op.append(tmpop)
+        return op, additional
+    raise NotImplementedError
 
 
 def _polfreq_key(stokes_label, freq):

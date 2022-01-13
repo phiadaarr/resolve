@@ -209,10 +209,10 @@ def _multi_freq_logsky_integrated_wiener_process(cfg, sdom, pol_label, freq):
     return op, additional
 
 
-def cfm_from_cfg(cfg, domain_dct, prefix, total_N=0, dofdex=None, override={}):
+def cfm_from_cfg(cfg, domain_dct, prefix, total_N=0, dofdex=None, override={}, domain_prefix=None):
     assert len(prefix) > 0
     product_spectrum = len(domain_dct) > 1
-    cfm = ift.CorrelatedFieldMaker(f"{prefix}", total_N=total_N)
+    cfm = ift.CorrelatedFieldMaker(prefix if domain_prefix is None else domain_prefix, total_N=total_N)
     for key_prefix, dom in domain_dct.items():
         ll = _append_to_nonempty_string(key_prefix, " ")
         kwargs = {kk: _parse_or_none(cfg, f"{prefix} {ll}{kk}", override)
