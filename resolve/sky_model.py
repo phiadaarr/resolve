@@ -34,11 +34,7 @@ def sky_model(cfg, observations=[]):
         elif cfg["freq mode"] == "cfm":
             op, aa = _multi_freq_logsky_cfm(cfg, sdom, pol_lbl)
         elif cfg["freq mode"] == "iwp":
-            if cfg["frequencies"] == "data":
-                freq = np.array([oo.freq for oo in observations]).flatten()
-            else:
-                freq = map(float, cfg["frequencies"].split(","))
-            freq = np.sort(np.array(list(freq)))
+            freq = _get_frequencies(cfg, observations)
             op, aa = _multi_freq_logsky_integrated_wiener_process(cfg, sdom, pol_lbl, freq)
         else:
             raise RuntimeError
@@ -92,6 +88,32 @@ def sky_model(cfg, observations=[]):
         additional["points"] = inserter @ points
         domains["points"] = points.domain
         sky = sky + inserter @ points
+    elif cfg["point sources mode"] == "single-iwp":
+        if not pdom.labels_eq("I"):
+            raise NotImplementedError
+        ppos = []
+        s = cfg["point sources locations"]
+        for xy in s.split(","):
+            x, y = xy.split("$")
+            ppos.append((str2rad(x), str2rad(y)))
+        alpha = cfg.getfloat("point sources alpha")
+        q = cfg.getfloat("point sources q")
+
+        inserter = PointInserter(sky.target, ppos)
+
+        freq = _get_frequencies(cfg, observations)
+        op, aa = _multi_freq_logsky_integrated_wiener_process(cfg, inserter.domain, pol_lbl, freq)
+        exit()
+
+        print(inserter.domain)
+        print(inserter.target)
+        print("HI")
+
+        additional["point_list"] = points
+        additional["points"] = inserter @ points
+        domains["points"] = points.domain
+        sky = sky + inserter @ points
+        exit()
 
     if not sky.target[0].labels_eq("I"):
         multifield_sky = mfs.inverse.ducktape(sky.target) @ sky
@@ -270,3 +292,11 @@ def default_sky_domain(pdom=PolarizationSpace("I"), tdom=IRGSpace([0.]),
     for dd in [pdom, tdom, fdom, sdom]:
         my_assert_isinstance(dd, ift.Domain)
     return ift.DomainTuple.make((pdom, tdom, fdom, sdom))
+
+
+def _get_frequencies(cfg, observations):
+    if cfg["frequencies"] == "data":
+        freq = np.array([oo.freq for oo in observations]).flatten()
+    else:
+        freq = map(float, cfg["frequencies"].split(","))
+    return np.sort(np.array(list(freq)))
