@@ -159,7 +159,7 @@ def ImagingLikelihood(
     sky_operator = sky_operator.ducktape_left("_sky")
     energy = reduce(add, energy).partial_insert(sky_operator)
     data = ift.MultiField.union(data)
-    model_data = reduce(add, model_data) @ sky_operator
+    model_data = reduce(add, model_data).partial_insert(sky_operator)
     total_icov_at = lambda x: reduce(add, (iicc(x) for iicc in icov_at))
     return _Likelihood(energy, data, total_icov_at, model_data)
 
@@ -198,7 +198,6 @@ def CalibrationLikelihood(
         Optional. Target needs to be the same space as observation.vis. If it is
         not specified, observation.wgt is taken as covariance.
     """
-    my_assert_isinstance(sky_operator, ift.Operator)
     obs = _obj2list(observation, Observation)
     cops = _duplicate(_obj2list(calibration_operator, ift.Operator), len(obs))
     icovs = _duplicate(_obj2list(inverse_covariance_operator, ift.Operator),
