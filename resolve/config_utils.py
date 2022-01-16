@@ -2,6 +2,8 @@
 # Copyright(C) 2021 Max-Planck-Society
 # Author: Philipp Arras
 
+from glob import glob
+
 import numpy as np
 import os
 import nifty8 as ift
@@ -119,6 +121,15 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}):
 
 
 def _cfg_to_observations(cfg):
+    newcfg = []
+    for cc in cfg.split(","):
+        if len(cc) == 0:
+            continue
+        fname, options = cc.split(":")
+        for ff in glob(os.path.expanduser(fname)):
+            newcfg.append(f"{ff}:{options}")
+    cfg = ",".join(newcfg)
+
     res = []
     for cc in cfg.split(","):
         cc = cc.split(":")
