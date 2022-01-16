@@ -6,7 +6,7 @@ RUN apt-get update -qq && apt-get install -qq git
 
 # Actual dependencies
 RUN apt-get update -qq && apt-get install -qq python3-pip casacore-dev python3-matplotlib
-RUN pip3 install scipy git+https://gitlab.mpcdf.mpg.de/ift/nifty.git@empty_sample_lists ducc0
+RUN pip3 install scipy git+https://gitlab.mpcdf.mpg.de/ift/nifty.git@NIFTy_8 ducc0
 # Optional dependencies
 RUN pip3 install astropy
 RUN apt-get install -qq python3-mpi4py
