@@ -49,7 +49,6 @@ def sky_model(cfg, observations=[]):
         mfs = MultiFieldStacker((pdom, fdom, sdom), 0, pdom.labels)
     logsky = reduce(add, logsky)
 
-    #ift.extra.check_linear_operator(mfs)
     mexp = polarization_matrix_exponential(tgt)
 
     sky = mexp @ (mfs @ logsky).ducktape_left(tgt)
@@ -100,20 +99,35 @@ def sky_model(cfg, observations=[]):
         q = cfg.getfloat("point sources q")
 
         inserter = PointInserter(sky.target, ppos)
+        udom = inserter.domain[-1]
+
+        p_i0 = ift.InverseGammaOperator(udom, alpha=alpha, q=q/sdom.scalar_dvol)
+        p_i0 = p_i0.ducktape("points")
+
+        p_alpha = _parse_or_none(cfg, "point sources alpha")
+        p_alpha = ift.NormalTransform(*p_alpha, "points alpha", udom.shape)
+        p_alpha = p_alpha.ducktape_left(udom)
+
+        p_flex = _parse_or_none(cfg, "point sources flexibility")
+        p_flex = ift.LognormalTransform(*p_flex, "points flexibility", 0)
+
+        p_asp = _parse_or_none(cfg, "point sources asperity")
+        if p_asp is not None:
+            p_asp = ift.LognormalTransform(*p_asp, "points asperity", 0)
 
         freq = _get_frequencies(cfg, observations)
-        op, aa = _multi_freq_logsky_integrated_wiener_process(cfg, inserter.domain, pol_lbl, freq)
-        exit()
+        log_fdom = IRGSpace(np.sort(np.log(freq)))
+        nfreq = len(freq)
+        npoints = udom.size
+        p_xi = ift.ScalingOperator(ift.UnstructuredDomain(2*npoints*(nfreq - 1)), 1.).ducktape("points xi")
 
-        print(inserter.domain)
-        print(inserter.target)
-        print("HI")
+        points = _integrated_wiener_process(p_i0, p_alpha, log_fdom, p_flex, p_asp, p_xi)
+        points = points.ducktape_left(inserter.domain)
 
         additional["point_list"] = points
         additional["points"] = inserter @ points
         domains["points"] = points.domain
         sky = sky + inserter @ points
-        exit()
 
     if not sky.target[0].labels_eq("I"):
         multifield_sky = mfs.inverse.ducktape(sky.target) @ sky
@@ -190,45 +204,53 @@ def _multi_freq_logsky_integrated_wiener_process(cfg, sdom, pol_label, freq):
                        override=override)
     freq_xi = cfm.finalize(0)
 
-    # Integrate over excitation fields
-    intop = WienerIntegrations(log_fdom, sdom)
-    freq_xi = freq_xi.ducktape_left(intop.domain)
-    broadcast = ift.ContractionOperator(intop.domain[0], None).adjoint
-    broadcast_full = ift.ContractionOperator(intop.domain, 1).adjoint
-    vol = log_fdom.distances
-
     flexibility = _parse_or_none(cfg, prefix + " wp flexibility")
     if flexibility is None:
         raise RuntimeError("freq flexibility cannot be None")
-    flex = ift.LognormalTransform(*flexibility, prefix + " wp flexibility", 0)
-    dom = intop.domain[0]
-    vflex = np.empty(dom.shape)
-    vflex[0] = vflex[1] = np.sqrt(vol)
-    sig_flex = ift.makeOp(ift.makeField(dom, vflex)) @ broadcast @ flex
-    sig_flex = broadcast_full @ sig_flex
-    shift = np.ones(dom.shape)
-    shift[0] = vol * vol / 12.0
-    asperity = _parse_or_none(cfg, prefix + " wp asperity")
-    if asperity is None:
-        shift = ift.DiagonalOperator(ift.makeField(dom, shift).sqrt(), intop.domain, 0)
-        increments = shift @ (freq_xi * sig_flex)
-    else:
-        asp = ift.LognormalTransform(*asperity, prefix + " wp asperity", 0)
-        vasp = np.empty(dom.shape)
-        vasp[0] = 1
-        vasp[1] = 0
-        vasp = ift.DiagonalOperator(ift.makeField(dom, vasp), domain=broadcast.target, spaces=0)
-        sig_asp = broadcast_full @ vasp @ broadcast @ asp
-        shift = ift.makeField(intop.domain, np.broadcast_to(shift[..., None, None], intop.domain.shape))
-        increments = freq_xi * sig_flex * (ift.Adder(shift) @ sig_asp).ptw("sqrt")
-    op = IntWProcessInitialConditions(i0, alpha, intop @ increments)
+    flexibility = ift.LognormalTransform(*flexibility, prefix + " wp flexibility", 0)
 
+    asperity = _parse_or_none(cfg, prefix + " wp asperity")
+    asperity = ift.LognormalTransform(*asperity, prefix + " wp asperity", 0)
     additional = {
         f"stokes{pol_label} i0": i0,
         f"stokes{pol_label} alpha": alpha,
     }
-    op = op.ducktape_left((fdom, sdom))
-    return op, additional
+    iwp = _integrated_wiener_process(i0, alpha, log_fdom,
+                                     flexibility, asperity, freq_xi)
+    iwp = iwp.ducktape_left((fdom, sdom))
+    return iwp, additional
+
+
+def _integrated_wiener_process(i0, alpha, irg_space, flexibility, asperity, freq_xi):
+    assert i0.target == alpha.target
+    assert len(i0.target) == 1
+    # Integrate over excitation fields
+    intop = WienerIntegrations(irg_space, i0.target[0])
+    freq_xi = freq_xi.ducktape_left(intop.domain)
+    broadcast = ift.ContractionOperator(intop.domain[0], None).adjoint
+    broadcast_full = ift.ContractionOperator(intop.domain, 1).adjoint
+    vol = irg_space.distances
+
+    dom = intop.domain[0]
+    vflex = np.empty(dom.shape)
+    vflex[0] = vflex[1] = np.sqrt(vol)
+    sig_flex = ift.makeOp(ift.makeField(dom, vflex)) @ broadcast @ flexibility
+    sig_flex = broadcast_full @ sig_flex
+    shift = np.ones(dom.shape)
+    shift[0] = vol * vol / 12.0
+    if asperity is None:
+        shift = ift.DiagonalOperator(ift.makeField(dom, shift).sqrt(), intop.domain, 0)
+        increments = shift @ (freq_xi * sig_flex)
+    else:
+        vasp = np.empty(dom.shape)
+        vasp[0] = 1
+        vasp[1] = 0
+        vasp = ift.DiagonalOperator(ift.makeField(dom, vasp), domain=broadcast.target, spaces=0)
+        sig_asp = broadcast_full @ vasp @ broadcast @ asperity
+        shift = ift.makeField(intop.domain, np.broadcast_to(shift[..., None, None], intop.domain.shape))
+        increments = freq_xi * sig_flex * (ift.Adder(shift) @ sig_asp).ptw("sqrt")
+
+    return IntWProcessInitialConditions(i0, alpha, intop @ increments)
 
 
 def cfm_from_cfg(cfg, domain_dct, prefix, total_N=0, dofdex=None, override={}, domain_prefix=None):

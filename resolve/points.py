@@ -23,6 +23,7 @@ class PointInserter(ift.LinearOperator):
             print("WARNING: Resolution not sufficient to assign a unique pixel to every point source.")
         self._domain = ift.makeDomain((pdom, tdom, fdom, ift.UnstructuredDomain(npoints)))
 
+
     def apply(self, x, mode):
         self._check_input(x, mode)
         x = x.val
@@ -31,7 +32,5 @@ class PointInserter(ift.LinearOperator):
             res = np.zeros(self._target.shape, dtype=x.dtype)
             res[..., xs, ys] = x
         else:
-            res = np.sum(x, axis=(1, 2))
-            res = res[:, xs, ys]
-            res = res[:, None, None]
+            res = x[..., xs, ys]
         return ift.makeField(self._tgt(mode), res)

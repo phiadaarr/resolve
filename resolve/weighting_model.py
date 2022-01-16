@@ -29,7 +29,7 @@ def weighting_model(cfg, obs, sky_domain):
         fac = cfg.getfloat("zeropadding factor")
         npix_padded = ducc0.fft.good_size(int(np.round(npix*fac)))
 
-        op = []
+        op, additional = [], {}
         for iobs, oo in enumerate(obs):
             xs = np.log(oo.effective_uvwlen().val)
             minlen, maxlen = np.min(xs), np.max(xs)
@@ -44,12 +44,9 @@ def weighting_model(cfg, obs, sky_domain):
             mfs = MultiFieldStacker(log_weights.target, 0, keys)
             log_weights = mfs.inverse @ log_weights
             pspecs = MultiFieldStacker(cfm.power_spectrum.target, 0, keys).inverse @ cfm.power_spectrum
-            additional = {
-                    f"observation {iobs}: weights_power_spectrum": pspecs,
-                    f"observation {iobs}: log_sigma_correction": log_weights,
-                    f"observation {iobs}: sigma_correction": log_weights.exp()
-            }
-            #ift.extra.check_linear_operator(mfs)
+            additional[f"observation {iobs}: weights_power_spectrum"] = pspecs
+            additional[f"observation {iobs}: log_sigma_correction"] = log_weights
+            additional[f"observation {iobs}: sigma_correction"] = log_weights.exp()
             tmpop = []
             for pp in range(oo.npol):
                 for ii in range(oo.nfreq):
