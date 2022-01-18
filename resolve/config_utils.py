@@ -87,8 +87,11 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}):
             return None
         opt = getattr(ift, name)
         lim = _comma_separated_str_to_list(cfg["nonlinear sampling optimizer iteration limit"], total_iterations,
-                                              output_type=int)[ii]
-        ic = ift.AbsDeltaEnergyController(.001, iteration_limit=lim, name=f"iter{ii} {f(cfg['nonlinear sampling optimizer'])[ii]}",
+                                           output_type=int, allow_none=True)[ii]
+        if lim is None:
+            raise ValueError()
+        ic = ift.AbsDeltaEnergyController(.001, iteration_limit=lim,
+                                          name=f"iter{ii} {name}",
                                           convergence_level=3)
         return opt(ic)
 
