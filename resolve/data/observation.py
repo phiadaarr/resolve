@@ -636,6 +636,8 @@ class Observation(BaseObservation):
 
     @property
     def source_name(self):
+        if self._auxiliary_tables is None:
+            return None
         if "FIELD" in self._auxiliary_tables:
             return self._auxiliary_tables["FIELD"]["NAME"][0]
         raise NotImplementedError("FIELD subtable not available.")

@@ -138,7 +138,7 @@ def _cfg_to_observations(cfg):
             continue
         ext = os.path.splitext(file_name)[1]
         if ext == ".npz":
-            assert len(cc) == 0
+            assert cc == ['']
             obs = Observation.load(file_name)
         elif ext == ".ms":  # ms
             assert len(cc) == 1
