@@ -114,7 +114,7 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window,
         auxtables = {}
         auxtables["ANTENNA"] = _import_aux_table(ms, "ANTENNA")
         auxtables["STATE"] = _import_aux_table(ms, "STATE")
-        auxtables["SPECTRAL_WINDOW"] = _import_aux_table(ms, "SPECTRAL_WINDOW", row=spectral_window, skip=["ASSOC_NATURE"])
+        auxtables["SPECTRAL_WINDOW"] = _import_aux_table(ms, "SPECTRAL_WINDOW", row=spectral_window, skip=["ASSOC_NATURE", "ASSOC_SPW_ID"])
         sf = _source_and_field_table(ms, spectral_window, ifield)
         if sf is None:
             print(f"Field {ifield} cannot be found in SOURCE table")
