@@ -114,7 +114,7 @@ def polarization_quiver(ax, sky_field):
 
     im = ax.imshow(lin.T, cmap="inferno", norm=LogNorm(), origin="lower",
                    extent=_extent(sdom))
-    scale = np.max(lin)*max(lin.shape) * 1
+    scale = np.max(lin)*max(lin.shape) * 5
 
     nx, ny = sdom.shape
     Y, X = np.meshgrid(np.linspace(*ax.get_ylim(), ny, endpoint=True),
@@ -125,7 +125,7 @@ def polarization_quiver(ax, sky_field):
               units="xy",
               scale_units="xy",
               scale=scale,
-              #alpha=.3,
+              alpha=.3,
               )
 
 
