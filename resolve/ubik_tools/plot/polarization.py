@@ -104,7 +104,7 @@ def _extent(sdom, offset=None):
         return [-xlim+ox, xlim+ox, -ylim+oy, ylim+oy]
 
 
-def polarization_quiver(ax, sky_field):
+def polarization_quiver(ax, sky_field, skip=1, pfrac=0.001):
     assert_sky_domain(sky_field.domain)
     pdom, tdom, fdom, sdom = sky_field.domain
     assert all((pol in pdom.labels) for pol in ["I", "Q", "U"])
@@ -116,16 +116,22 @@ def polarization_quiver(ax, sky_field):
                    extent=_extent(sdom))
     scale = np.max(lin)*max(lin.shape) * 5
 
+    ang = ang[::skip, ::skip]
+    lin = lin[::skip, ::skip]
+
+    ang = np.ma.masked_where(lin < pfrac * np.max(lin), ang)
+    lin = np.ma.masked_where(lin < pfrac * np.max(lin), lin)
+
     nx, ny = sdom.shape
-    Y, X = np.meshgrid(np.linspace(*ax.get_ylim(), ny, endpoint=True),
-                       np.linspace(*ax.get_xlim(), nx, endpoint=True))
-    ax.quiver(X, Y, -lin*np.sin(ang), lin*np.cos(ang),
-              angles="uv", pivot='middle',
-              headlength=0, headwidth=1, minlength=0, minshaft=.1, width=0.01,
-              units="xy",
-              scale_units="xy",
-              scale=scale,
-              alpha=.3,
+    xs = np.linspace(*ax.get_xlim(), ang.shape[0])
+    ys = np.linspace(*ax.get_ylim(), ang.shape[1])
+    dst = min(sdom.distances)
+    ax.quiver(*np.meshgrid(xs, ys, indexing="ij"),
+              np.cos(ang), np.sin(ang),
+              angles="uv", pivot='mid',
+              headaxislength=0, headwidth=0, headlength=0,
+              scale=1.1/dst/skip, scale_units="xy",
+              alpha=.6,
               )
 
 
