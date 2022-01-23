@@ -113,9 +113,13 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}):
             reset_domain = constants_dct[reset[iglobal]]
             return ift.MultiField.union([position, 0.1*ift.from_random(reset_domain)])
 
-    cstlst = _comma_separated_str_to_list(cfg["constants"], total_iterations, allow_none=True)
     constants_dct[None] = ift.MultiDomain.make({})
-    res["point_estimates"] = res["constants"] = lambda ii: constants_dct[cstlst[ii]].keys()
+
+    cstlst = _comma_separated_str_to_list(cfg["point estimates"], total_iterations, allow_none=True)
+    res["point_estimates"] = lambda ii: constants_dct[cstlst[ii]].keys()
+
+    cstlst = _comma_separated_str_to_list(cfg["constants"], total_iterations, allow_none=True)
+    res["constants"] = lambda ii: constants_dct[cstlst[ii]].keys()
 
     res["resume"] = cfg.getboolean("resume")
     res["save_strategy"] = cfg.get("save strategy")
