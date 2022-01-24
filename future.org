@@ -1,5 +1,6 @@
 #+TITLE: The future
 
+* Save minisanity output
 * Refine resolution over run
 * Multiple sky models at the same time
 * Multigrids
