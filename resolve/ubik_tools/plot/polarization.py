@@ -26,7 +26,7 @@ def polarization_overview(sky_field, name=None, offset=None):
     if tdom.size != 1:
         raise NotImplementedError
 
-    fig, axs = plt.subplots(nrows=pdom.size+1, ncols=fdom.size, figsize=[10, 10])
+    fig, axs = plt.subplots(ncols=pdom.size-2+2, nrows=fdom.size, figsize=[10, 10])
     axs = list(np.ravel(axs))
 
     # Figure out limits for color bars
@@ -38,12 +38,15 @@ def polarization_overview(sky_field, name=None, offset=None):
         else:
             lim = 0.1*np.max(np.abs(foo))
             vmin[pol], vmax[pol] = -lim, lim
+    lin = linear_polarization(sky_field)#.val
     # /Figure out limits for color bars
 
     for ii, ff in enumerate(fdom.coordinates):
         colorbar = ff == fdom.coordinates[-1]
         title = ff == fdom.coordinates[0]
         for pol in pdom.labels:
+            if pol in ["U", "Q"]:
+                continue
             axx = axs.pop(0)
             _plot_single_freq(
                     axx,
@@ -60,6 +63,19 @@ def polarization_overview(sky_field, name=None, offset=None):
         loop_sky = ift.makeField(loop_dom, sky_field.val[:, :, ii:ii+1])
         ang = polarization_angle(loop_sky).val[0, 0]
         lin = linear_polarization(loop_sky).val[0, 0]
+
+        axx = axs.pop(0)
+        if title:
+            axx.set_title("Linear polarization")
+        _plot_single_freq(
+                axx,
+                ift.makeField(sdom, lin),
+                title=f"Linear polarization" if title else "",
+                colorbar=colorbar,
+                offset=offset,
+                norm=LogNorm(),
+                cmap="inferno",
+                vmin=vmin["I"], vmax=vmax["I"])
 
         axx = axs.pop(0)
         if title:
@@ -104,7 +120,7 @@ def _extent(sdom, offset=None):
         return [-xlim+ox, xlim+ox, -ylim+oy, ylim+oy]
 
 
-def polarization_quiver(ax, sky_field, skip=1, pfrac=0.001):
+def polarization_quiver(ax, sky_field, nquivers=100, pfrac=0.001):
     assert_sky_domain(sky_field.domain)
     pdom, tdom, fdom, sdom = sky_field.domain
     assert all((pol in pdom.labels) for pol in ["I", "Q", "U"])
@@ -116,11 +132,12 @@ def polarization_quiver(ax, sky_field, skip=1, pfrac=0.001):
                    extent=_extent(sdom))
     scale = np.max(lin)*max(lin.shape) * 5
 
-    ang = ang[::skip, ::skip]
-    lin = lin[::skip, ::skip]
-
     ang = np.ma.masked_where(lin < pfrac * np.max(lin), ang)
     lin = np.ma.masked_where(lin < pfrac * np.max(lin), lin)
+
+    skip = max(sdom.shape) // nquivers
+    ang = ang[::skip, ::skip]
+    lin = lin[::skip, ::skip]
 
     nx, ny = sdom.shape
     xs = np.linspace(*ax.get_xlim(), ang.shape[0])
