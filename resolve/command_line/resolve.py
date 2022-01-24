@@ -14,6 +14,7 @@ from ..weighting_model import weighting_model
 from ..likelihood import ImagingLikelihood
 from ..util import profile_function
 from ..mpi import barrier, comm, master
+from ..global_config import set_verbosity
 
 
 def main():
@@ -46,13 +47,16 @@ def main():
     # Initial position
     position = 0.1 * ift.from_random(lhs["full"].domain)
 
+    set_verbosity(True)
     barrier(comm)
     s = profile_function(lhs["full"], position, 1)
     if master:
         print(s)
     del position
     barrier(comm)
+    set_verbosity(False)
     # /Initial position
+    exit()
 
     # Assumption: likelihood is not MPI distributed
     get_comm = comm
