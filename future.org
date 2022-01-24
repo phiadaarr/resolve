@@ -1,7 +1,13 @@
 #+TITLE: The future
 
+* Refine resolution over run
+* Multiple sky models at the same time
+* Multigrids
+** Fourier interpolation
+** Multigrid with wgridder?
 * To be investigated
 ** Baseline-dependent averaging [[https://arxiv.org/pdf/1802.09321.pdf][arXiv]]
 ** Anisotropic Gaussian random fields [[https://arxiv.org/pdf/2011.07151.pdf][arXiv]]
 * Technical
 ** Make matplotlib optional dependency
+** Multiple constants at the same time and properly test config parser
