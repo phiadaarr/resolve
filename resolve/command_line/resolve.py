@@ -9,12 +9,12 @@ import sys
 import nifty8 as ift
 
 from ..config_utils import parse_data_config, parse_optimize_kl_config
-from ..sky_model import sky_model
-from ..weighting_model import weighting_model
-from ..likelihood import ImagingLikelihood
-from ..util import profile_function
-from ..mpi import barrier, comm, master
 from ..global_config import set_verbosity
+from ..likelihood import ImagingLikelihood
+from ..mpi import barrier, comm, master
+from ..sky_model import sky_model
+from ..util import profile_function
+from ..weighting_model import weighting_model
 
 
 def main():
@@ -44,9 +44,8 @@ def main():
     lhs["data weights"] = ImagingLikelihood(obs_science, sky)
     # /Likelihoods
 
-    # Initial position
+    # Profiling
     position = 0.1 * ift.from_random(lhs["full"].domain)
-
     set_verbosity(True)
     barrier(comm)
     s = profile_function(lhs["full"], position, 1)
@@ -55,8 +54,7 @@ def main():
     del position
     barrier(comm)
     set_verbosity(False)
-    # /Initial position
-    exit()
+    # /Profiling
 
     # Assumption: likelihood is not MPI distributed
     get_comm = comm
