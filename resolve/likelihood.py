@@ -140,7 +140,7 @@ def ImagingLikelihood(
         if icov is None:
             icov = ift.makeOp(weight, sampling_dtype=dtype)
             ee = ift.GaussianEnergy(mean=vis, inverse_covariance=icov) @ R
-            icov_at.append(lambda x: icov.ducktape(virtual_key))
+            icov_at.append(lambda x: ift.BlockDiagonalOperator(ift.makeDomain({virtual_key: icov.domain}), {virtual_key: icov}))
         else:
             s0, s1 = "_resi", "_icov"
             resi = ift.Adder(vis, neg=True) @ R
@@ -148,7 +148,7 @@ def ImagingLikelihood(
             op = resi.ducktape_left(s0) + icov.ducktape_left(s1)
             ee = ift.VariableCovarianceGaussianEnergy(resi.target, s0, s1, dtype) @ \
                     (resi.ducktape_left(s0) + icov.ducktape_left(s1))
-            icov_at.append(lambda x: icov.ducktape_left(virtual_key).force(x))
+            icov_at.append(lambda x: ift.makeOp(icov.ducktape_left(virtual_key).force(x)))
 
         energy.append(ee)
         data.append(vis.ducktape_left(virtual_key))

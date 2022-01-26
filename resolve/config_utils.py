@@ -12,6 +12,7 @@ from distutils.util import strtobool
 from .global_config import set_epsilon, set_wgridding, set_double_precision, set_nthreads
 from .data.observation import Observation
 from .data.ms_import import ms2observations
+from .mpi import master
 
 
 def parse_data_config(cfg):
@@ -106,13 +107,14 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}):
     def callback(sl, iglobal, position):
         lh = res["likelihood_energy"](iglobal)
         s = ift.extra.minisanity(lh.data, lh.metric_at_pos, lh.model_data, sl)
-        if rve.mpi.master:
+        if master:
             print(s)
 
         if reset[iglobal] is not None:
             reset_domain = constants_dct[reset[iglobal]]
             return ift.MultiField.union([position, 0.1*ift.from_random(reset_domain)])
 
+    res["inspect_callback"] = callback
     constants_dct[None] = ift.MultiDomain.make({})
 
     cstlst = _comma_separated_str_to_list(cfg["point estimates"], total_iterations, allow_none=True)
