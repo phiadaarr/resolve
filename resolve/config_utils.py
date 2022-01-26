@@ -2,16 +2,18 @@
 # Copyright(C) 2021 Max-Planck-Society
 # Author: Philipp Arras
 
+import os
+from datetime import datetime
+from distutils.util import strtobool
 from glob import glob
 
-import numpy as np
-import os
 import nifty8 as ift
-from distutils.util import strtobool
+import numpy as np
 
-from .global_config import set_epsilon, set_wgridding, set_double_precision, set_nthreads
-from .data.observation import Observation
 from .data.ms_import import ms2observations
+from .data.observation import Observation
+from .global_config import (set_double_precision, set_epsilon, set_nthreads,
+                            set_wgridding)
 from .mpi import master
 
 
@@ -106,8 +108,18 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}):
 
     def callback(sl, iglobal, position):
         lh = res["likelihood_energy"](iglobal)
-        s = ift.extra.minisanity(lh.data, lh.metric_at_pos, lh.model_data, sl)
+        s = "\n".join(
+            ["", "",
+             f"Finished index: {iglobal}",
+             f"Current datetime: {datetime.now()}",
+             ift.extra.minisanity(lh.data, lh.metric_at_pos, lh.model_data, sl,
+                                  terminal_colors=False),
+             ""]
+            )
         if master:
+            # FIXME Use python's logger module for this
+            with open(os.path.join(res["output_directory"], "log.txt"), "a") as f:
+                f.write(s)
             print(s)
 
         if reset[iglobal] is not None:

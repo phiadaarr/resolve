@@ -48,8 +48,13 @@ def main():
     position = 0.1 * ift.from_random(lhs["full"].domain)
     set_verbosity(True)
     barrier(comm)
-    s = profile_function(lhs["full"], position, 1)
+    s = "\n\nProfile likelihood\n" + profile_function(lhs["full"], position, 1)
     if master:
+        # FIXME Use python's logger module for this
+        outdir = parse_optimize_kl_config(cfg["optimization"], lhs, domains)["output_directory"]
+        os.makedirs(outdir, exist_ok=True)
+        with open(os.path.join(outdir, "log.txt"), "a") as f:
+            f.write(s)
         print(s)
     del position
     barrier(comm)
