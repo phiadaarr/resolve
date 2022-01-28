@@ -1,4 +1,4 @@
-from .calibration import calibration_distribution
+from .calibration import calibration_distribution, CalibrationDistributor
 from .constants import *
 from .data.antenna_positions import AntennaPositions
 from .data.averaging import *
