@@ -5,7 +5,7 @@
 import nifty8 as ift
 import numpy as np
 
-from ..constants import SPEEDOFLIGHT
+from ..constants import AS2RAD, DEG2RAD, SPEEDOFLIGHT
 from ..mpi import onlymaster
 from ..util import (compare_attributes, my_assert, my_assert_isinstance,
                     my_asserteq)
@@ -662,6 +662,28 @@ class Observation(BaseObservation):
 
     def uvwlen(self):
         return np.linalg.norm(self.uvw, axis=1)
+
+    def __str__(self):
+        short0 = self.uvwlen().min()
+        long0 = self.uvwlen().max()
+
+        short1 = 1/(short0*self.freq.min()/SPEEDOFLIGHT)
+        long1 = 1/(long0*self.freq.max()/SPEEDOFLIGHT)
+
+        s = [f"Source name:\t\t{self.source_name}",
+             f"Visibilities shape:\t{self.vis.shape}",
+             f"# visibilities:\t{self.vis.size}",
+             f"Frequency range:\t{self.freq.min()*1e-6:.3f} -- {self.freq.max()*1e-6:.3f} MHz",
+             "Polarizations:\t" + ", ".join(self.vis.domain[0].labels),
+             f"Shortest baseline:\t{short0:.1f} m -> {short1/DEG2RAD:.3f} deg",
+             f"Longest baseline:\t{long0:.1f} m -> {long1/AS2RAD:.3f} arcsec"
+             ]
+        flagged = 1-self.fraction_useful()
+        if flagged == 0.:
+            s += ["Flagged:\t\tNone"]
+        else:
+            s += [f"Flagged:\t\t{flagged*100:.1f}%"]
+        return "\n".join(["Observation:"] + [f"  {ss}" for ss in s])
 
 
 def tmin_tmax(*args):
