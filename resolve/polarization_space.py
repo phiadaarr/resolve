@@ -59,10 +59,10 @@ def polarization_converter(domain, target):
             # Convention: Stokes I 1Jy source leads to 1Jy in LL and 1Jy in RR
             op = ift.ContractionOperator(target, 0).adjoint
             return op.ducktape(domain)
-    if domain[0].labels_eq(["I", "Q", "U"]):
+    if domain[0].labels_eq(["I", "Q", "U"]) or domain[0].labels_eq(["I", "Q", "U", "V"]):
         if target[0].labels_eq(["LL", "RR", "LR", "RL"]):
             op = _PolarizationConverter(domain, target, 0)
-            #ift.extra.check_linear_operator(op, complex, complex)
+            # ift.extra.check_linear_operator(op, complex, complex)
             return op
     raise NotImplementedError(f"Polarization converter\ndomain:\n{domain[0]}\ntarget\n{target[0]}\n")
 
@@ -82,6 +82,8 @@ class _PolarizationConverter(ift.LinearOperator):
             else:
                 assert self._domain[ii] == self._target[ii]
 
+        self._with_v = "V" in self._domain[space].labels
+
     def apply(self, x, mode):
         self._check_input(x, mode)
         polx = lambda lbl: x.val[x.domain[self._space].label2index(lbl)]
@@ -90,15 +92,15 @@ class _PolarizationConverter(ift.LinearOperator):
         if mode == self.TIMES:
             # Convention: Stokes I 1Jy source leads to 1Jy in LL and 1Jy in RR
             res[f("LL")] = res[f("RR")] = polx("I")
-            # if with_v:
-            #     LL += V
-            #     RR -= -V
+            if self._with_v:
+                res[f("LL")] += polx("V")
+                res[f("RR")] -= polx("V")
             res[f("RL")] = polx("Q")+1j*polx("U")
             res[f("LR")] = polx("Q")-1j*polx("U")
         else:
             res[f("I")] = polx("LL") + polx("RR")
-            # if with_v:
-            #     V = LL - RR
+            if self._with_v:
+                res[f("V")] = polx("LL") - polx("RR")
             res[f("Q")] = polx("LR") + polx("RL")
             res[f("U")] = 1j*(polx("LR") - polx("RL"))
         return ift.makeField(self._tgt(mode), res)
