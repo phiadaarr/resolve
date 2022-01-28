@@ -26,6 +26,13 @@ def _pol_id(ms_path, spectral_window):
     return polid
 
 
+def ms2observations_all(ms, data_column):
+    res = []
+    for spw in range(ms_n_spectral_windows(ms)):
+        res.extend(ms2observations(ms, data_column, True, spw))
+    return list(filter(lambda x: x is not None, res))
+
+
 def ms2observations(ms, data_column, with_calib_info, spectral_window,
                     polarizations="all", channels=slice(None), ignore_flags=False,
                     field=None):
