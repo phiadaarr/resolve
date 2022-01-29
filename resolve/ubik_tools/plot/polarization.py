@@ -38,7 +38,7 @@ def polarization_overview(sky_field, name=None, offset=None):
         else:
             lim = 0.1*np.max(np.abs(foo))
             vmin[pol], vmax[pol] = -lim, lim
-    lin = linear_polarization(sky_field)#.val
+    lin = linear_polarization(sky_field)
     # /Figure out limits for color bars
 
     for ii, ff in enumerate(fdom.coordinates):
@@ -48,15 +48,18 @@ def polarization_overview(sky_field, name=None, offset=None):
             if pol in ["U", "Q"]:
                 continue
             axx = axs.pop(0)
+            val = sky_field.val[pdom.label2index(pol), 0, ii]
+            if pol == "I" and val.min() < 0:
+                raise RuntimeError("Stokes I cannot be negative")
             _plot_single_freq(
                     axx,
-                    ift.makeField(sdom, sky_field.val[pdom.label2index(pol), 0, ii]),
+                    ift.makeField(sdom, val),
                     title=f"Stokes {pol}" if title else "",
                     colorbar=colorbar,
                     offset=offset,
-                    norm=LogNorm() if pol == "I" else None,
+                    norm=LogNorm(vmin=vmin[pol], vmax=vmax[pol]) if pol == "I" else None,
                     cmap="inferno" if pol == "I" else "seismic",
-                    vmin=vmin[pol], vmax=vmax[pol])
+                )
 
         loop_fdom = IRGSpace([ff])
         loop_dom = pdom, tdom, loop_fdom, sdom
@@ -73,10 +76,9 @@ def polarization_overview(sky_field, name=None, offset=None):
                 title=f"Linear polarization" if title else "",
                 colorbar=colorbar,
                 offset=offset,
-                norm=LogNorm(),
+                norm=LogNorm(vmin["I"], vmax["I"]),
                 cmap="inferno",
-                vmin=vmin["I"], vmax=vmax["I"])
-
+            )
         axx = axs.pop(0)
         if title:
             axx.set_title("Magnetic field orientation")
