@@ -1,5 +1,6 @@
-import resolve as rve
-import numpy as np
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright(C) 2021-2022 Max-Planck-Society
+# Author: Philipp Arras
 
 import nifty8 as ift
 
