@@ -19,12 +19,11 @@ from .simple_operators import MultiFieldStacker
 from .util import assert_sky_domain
 
 
-def sky_model(cfg, observations=[]):
+def sky_model_diffuse(cfg, observations=[]):
     sdom = _spatial_dom(cfg)
     pdom = PolarizationSpace(cfg["polarization"].split(","))
 
     additional = {}
-    domains = {}
 
     logsky = []
     for lbl in pdom.labels:
@@ -50,10 +49,17 @@ def sky_model(cfg, observations=[]):
     logsky = reduce(add, logsky)
 
     mexp = polarization_matrix_exponential(tgt)
-
     sky = mexp @ (mfs @ logsky).ducktape_left(tgt)
-    domains["diffuse"] = sky.domain
+    assert_sky_domain(sky.target)
 
+    return sky, additional
+
+
+def sky_model_points(cfg, observations=[]):
+    sdom = _spatial_dom(cfg)
+    pdom = PolarizationSpace(cfg["polarization"].split(","))
+
+    additional = {}
     # Point sources
     if cfg["point sources mode"] == "single":
         ppos = []
@@ -64,7 +70,7 @@ def sky_model(cfg, observations=[]):
         alpha = cfg.getfloat("point sources alpha")
         q = cfg.getfloat("point sources q")
 
-        inserter = PointInserter(sky.target, ppos)
+        inserter = PointInserter(default_sky_domain(pdom=pdom, sdom=sdom), ppos)
 
         if pdom.labels_eq("I"):
             points = ift.InverseGammaOperator(inserter.domain, alpha=alpha, q=q/sdom.scalar_dvol)
@@ -89,8 +95,7 @@ def sky_model(cfg, observations=[]):
             raise NotImplementedError(f"single_frequency_sky does not support point sources on {pdom.labels} (yet?)")
 
         additional["point_list"] = points
-        domains["points"] = points.domain
-        sky = sky + inserter @ points
+        sky = inserter @ points
     elif cfg["point sources mode"] == "single-iwp":
         if not pdom.labels_eq("I"):
             raise NotImplementedError
@@ -129,13 +134,12 @@ def sky_model(cfg, observations=[]):
         points = points.ducktape_left(inserter.domain)
 
         additional["point_list"] = points
-        domains["points"] = points.domain
-        sky = sky + inserter @ points
+        sky = inserter @ points
+    else:
+        return None, {}
 
     assert_sky_domain(sky.target)
-    domains["sky"] = sky.domain
-    additional["sky"] = sky
-    return sky, additional, domains
+    return sky, additional
 
 
 def _single_freq_logsky(cfg, pol_label):

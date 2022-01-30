@@ -4,8 +4,8 @@
 
 import configparser
 
-import numpy as np
 import nifty8 as ift
+import numpy as np
 import pytest
 import resolve as rve
 
@@ -20,5 +20,14 @@ obs = rve.ms2observations("/data/CYG-D-6680-64CH-10S.ms", "DATA", True, 0, polar
 def test_build_multi_frequency_skymodel(fname):
     cfg = configparser.ConfigParser()
     cfg.read(fname)
-    op, _, _ = rve.sky_model(cfg["sky"], obs)
+    op, _ = rve.sky_model_diffuse(cfg["sky"], obs)
     op(ift.from_random(op.domain))
+
+    key1 = op.domain.keys()
+
+    op, _ = rve.sky_model_points(cfg["sky"], obs)
+    if op is not None:
+        op(ift.from_random(op.domain))
+
+        key2 = op.domain.keys()
+        assert len(set(key1) & set(key2)) == 0
