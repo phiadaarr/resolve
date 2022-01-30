@@ -3,8 +3,8 @@
 # Author: Philipp Arras
 
 import nifty8 as ift
-
-obs = rve.ms2observations("/data/CYG-ALL-2052-2MHZ.ms", "DATA", True, 0)[0]
+import numpy as np
+import resolve as rve
 
 
 def baseline_histogram(file_name, vis, observation, bins, weight=None):
