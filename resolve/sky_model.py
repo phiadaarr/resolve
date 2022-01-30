@@ -69,7 +69,7 @@ def sky_model(cfg, observations=[]):
         if pdom.labels_eq("I"):
             points = ift.InverseGammaOperator(inserter.domain, alpha=alpha, q=q/sdom.scalar_dvol)
             points = points.ducktape("points")
-        elif pdom.labels_eq(["I", "Q", "U"]):
+        elif pdom.labels_eq(["I", "Q", "U"]) or pdom.labels_eq(["I", "Q", "U", "V"]):
             points_domain = inserter.domain[-1]
             npoints = points_domain.size
             i = ift.InverseGammaOperator(points_domain, alpha=alpha, q=q/sdom.scalar_dvol).log().ducktape("points I")
@@ -78,7 +78,12 @@ def sky_model(cfg, observations=[]):
             i = i.ducktape_left("I")
             q = q.ducktape_left("Q")
             u = u.ducktape_left("U")
-            iqu = MultiFieldStacker((pdom, points_domain), 0, pdom.labels) @ (i + q + u)
+            polsum = i + q + u
+            if pdom.labels_eq(["I", "Q", "U", "V"]):
+                v = ift.NormalTransform(cfg["point sources stokesv log mean"], cfg["point sources stokesv log stddev"], "points V", npoints)
+                v = v.ducktape_left("V")
+                polsum = polsum + v
+            iqu = MultiFieldStacker((pdom, points_domain), 0, pdom.labels) @ polsum
             points = (polarization_matrix_exponential(iqu.target) @ iqu).ducktape_left(inserter.domain)
         else:
             raise NotImplementedError(f"single_frequency_sky does not support point sources on {pdom.labels} (yet?)")
