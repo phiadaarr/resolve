@@ -47,6 +47,7 @@ def main():
         domains["points"] = points.domain
     if weights is not None:
         domains["weights"] = ift.MultiDomain.union([ww.domain for ww in weights])
+    domains["sky"] = sky.domain
     # /Domains
 
     # Likelihoods
