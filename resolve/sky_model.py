@@ -84,7 +84,6 @@ def sky_model(cfg, observations=[]):
             raise NotImplementedError(f"single_frequency_sky does not support point sources on {pdom.labels} (yet?)")
 
         additional["point_list"] = points
-        additional["points"] = inserter @ points
         domains["points"] = points.domain
         sky = sky + inserter @ points
     elif cfg["point sources mode"] == "single-iwp":
@@ -125,29 +124,12 @@ def sky_model(cfg, observations=[]):
         points = points.ducktape_left(inserter.domain)
 
         additional["point_list"] = points
-        additional["points"] = inserter @ points
         domains["points"] = points.domain
         sky = sky + inserter @ points
 
-    if not sky.target[0].labels_eq("I"):
-        multifield_sky = mfs.inverse.ducktape(sky.target) @ sky
-        additional["sky"] = multifield_sky
-        if "U" in multifield_sky.target.keys() and "Q" in multifield_sky.target.keys():
-            polarized = (multifield_sky["Q"] ** 2 + multifield_sky["U"] ** 2).sqrt()
-            additional["linear polarization"] = polarized
-            additional["fractional polarization"] = polarized * multifield_sky["I"].reciprocal()
-    else:
-        if sky.target[1].size == 1 and sky.target[2].size == 1:  # single-time, single-freq
-            tmpsky = sky.ducktape_left((sky.target[0], sky.target[-1]))
-            additional["sky"] = MultiFieldStacker(tmpsky.target, 0, tmpsky.target[0].labels).inverse @ tmpsky
-        if sky.target[0].size == 1 and sky.target[1].size == 1 and sky.target[2].size > 1:  # single-pol, single-time, multi-frequency
-            additional["mf sky"] = MultiFieldStacker(sky.target[2:], 0,
-                                                     [f"{cc*1e-9:.6} GHz" for cc in sky.target[2].coordinates]).inverse \
-                                       @ sky.ducktape_left(sky.target[2:])
-            additional["mf logsky"] = additional["mf sky"].log()
-
     assert_sky_domain(sky.target)
     domains["sky"] = sky.domain
+    additional["sky"] = sky
     return sky, additional, domains
 
 
