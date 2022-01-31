@@ -23,18 +23,23 @@ rve.set_nthreads(8)
 @pmp("flux_source", [1.213, 2.])
 @pmp("weights", [1., 1.231])
 @pmp("weighting", ["natural", "uniform"])
-def test_dirty(with_zero_mode, weights, flux_source, npol, weighting):
-    npix = 100
-    fov = "0.05deg"
-    dst = rve.str2rad(fov) / npix
-    sdom = ift.RGSpace([npix, npix], [dst, dst])
-    obs = _generate_testing_data(sdom, npol, weights=weights, flux_source=flux_source, with_zero_mode=with_zero_mode)
-    dirty = rve.dirty_image(obs, weighting, fov, npix)
-    psf = rve.dirty_image(obs, weighting, fov, npix, vis=ift.full(obs.vis.domain, 1.+0j))
+@pmp("nx", [100])
+@pmp("ny", [100, 120])
+@pmp("fovx", ["0.05deg", "0.06deg"])
+@pmp("fovy", ["0.05deg"])
+def test_dirty(with_zero_mode, weights, flux_source, npol, weighting, nx, ny, fovx, fovy):
+    dstx = rve.str2rad(fovx) / nx
+    dsty = rve.str2rad(fovy) / ny
+    sdom = ift.RGSpace([nx, ny], [dstx, dsty])
+    sky_domain = rve.default_sky_domain(sdom=sdom)
+    obs = _generate_testing_data(sdom, npol, weights, flux_source, with_zero_mode)
+    dirty = rve.dirty_image(obs, weighting, sky_domain)
+    psf = rve.dirty_image(obs, weighting, sky_domain, vis=ift.full(obs.vis.domain, 1.+0j))
 
     if with_zero_mode:
-        rve.ubik_tools.field2fits(dirty, "dirty.fits", [obs])
         np.testing.assert_allclose(dirty.ducktape_left(sdom).s_integrate(), flux_source)
+    else:
+        np.testing.assert_allclose(dirty.ducktape_left(sdom).s_integrate(), 0.)
 
 
 def _generate_testing_data(sdom, npol, weights, flux_source, with_zero_mode):

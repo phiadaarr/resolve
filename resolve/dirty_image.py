@@ -10,33 +10,20 @@ from .irg_space import IRGSpace
 from .polarization_space import PolarizationSpace
 from .response_new import InterferometryResponse
 from .global_config import set_epsilon, set_wgridding
+from .util import assert_sky_domain
 
 
-def dirty_image(observation, weighting, fov, npix, freqs=[1.0], times=[0.0], vis=None, weight=None):
-    if isinstance(fov, (str, float)):
-        fov = [fov, fov]
-    fov = np.array(list(map(str2rad, fov)))
-    if isinstance(npix, int):
-        npix = [npix, npix]
-    npix = np.array(npix)
-    sdom = ift.RGSpace(npix, fov / npix)
-
+def dirty_image(observation, weighting, sky_domain, vis=None, weight=None):
+    assert_sky_domain(sky_domain)
     pol = observation.polarization.has_crosshanded()
-    if pol:
-        pdom = PolarizationSpace(["I", "Q", "U", "V"])
-    else:
-        pdom = PolarizationSpace("I")
-
-    fdom = IRGSpace(freqs)
-    tdom = IRGSpace(times)
-    R = InterferometryResponse(observation, (pdom, tdom, fdom, sdom))
-
+    R = InterferometryResponse(observation, sky_domain)
     w = observation.weight if weight is None else weight
     d = observation.vis if vis is None else vis
+    vol = sky_domain[-1].scalar_dvol
     if weighting == "natural":
-        return R.adjoint(d * w/w.s_sum()) / sdom.scalar_dvol**2
+        return R.adjoint(d * w/w.s_sum()) / vol**2
     elif weighting == "uniform":
         w1 = ift.full(R.target, 1.+0.j)
-        rho = (R @ R.adjoint)(w1/w1.s_sum()).scale(1/sdom.scalar_dvol**2)
-        return R.adjoint(d* 1/rho * w/w.s_sum()) / sdom.scalar_dvol**2
+        rho = (R @ R.adjoint)(w1/w1.s_sum()) / vol**2
+        return R.adjoint(d* 1/rho * w/w.s_sum()) / vol**2
     raise RuntimeError
