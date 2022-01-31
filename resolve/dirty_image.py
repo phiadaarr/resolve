@@ -34,9 +34,9 @@ def dirty_image(observation, weighting, fov, npix, freqs=[1.0], times=[0.0], vis
     w = observation.weight if weight is None else weight
     d = observation.vis if vis is None else vis
     if weighting == "natural":
-        return R.adjoint(w * d)
+        return R.adjoint(d * w/w.s_sum()) / sdom.scalar_dvol**2
     elif weighting == "uniform":
-        # FIXME Figure out units
-        rho = (R @ R.adjoint)(ift.full(R.target, 1.+0.j))
-        return R.adjoint(d/rho*w)
+        w1 = ift.full(R.target, 1.+0.j)
+        rho = (R @ R.adjoint)(w1/w1.s_sum()).scale(1/sdom.scalar_dvol**2)
+        return R.adjoint(d* 1/rho * w/w.s_sum()) / sdom.scalar_dvol**2
     raise RuntimeError
