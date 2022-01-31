@@ -12,7 +12,7 @@ from .response_new import InterferometryResponse
 from .global_config import set_epsilon, set_wgridding
 
 
-def dirty_image(observation, weighting, fov, npix, freqs=[1.0], times=[0.0]):
+def dirty_image(observation, weighting, fov, npix, freqs=[1.0], times=[0.0], vis=None, weight=None):
     if isinstance(fov, (str, float)):
         fov = [fov, fov]
     fov = np.array(list(map(str2rad, fov)))
@@ -31,15 +31,12 @@ def dirty_image(observation, weighting, fov, npix, freqs=[1.0], times=[0.0]):
     tdom = IRGSpace(times)
     R = InterferometryResponse(observation, (pdom, tdom, fdom, sdom))
 
+    w = observation.weight if weight is None else weight
+    d = observation.vis if vis is None else vis
     if weighting == "natural":
-        w = observation.weight
+        return R.adjoint(w * d)
     elif weighting == "uniform":
         # FIXME Figure out units
-        w = observation.weight
-        d = observation.vis
         rho = (R @ R.adjoint)(ift.full(R.target, 1.+0.j))
         return R.adjoint(d/rho*w)
-    else:
-        raise RuntimeError
-
-    return R.adjoint(w * observation.vis)
+    raise RuntimeError
