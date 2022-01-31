@@ -34,7 +34,11 @@ def dirty_image(observation, weighting, fov, npix, freqs=[1.0], times=[0.0]):
     if weighting == "natural":
         w = observation.weight
     elif weighting == "uniform":
-        raise NotImplementedError
+        # FIXME Figure out units
+        w = observation.weight
+        d = observation.vis
+        rho = (R @ R.adjoint)(ift.full(R.target, 1.+0.j))
+        return R.adjoint(d/rho*w)
     else:
         raise RuntimeError
 
