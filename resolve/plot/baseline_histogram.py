@@ -44,7 +44,7 @@ def baseline_histogram(file_name, vis, observation, bins, weight=None):
                                   luvwlen < ma)
             if np.sum(inds) == 0:
                 continue
-            weighted_average = np.average(lvis[inds], weights=lweight[inds])
+            weighted_average = np.mean(lvis[inds]* lvis[inds] * lweight[inds])
             xs.append(mi + 0.5*(ma-mi))
             ys.append(weighted_average)
             nys.append(np.sum(inds))

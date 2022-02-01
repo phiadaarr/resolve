@@ -31,13 +31,14 @@ def weighting_model(cfg, obs, sky_domain):
 
         op, additional = [], {}
         for iobs, oo in enumerate(obs):
-            xs = np.log(oo.effective_uvwlen().val)
+            xs = oo.effective_uvwlen().val_rw()
             minlen = np.min(xs)
             xs -= minlen
             maxlen = np.max(xs)
             dom = ift.RGSpace(npix_padded, maxlen / npix)
 
-            cfm = cfm_from_cfg(cfg, {"": dom}, "invcov", total_N=oo.nfreq*oo.npol, domain_prefix=f"Observation {iobs}, invcov")
+            cfm = cfm_from_cfg(cfg, {"": dom}, "invcov", total_N=oo.nfreq*oo.npol,
+                               domain_prefix=f"Observation {iobs}, invcov")
             log_weights = cfm.finalize(0)
 
             keys = [_polfreq_key(pp, ii) for pp in range(oo.npol)
@@ -51,6 +52,8 @@ def weighting_model(cfg, obs, sky_domain):
             tmpop = []
             for pp in range(oo.npol):
                 for ii in range(oo.nfreq):
+                    assert dom.total_volume >= xs[0, :, ii].max()
+                    assert 0 <= xs[0, :, ii].min()
                     foo = ift.LinearInterpolator(dom, xs[0, :, ii][None])
                     key = _polfreq_key(pp, ii)
                     tmpop.append(foo.ducktape(key).ducktape_left(key))
