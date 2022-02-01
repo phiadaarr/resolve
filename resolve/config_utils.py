@@ -133,18 +133,28 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}, inspect_call
         # /Reset parts of the latent space
 
     res["inspect_callback"] = callback
+    terminate = cfg.getfloat("terminate")
+    if terminate is not None:
+        res["terminate_callback"] = lambda iglobal: iglobal == terminate
+
     constants_dct[None] = ift.MultiDomain.make({})
 
-    cstlst = _comma_separated_str_to_list(cfg["point estimates"], total_iterations, allow_none=True)
-    res["point_estimates"] = lambda ii: constants_dct[cstlst[ii]].keys()
-
-    cstlst = _comma_separated_str_to_list(cfg["constants"], total_iterations, allow_none=True)
-    res["constants"] = lambda ii: constants_dct[cstlst[ii]].keys()
+    pe_keys = _parse_cst(cfg["point estimates"], total_iterations, constants_dct)
+    res["point_estimates"] = lambda ii: pe_keys[ii]
+    cst_keys = _parse_cst(cfg["constants"], total_iterations, constants_dct)
+    res["constants"] = lambda ii: cst_keys[ii]
 
     res["resume"] = cfg.getboolean("resume")
     res["save_strategy"] = cfg.get("save strategy")
 
     return res
+
+
+def _parse_cst(cfg, total_iterations, constants_dct):
+    cst_keys = _comma_separated_str_to_list(cfg, total_iterations, allow_none=True)
+    cst_keys = map(lambda x: [None] if x is None else x.split("$"), cst_keys)
+    cst_keys = map(lambda x: ift.MultiDomain.union(constants_dct[y] for y in x).keys(), cst_keys)
+    return tuple(cst_keys)
 
 
 def _cfg_to_observations(cfg):
