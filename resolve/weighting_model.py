@@ -32,9 +32,10 @@ def weighting_model(cfg, obs, sky_domain):
         op, additional = [], {}
         for iobs, oo in enumerate(obs):
             xs = np.log(oo.effective_uvwlen().val)
-            minlen, maxlen = np.min(xs), np.max(xs)
+            minlen = np.min(xs)
             xs -= minlen
-            dom = ift.RGSpace(npix_padded, fac * maxlen / npix)
+            maxlen = np.max(xs)
+            dom = ift.RGSpace(npix_padded, maxlen / npix)
 
             cfm = cfm_from_cfg(cfg, {"": dom}, "invcov", total_N=oo.nfreq*oo.npol, domain_prefix=f"Observation {iobs}, invcov")
             log_weights = cfm.finalize(0)
