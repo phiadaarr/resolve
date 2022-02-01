@@ -58,6 +58,8 @@ def main():
     lhs["data weights"] = ImagingLikelihood(obs_science, sky)
     # /Likelihoods
 
+    outdir = parse_optimize_kl_config(cfg["optimization"], lhs, domains)["output_directory"]
+
     # Profiling
     position = 0.1 * ift.from_random(lhs["full"].domain)
     set_verbosity(True)
@@ -65,7 +67,6 @@ def main():
     s = "\n\nProfile likelihood\n" + profile_function(lhs["full"], position, 1)
     if master:
         # FIXME Use python's logger module for this
-        outdir = parse_optimize_kl_config(cfg["optimization"], lhs, domains)["output_directory"]
         os.makedirs(outdir, exist_ok=True)
         with open(os.path.join(outdir, "log.txt"), "a") as f:
             f.write(s)
@@ -77,18 +78,29 @@ def main():
 
     def inspect_callback(sl, iglobal, position):
         from ..plot.baseline_histogram import baseline_histogram
+        from ..response_new import InterferometryResponse
 
         sky_mean = sl.average(sky)
         for ii, oo in enumerate(obs_science):
-            from ..response_new import InterferometryResponse
+            # data weights
             model_vis = InterferometryResponse(oo, sky.target)(sky_mean)
-            baseline_histogram(f"baseline_data_weights_iter{iglobal}_obs{ii}.png",
-                               model_vis, oo, 100, weight=oo.weight)
+            dd = os.path.join(outdir, f"normlized data residuals obs{ii} (data weights)")
+            if master:
+                os.makedirs(dd, exist_ok=True)
+                fname = os.path.join(dd, f"baseline_data_weights_iter{iglobal}_obs{ii}.png")
+                baseline_histogram(fname, model_vis-oo.vis, oo, 100, weight=oo.weight)
+            # /data weights
+
+            # learned weights
             if weights is None:
                 continue
+            dd = os.path.join(outdir, f"normlized data residuals obs{ii} (learned weights)")
             weights_mean = sl.average(weights[ii])
-            baseline_histogram(f"baseline_model_weights_iter{iglobal}_obs{ii}.png",
-                               model_vis, oo, 100, weight=weights_mean)
+            if master:
+                os.makedirs(dd, exist_ok=True)
+                fname = os.path.join(dd, f"baseline_model_weights_iter{iglobal}_obs{ii}.png")
+                baseline_histogram(fname, model_vis-oo.vis, oo, 100, weight=weights_mean)
+            # /learned weights
 
     # Assumption: likelihood is not MPI distributed
     get_comm = comm
