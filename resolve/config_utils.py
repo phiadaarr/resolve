@@ -44,11 +44,11 @@ def parse_data_config(cfg):
     return obs_calib_flux, obs_calib_phase, obs_science
 
 
-def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}):
+def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}, inspect_callback=None):
     """
     Parameters
     ----------
-    cfg : 
+    cfg :
 
     likelihood_dct : dict
         Dictionary of likelihood operators that is
@@ -107,6 +107,8 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}):
     reset = _comma_separated_str_to_list(cfg["reset"], total_iterations, allow_none=True)
 
     def callback(sl, iglobal, position):
+        if inspect_callback is not None:
+            inspect_callback(sl, iglobal, position)
         # Minisanity
         lh = res["likelihood_energy"](iglobal)
         s = "\n".join(

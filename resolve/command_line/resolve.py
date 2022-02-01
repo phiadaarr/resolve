@@ -75,9 +75,24 @@ def main():
     set_verbosity(False)
     # /Profiling
 
+    def inspect_callback(sl, iglobal, position):
+        from ..plot.baseline_histogram import baseline_histogram
+
+        sky_mean = sl.average(sky)
+        for ii, oo in enumerate(obs_science):
+            from ..response_new import InterferometryResponse
+            model_vis = InterferometryResponse(oo, sky.target)(sky_mean)
+            baseline_histogram(f"baseline_data_weights_iter{iglobal}_obs{ii}.png",
+                               model_vis, oo, 100, weight=oo.weight)
+            if weights is None:
+                continue
+            weights_mean = sl.average(weights[ii])
+            baseline_histogram(f"baseline_model_weights_iter{iglobal}_obs{ii}.png",
+                               model_vis, oo, 100, weight=weights_mean)
+
     # Assumption: likelihood is not MPI distributed
     get_comm = comm
-    ift.optimize_kl(**parse_optimize_kl_config(cfg["optimization"], lhs, domains),
+    ift.optimize_kl(**parse_optimize_kl_config(cfg["optimization"], lhs, domains, inspect_callback),
                     plottable_operators=operators, comm=get_comm, overwrite=True,
                     plot_latent=True)
 

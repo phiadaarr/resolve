@@ -14,8 +14,10 @@ def baseline_histogram(file_name, vis, observation, bins, weight=None):
     uvwlen = observation.effective_uvwlen().val
     pdom = vis.domain[0]
 
+    if isinstance(bins, int):
+        bins = np.linspace(uvwlen.min(), uvwlen.max(), num=bins, endpoint=True)
     assert np.min(uvwlen) >= np.min(bins)
-    assert np.max(uvwlen) < np.max(bins)
+    assert np.max(uvwlen) <= np.max(bins)
     assert np.all(np.sort(bins) == np.array(bins))
 
     fig, (ax0, ax1) = plt.subplots(nrows=2, ncols=1, sharex=True)
@@ -37,7 +39,9 @@ def baseline_histogram(file_name, vis, observation, bins, weight=None):
         xs = []
         for ii in range(len(bins) - 1):
             mi, ma = bins[ii], bins[ii+1]
-            inds = np.logical_and(luvwlen >= mi, luvwlen < ma)
+            inds = np.logical_and(luvwlen >= mi,
+                                  luvwlen <= ma if ii == len(bins)-2 else
+                                  luvwlen < ma)
             if np.sum(inds) == 0:
                 continue
             weighted_average = np.average(lvis[inds], weights=lweight[inds])
@@ -49,6 +53,8 @@ def baseline_histogram(file_name, vis, observation, bins, weight=None):
         ax1.scatter(xs, nys)
     ax1.set_ylabel("Number visibilities")
     ax1.set_xlabel("Effective baseline length [1/arcmin]")
+    ax0.axhline(1, linestyle="--", alpha=0.5, color="k")
+    ax0.set_ylim([1e-1, 1e3])
     ax0.legend()
 
     plt.tight_layout()
