@@ -205,7 +205,7 @@ def _comma_separated_str_to_list(cfg, length, allow_none=False, output_type=None
     # Parse *
     if lst.count("*") > 1:
         raise ValueError("Only one * allowed")
-    if lst.count("*") == 1 and len(lst) != length:
+    if lst.count("*") == 1 and len(lst) <= length:
         ind = lst.index("*")
         if ind == 0:
             raise ValueError("* at beginning not allowed")

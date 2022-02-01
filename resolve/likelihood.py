@@ -122,6 +122,8 @@ def ImagingLikelihood(
     cops = _duplicate(_obj2list(calibration_operator, ift.Operator), len(obs))
     icovs = _duplicate(_obj2list(inverse_covariance_operator, ift.Operator),
                        len(obs))
+    if len(obs) == 0:
+        raise ValueError("List of observations is empty")
 
     energy = []
     data, model_data, icov_at = [], [], []
