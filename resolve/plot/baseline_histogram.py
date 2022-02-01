@@ -54,7 +54,8 @@ def baseline_histogram(file_name, vis, observation, bins, weight=None):
     ax1.set_ylabel("Number visibilities")
     ax1.set_xlabel("Effective baseline length [1/arcmin]")
     ax0.axhline(1, linestyle="--", alpha=0.5, color="k")
-    ax0.set_ylim([1e-1, 1e3])
+    ymin, ymax = ax0.get_ylim()
+    ax0.set_ylim([min([ymin, 1e-2]), max([ymax, 1e2])])
     ax0.legend()
 
     plt.tight_layout()
