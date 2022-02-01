@@ -11,7 +11,7 @@ def baseline_histogram(file_name, vis, observation, bins, weight=None):
     import matplotlib.pyplot as plt
 
     assert vis.domain == observation.vis.domain
-    uvwlen = obs.effective_uvwlen().val
+    uvwlen = observation.effective_uvwlen().val
     pdom = vis.domain[0]
 
     assert np.min(uvwlen) >= np.min(bins)
@@ -54,10 +54,3 @@ def baseline_histogram(file_name, vis, observation, bins, weight=None):
     plt.tight_layout()
     plt.savefig(file_name)
     plt.close()
-
-
-
-mi = obs.effective_uvwlen().val.min()
-ma = obs.effective_uvwlen().val.max()
-bins = list(ift.PowerSpace.linear_binbounds(100, mi, ma)) + [np.inf]
-baseline_histogram("test.png", obs.vis, obs, bins, weight=obs.weight)

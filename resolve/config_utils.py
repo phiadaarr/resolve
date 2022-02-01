@@ -107,6 +107,7 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}):
     reset = _comma_separated_str_to_list(cfg["reset"], total_iterations, allow_none=True)
 
     def callback(sl, iglobal, position):
+        # Minisanity
         lh = res["likelihood_energy"](iglobal)
         s = "\n".join(
             ["", "",
@@ -121,10 +122,13 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}):
             with open(os.path.join(res["output_directory"], "log.txt"), "a") as f:
                 f.write(s)
             print(s)
+        # /Minisanity
 
+        # Reset parts of the latent space
         if reset[iglobal] is not None:
             reset_domain = constants_dct[reset[iglobal]]
             return ift.MultiField.union([position, 0.1*ift.from_random(reset_domain)])
+        # /Reset parts of the latent space
 
     res["inspect_callback"] = callback
     constants_dct[None] = ift.MultiDomain.make({})
