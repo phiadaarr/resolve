@@ -2,16 +2,17 @@
 # Copyright(C) 2021-2022 Max-Planck-Society
 # Author: Philipp Arras
 
-import configparser
 import os
 import sys
+from argparse import ArgumentParser
+from configparser import ConfigParser
 from functools import reduce
 from operator import add
 
 import nifty8 as ift
 
 from ..config_utils import parse_data_config, parse_optimize_kl_config
-from ..global_config import set_verbosity
+from ..global_config import set_verbosity, set_nthreads
 from ..likelihood import ImagingLikelihood
 from ..mpi import barrier, comm, master
 from ..sky_model import sky_model_diffuse, sky_model_points
@@ -20,9 +21,15 @@ from ..weighting_model import weighting_model
 
 
 def main():
-    cfg_file_name = sys.argv[1]
-    cfg = configparser.ConfigParser()
-    cfg.read(cfg_file_name)
+    parser = ArgumentParser()
+    parser.add_argument("config_file")
+    parser.add_argument("-j", type=int, default=1,
+                        help="Number of threads for thread parallelization")
+    args = parser.parse_args()
+
+    cfg = ConfigParser()
+    cfg.read(args.config_file)
+    set_nthreads(args.j)
 
     obs_calib_flux, obs_calib_phase, obs_science = parse_data_config(cfg)
 

@@ -37,7 +37,9 @@ or, if you have `mpi4py` installed:
 ``` sh
 mpirun -np <ntasks> resolve cygnusa.cfg
 ```
-which should speed up the computation. The number of threads used *per task* can be set in the configuration file `cygnusa.cfg` in the section `[technical]/nthreads`. The number threads multiplied by the number of MPI tasks should not exceed the number CPU cores available on the machine.
+which should speed up the computation. The number of threads used *per task* can
+be set via `-j`.  The number threads multiplied by the number of MPI tasks
+should not exceed the number CPU cores available on the machine.
 
 ### Multi-frequency imaging
 - Download the [data](https://www.philipp-arras.de/assets/mf_test_data.npz) and unpack it.

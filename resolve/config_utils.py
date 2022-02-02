@@ -12,7 +12,7 @@ import numpy as np
 
 from .data.ms_import import ms2observations
 from .data.observation import Observation
-from .global_config import (set_double_precision, set_epsilon, set_nthreads,
+from .global_config import (set_double_precision, set_epsilon,
                             set_wgridding)
 from .mpi import master
 
@@ -21,7 +21,6 @@ def parse_data_config(cfg):
     set_epsilon(cfg["response"].getfloat("epsilon"))
     set_wgridding(strtobool(cfg["response"]["wgridding"]))
     set_double_precision(cfg["response"].getboolean("double precision"))
-    set_nthreads(cfg["response"].getint("nthreads"))
 
     obs_calib_phase = _cfg_to_observations(cfg["data"]["phase calibrator"])
     obs_calib_flux = _cfg_to_observations(cfg["data"]["flux calibrator"])
