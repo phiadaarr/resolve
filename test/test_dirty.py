@@ -37,9 +37,9 @@ def test_dirty(with_zero_mode, weights, flux_source, npol, weighting, nx, ny, fo
     psf = rve.dirty_image(obs, weighting, sky_domain, vis=ift.full(obs.vis.domain, 1.+0j))
 
     if with_zero_mode:
-        np.testing.assert_allclose(dirty.ducktape_left(sdom).s_integrate(), flux_source)
+        np.testing.assert_allclose(dirty.ducktape_left(sdom).s_integrate(), flux_source, rtol=1e-6)
     else:
-        np.testing.assert_allclose(dirty.ducktape_left(sdom).s_integrate(), 0.)
+        np.testing.assert_allclose(dirty.ducktape_left(sdom).s_integrate(), 0., rtol=1e-6)
 
 
 def _generate_testing_data(sdom, npol, weights, flux_source, with_zero_mode):
