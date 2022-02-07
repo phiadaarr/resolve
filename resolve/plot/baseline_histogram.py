@@ -67,7 +67,7 @@ def baseline_histogram(file_name, vis, observation, bins, weight=None):
 
 
 def _red_chi_sq_limits(mi, ma):
-    return min([mi, 1e-2]), max([ma, 1e2])
+    return min([mi, 1e-1]), max([ma, 1e1])
 
 
 def antenna_matrix(file_name, vis, observation, weight=None, antenna_dct=None):
