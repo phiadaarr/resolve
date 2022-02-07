@@ -282,19 +282,24 @@ def read_ms_i(name, data_column, field, spectral_window, pol_indices, pol_summat
         if t.nrows() == 0:
             ptg = None
         else:
-            ptg = np.empty((nrealrows, 1, 2), dtype=np.float64)
-            start, realstart = 0, 0
-            while start < nrow:
-                if verbosity():
-                    print("Second pass:", f"{(start/nrow*100):.1f}%", end="\r")
-                stop = _ms_stop(start, nrow)
-                realstop = realstart + np.sum(active_rows[start:stop])
-                if realstop > realstart:
-                    allrows = stop - start == realstop - realstart
-                    tptg = t.getcol("DIRECTION", startrow=start, nrow=stop - start)
-                    tptg = tptg[active_rows[start:stop]]
-                    ptg[realstart:realstop] = tptg
-                start, realstart = stop, realstop
+            if t.nrows() == active_rows.size:
+                ptg = np.empty((nrealrows, 1, 2), dtype=np.float64)
+                start, realstart = 0, 0
+                while start < nrow:
+                    if verbosity():
+                        print("Second pass:", f"{(start/nrow*100):.1f}%", end="\r")
+                    stop = _ms_stop(start, nrow)
+                    realstop = realstart + np.sum(active_rows[start:stop])
+                    if realstop > realstart:
+                        allrows = stop - start == realstop - realstart
+                        tptg = t.getcol("DIRECTION", startrow=start, nrow=stop - start)
+                        tptg = tptg[active_rows[start:stop]]
+                        ptg[realstart:realstop] = tptg
+                    start, realstart = stop, realstop
+            else:
+                print(f"WARN: number of rows of POINTING table ({t.nrows()}) does not match number "
+                      f"of rows of main table ({active_rows.size}). Ignore POINTING table...")
+                ptg = None
 
     my_asserteq(wgt.shape, vis.shape)
     vis = np.ascontiguousarray(_ms2resolve_transpose(vis))
