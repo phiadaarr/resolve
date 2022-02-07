@@ -2,6 +2,7 @@
 # Copyright(C) 2021 Max-Planck-Society
 # Author: Philipp Arras
 
+import os
 from functools import reduce
 from operator import add
 
@@ -64,6 +65,34 @@ def weighting_model(cfg, obs, sky_domain):
             op.append(tmpop)
         return op, additional
     raise NotImplementedError
+
+
+def visualize_weights(obs_science, sl, iglobal, sky, weights, output_directory, io):
+    from .plot.baseline_histogram import baseline_histogram
+    from .response_new import InterferometryResponse
+
+    sky_mean = sl.average(sky)
+
+    for ii, oo in enumerate(obs_science):
+        # data weights
+        model_vis = InterferometryResponse(oo, sky.target)(sky_mean)
+        dd = os.path.join(output_directory, f"normlized data residuals obs{ii} (data weights)")
+        if io:
+            os.makedirs(dd, exist_ok=True)
+            fname = os.path.join(dd, f"baseline_data_weights_iter{iglobal}_obs{ii}.png")
+            baseline_histogram(fname, model_vis-oo.vis, oo, 100, weight=oo.weight)
+        # /data weights
+
+        # learned weights
+        if weights is None:
+            continue
+        dd = os.path.join(output_directory, f"normlized data residuals obs{ii} (learned weights)")
+        weights_mean = sl.average(weights[ii])
+        if io:
+            os.makedirs(dd, exist_ok=True)
+            fname = os.path.join(dd, f"baseline_model_weights_iter{iglobal}_obs{ii}.png")
+            baseline_histogram(fname, model_vis-oo.vis, oo, 100, weight=weights_mean)
+        # /learned weights
 
 
 def _polfreq_key(stokes_label, freq):
