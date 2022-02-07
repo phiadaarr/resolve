@@ -3,16 +3,17 @@
 # Author: Philipp Arras
 
 import os
+from ..constants import ARCMIN2RAD
+from ..data.observation import unique_antennas
 
 import nifty8 as ift
 import numpy as np
 
-import resolve as rve
+import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 
 
 def baseline_histogram(file_name, vis, observation, bins, weight=None):
-    import matplotlib.pyplot as plt
-
     assert vis.domain == observation.vis.domain
     uvwlen = observation.effective_uvwlen().val
     pdom = vis.domain[0]
@@ -51,16 +52,89 @@ def baseline_histogram(file_name, vis, observation, bins, weight=None):
             xs.append(mi + 0.5*(ma-mi))
             ys.append(weighted_average)
             nys.append(np.sum(inds))
-        xs = np.array(xs) * rve.ARCMIN2RAD
+        xs = np.array(xs) * ARCMIN2RAD
         ax0.scatter(xs, ys, label=pp, alpha=0.5)
         ax1.scatter(xs, nys)
     ax1.set_ylabel("Number visibilities")
     ax1.set_xlabel("Effective baseline length [1/arcmin]")
     ax0.axhline(1, linestyle="--", alpha=0.5, color="k")
-    ymin, ymax = ax0.get_ylim()
-    ax0.set_ylim([min([ymin, 1e-2]), max([ymax, 1e2])])
+    ax0.set_ylim(*_red_chi_sq_limits(*ax0.get_ylim()))
     ax0.legend()
 
+    plt.tight_layout()
+    plt.savefig(file_name)
+    plt.close()
+
+
+def _red_chi_sq_limits(mi, ma):
+    return min([mi, 1e-2]), max([ma, 1e2])
+
+
+def antenna_matrix(file_name, vis, observation, weight=None, antenna_dct=None):
+    if antenna_dct is not None:
+        raise NotImplementedError
+
+    ant1 = observation.ant1
+    ant2 = observation.ant2
+    pdom = vis.domain[0]
+    n_antennas = max([np.max(ant1), np.max(ant2)])
+
+    # Compute antenna distances
+    coords = observation.antenna_coordinates
+    lmat = np.empty((n_antennas, n_antennas))
+    lmat[()] = np.nan
+    for aa in range(n_antennas):
+        for bb in range(aa+1):
+            lmat[aa, bb] = lmat[bb, aa] = np.linalg.norm(coords[aa] - coords[bb])
+    # /Compute antenna distances
+
+    fig, axs = plt.subplots(nrows=3, ncols=observation.npol, figsize=(4*observation.npol, 12))
+    axs = list(np.array(axs).ravel())
+    for pp in pdom.labels:
+        ii = pdom.label2index(pp)
+        lvis = vis.val[ii]
+        if np.iscomplexobj(lvis):
+            lvis = np.abs(lvis)
+        if weight is None:
+            lweight = np.ones(lvis.shape)
+        else:
+            lweight = weight.val[ii]
+
+        mat = np.empty((n_antennas, n_antennas))
+        nmat = np.empty((n_antennas, n_antennas))
+        mat[()] = np.nan
+        nmat[()] = np.nan
+        assert mat.shape == lmat.shape == nmat.shape
+        xs = []
+        for aa in range(n_antennas):
+            for bb in range(aa+1):
+                inds = np.logical_or(np.logical_and(ant1 == aa, ant2 == bb),
+                                     np.logical_and(ant1 == bb, ant2 == aa))
+                if np.sum(inds) == 0:
+                    continue
+                weighted_average = np.mean(lvis[inds]* lvis[inds] * lweight[inds])
+                mat[aa, bb] = mat[bb, aa] = weighted_average
+                nmat[aa, bb] = nmat[bb, aa] = np.sum(inds)
+        axx = axs.pop(0)
+        axx.set_xlabel("Antenna label")
+        axx.set_ylabel("Antenna label")
+        im = axx.matshow(mat,
+                norm=LogNorm(*_red_chi_sq_limits(np.nanmin(mat), np.nanmax(mat))),
+                cmap="seismic"
+                )
+        plt.colorbar(im, ax=axx, orientation="horizontal", label=f"Normalized residuals ({pp})")
+
+        axx = axs.pop(0)
+        axx.set_xlabel("Antenna label")
+        axx.set_ylabel("Antenna label")
+        im = axx.matshow(nmat, vmin=0)
+        plt.colorbar(im, ax=axx, orientation="horizontal", label=f"# visibilities ({pp})")
+
+        axx = axs.pop(0)
+        axx.set_xlabel("Antenna label")
+        axx.set_ylabel("Antenna label")
+        im = axx.matshow(lmat, norm=LogNorm())
+        plt.colorbar(im, ax=axx, orientation="horizontal", label="Baseline length [m]")
     plt.tight_layout()
     plt.savefig(file_name)
     plt.close()
@@ -74,11 +148,14 @@ def visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_
     for ii, oo in enumerate(obs_science):
         # data weights
         model_vis = InterferometryResponse(oo, sky.target)(sky_mean)
-        dd = os.path.join(output_directory, f"normlized data residuals obs{ii} (data weights)")
         if io:
+            dd = os.path.join(output_directory, f"normlized data residuals obs{ii} (data weights)")
             os.makedirs(dd, exist_ok=True)
             fname = os.path.join(dd, f"baseline_data_weights_iter{iglobal}_obs{ii}.png")
             baseline_histogram(fname, model_vis-oo.vis, oo, 100, weight=oo.weight)
+
+            fname = os.path.join(dd, f"antenna_data_weights_iter{iglobal}_obs{ii}.png")
+            antenna_matrix(fname, model_vis-oo.vis, oo, weight=oo.weight)
         # /data weights
 
         # learned weights
@@ -90,4 +167,7 @@ def visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_
             os.makedirs(dd, exist_ok=True)
             fname = os.path.join(dd, f"baseline_model_weights_iter{iglobal}_obs{ii}.png")
             baseline_histogram(fname, model_vis-oo.vis, oo, 100, weight=weights_mean)
+
+            fname = os.path.join(dd, f"antenna_model_weights_iter{iglobal}_obs{ii}.png")
+            antenna_matrix(fname, model_vis-oo.vis, oo, weight=weights_mean)
         # /learned weights

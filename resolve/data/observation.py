@@ -650,6 +650,13 @@ class Observation(BaseObservation):
             return [f"{a} {b}" for a, b in zip(tab["NAME"], tab["STATION"])]
         raise NotImplementedError("ANTENNA subtable not available.")
 
+    @property
+    def antenna_coordinates(self):
+        # FIXME Merge this into AntennaPositions
+        if "ANTENNA" not in self._auxiliary_tables:
+            return None
+        return self._auxiliary_tables["ANTENNA"]["POSITION"]
+
     def effective_uvw(self):
         out = np.einsum("ij,k->jik", self.uvw, self._freq / SPEEDOFLIGHT)
         my_asserteq(out.shape, (3, self.nrow, self.nfreq))
