@@ -2,9 +2,8 @@
 # Copyright(C) 2021 Max-Planck-Society
 # Author: Philipp Arras
 
-import numpy as np
-
 import nifty8 as ift
+import numpy as np
 
 from ..data.observation import SingleDishObservation
 

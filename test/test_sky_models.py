@@ -4,12 +4,13 @@
 
 import configparser
 from os.path import join
+from tempfile import TemporaryDirectory
 
 import nifty8 as ift
 import numpy as np
 import pytest
+
 import resolve as rve
-from tempfile import TemporaryDirectory
 
 pmp = pytest.mark.parametrize
 np.seterr(all="raise")

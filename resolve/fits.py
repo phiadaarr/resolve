@@ -5,9 +5,8 @@
 import time
 from os.path import splitext
 
-import numpy as np
-
 import nifty8 as ift
+import numpy as np
 
 from .constants import DEG2RAD
 from .mpi import onlymaster
@@ -15,8 +14,8 @@ from .mpi import onlymaster
 
 @onlymaster
 def field2fits(field, file_name, overwrite, direction=None):
-    from astropy.time import Time
     import astropy.io.fits as pyfits
+    from astropy.time import Time
 
     dom0 = field.domain
     assert len(dom0) == 1

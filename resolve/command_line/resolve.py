@@ -12,12 +12,13 @@ from operator import add
 import nifty8 as ift
 
 from ..config_utils import parse_data_config, parse_optimize_kl_config
-from ..global_config import set_verbosity, set_nthreads
+from ..global_config import set_nthreads, set_verbosity
 from ..likelihood import ImagingLikelihood
 from ..mpi import barrier, comm, master
+from ..plot.baseline_histogram import visualize_weighted_residuals
 from ..sky_model import sky_model_diffuse, sky_model_points
 from ..util import profile_function
-from ..weighting_model import weighting_model, visualize_weights
+from ..weighting_model import weighting_model
 
 
 def main():
@@ -84,7 +85,7 @@ def main():
     # /Profiling
 
     def inspect_callback(sl, iglobal, position):
-        visualize_weights(obs_science, sl, iglobal, sky, weights, outdir, io=master)
+        visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, outdir, io=master)
 
     # Assumption: likelihood is not MPI distributed
     get_comm = comm

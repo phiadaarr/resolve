@@ -2,8 +2,11 @@
 # Copyright(C) 2021-2022 Max-Planck-Society
 # Author: Philipp Arras
 
+import os
+
 import nifty8 as ift
 import numpy as np
+
 import resolve as rve
 
 
@@ -61,3 +64,30 @@ def baseline_histogram(file_name, vis, observation, bins, weight=None):
     plt.tight_layout()
     plt.savefig(file_name)
     plt.close()
+
+
+def visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_directory, io):
+    from ..response_new import InterferometryResponse
+
+    sky_mean = sl.average(sky)
+
+    for ii, oo in enumerate(obs_science):
+        # data weights
+        model_vis = InterferometryResponse(oo, sky.target)(sky_mean)
+        dd = os.path.join(output_directory, f"normlized data residuals obs{ii} (data weights)")
+        if io:
+            os.makedirs(dd, exist_ok=True)
+            fname = os.path.join(dd, f"baseline_data_weights_iter{iglobal}_obs{ii}.png")
+            baseline_histogram(fname, model_vis-oo.vis, oo, 100, weight=oo.weight)
+        # /data weights
+
+        # learned weights
+        if weights is None:
+            continue
+        dd = os.path.join(output_directory, f"normlized data residuals obs{ii} (learned weights)")
+        weights_mean = sl.average(weights[ii])
+        if io:
+            os.makedirs(dd, exist_ok=True)
+            fname = os.path.join(dd, f"baseline_model_weights_iter{iglobal}_obs{ii}.png")
+            baseline_histogram(fname, model_vis-oo.vis, oo, 100, weight=weights_mean)
+        # /learned weights

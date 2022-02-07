@@ -2,12 +2,12 @@
 # Copyright(C) 2019-2021 Max-Planck-Society
 
 import os
-from os.path import isdir, join, expanduser
+from os.path import expanduser, isdir, join
 
 import numpy as np
 
-from ..util import my_assert, my_assert_isinstance, my_asserteq
 from ..global_config import verbosity
+from ..util import my_assert, my_assert_isinstance, my_asserteq
 from .antenna_positions import AntennaPositions
 from .auxiliary_table import AuxiliaryTable
 from .observation import Observation

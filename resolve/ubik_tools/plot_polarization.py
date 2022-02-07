@@ -1,12 +1,13 @@
-import matplotlib.pyplot as plt
 import pickle
-from matplotlib.colors import LogNorm
+
 import matplotlib as mpl
-from matplotlib.ticker import PercentFormatter, StrMethodFormatter
+import matplotlib.pyplot as plt
 import nifty8 as ift
 import numpy as np
-from ..irg_space import IRGSpace
+from matplotlib.colors import LogNorm
+from matplotlib.ticker import PercentFormatter, StrMethodFormatter
 
+from ..irg_space import IRGSpace
 from ..util import assert_sky_domain
 
 

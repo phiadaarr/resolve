@@ -5,17 +5,16 @@
 import time
 from os.path import splitext
 
+import nifty8 as ift
 import numpy as np
 
-import nifty8 as ift
-
-from ..util import assert_sky_domain
 from ..constants import DEG2RAD
+from ..util import assert_sky_domain
 
 
 def field2fits(field, file_name, observations=[]):
-    from astropy.time import Time
     import astropy.io.fits as pyfits
+    from astropy.time import Time
     
     if len(observations) == 0:
         direction = None

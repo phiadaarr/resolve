@@ -8,6 +8,7 @@ from os import makedirs
 from os.path import join, split, splitext
 
 import numpy as np
+
 import resolve as rve
 
 if __name__ == "__main__":

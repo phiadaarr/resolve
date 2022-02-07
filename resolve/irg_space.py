@@ -13,9 +13,8 @@
 #
 # Copyright(C) 2013-2020 Max-Planck-Society
 
-import numpy as np
-
 import nifty8 as ift
+import numpy as np
 
 
 class IRGSpace(ift.StructuredDomain):

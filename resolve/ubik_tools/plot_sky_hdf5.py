@@ -3,22 +3,24 @@
 # Author: Philipp Arras
 
 import argparse
-from warnings import warn
-import pickle
-from matplotlib.colors import LogNorm, Normalize, CenteredNorm
 import os
+import pickle
+from warnings import warn
+
 import h5py
+import matplotlib.pyplot as plt
 import nifty8 as ift
 import numpy as np
-import matplotlib.pyplot as plt
+from matplotlib.colors import CenteredNorm, LogNorm, Normalize
 
+from ..sky_model import assert_sky_domain, default_sky_domain
 from .fits import field2fits
-from ..sky_model import default_sky_domain, assert_sky_domain
 
 # For eval() spaces
 from nifty8 import DomainTuple, MultiDomain
 from nifty8.domains import *
-from resolve import PolarizationSpace, IRGSpace
+from ..irg_space import IRGSpace
+from ..polarization_space import PolarizationSpace
 # /For eval() spaces
 
 

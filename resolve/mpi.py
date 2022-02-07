@@ -3,8 +3,10 @@
 # Author: Philipp Arras
 
 import functools
-from .util import my_asserteq
+
 import nifty8 as ift
+
+from .util import my_asserteq
 
 try:
     from mpi4py import MPI

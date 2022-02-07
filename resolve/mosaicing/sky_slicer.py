@@ -2,9 +2,8 @@
 # Copyright(C) 2020 Max-Planck-Society
 # Author: Philipp Arras
 
-import numpy as np
-
 import nifty8 as ift
+import numpy as np
 
 
 class SkySlicer(ift.LinearOperator):

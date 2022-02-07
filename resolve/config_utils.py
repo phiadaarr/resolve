@@ -12,8 +12,7 @@ import numpy as np
 
 from .data.ms_import import ms2observations
 from .data.observation import Observation
-from .global_config import (set_double_precision, set_epsilon,
-                            set_wgridding)
+from .global_config import set_double_precision, set_epsilon, set_wgridding
 from .mpi import master
 
 

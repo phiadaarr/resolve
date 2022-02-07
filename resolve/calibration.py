@@ -2,9 +2,8 @@
 # Copyright(C) 2019-2020 Max-Planck-Society
 # Author: Philipp Arras
 
-import numpy as np
-
 import nifty8 as ift
+import numpy as np
 
 from .data.observation import Observation
 from .util import my_assert, my_assert_isinstance, my_asserteq

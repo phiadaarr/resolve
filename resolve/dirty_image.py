@@ -6,10 +6,10 @@ import nifty8 as ift
 import numpy as np
 
 from .constants import str2rad
+from .global_config import set_epsilon, set_wgridding
 from .irg_space import IRGSpace
 from .polarization_space import PolarizationSpace
 from .response_new import InterferometryResponse
-from .global_config import set_epsilon, set_wgridding
 from .util import assert_sky_domain
 
 

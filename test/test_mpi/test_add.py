@@ -5,11 +5,11 @@
 from functools import reduce
 from operator import add
 from types import GeneratorType
-from mpi4py import MPI
-
-import numpy as np
 
 import nifty8 as ift
+import numpy as np
+from mpi4py import MPI
+
 import resolve as rve
 
 

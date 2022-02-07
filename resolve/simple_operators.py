@@ -5,9 +5,8 @@
 from functools import reduce
 from operator import add
 
-import numpy as np
-
 import nifty8 as ift
+import numpy as np
 
 from .util import my_assert, my_assert_isinstance, my_asserteq
 

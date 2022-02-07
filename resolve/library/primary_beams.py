@@ -2,13 +2,12 @@
 # Copyright(C) 2019-2021 Max-Planck-Society
 # Author: Philipp Arras
 
+import nifty8 as ift
 import numpy as np
 import scipy.special as sc
 
-import nifty8 as ift
-
 from ..constants import ARCMIN2RAD, SPEEDOFLIGHT
-from ..util import my_assert, assert_sky_domain
+from ..util import assert_sky_domain, my_assert
 from .meerkat_beam import JimBeam
 
 

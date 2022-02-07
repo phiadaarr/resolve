@@ -4,10 +4,10 @@
 
 from os.path import join
 
+import nifty8 as ift
 import numpy as np
 from ducc0.fft import good_size
 
-import nifty8 as ift
 import resolve as rve
 
 

@@ -4,10 +4,10 @@
 
 from os.path import join
 
+import nifty8 as ift
 import numpy as np
 import pytest
 
-import nifty8 as ift
 import resolve as rve
 
 pmp = pytest.mark.parametrize

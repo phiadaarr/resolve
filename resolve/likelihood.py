@@ -10,7 +10,8 @@ import numpy as np
 
 from .data.observation import Observation
 from .response_new import InterferometryResponse
-from .util import my_assert, my_assert_isinstance, my_asserteq, _obj2list, _duplicate
+from .util import (_duplicate, _obj2list, my_assert, my_assert_isinstance,
+                   my_asserteq)
 
 
 def _get_mask(observation):

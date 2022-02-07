@@ -10,10 +10,11 @@ from ducc0.wgridder.experimental import dirty2vis, vis2dirty
 
 from .constants import SPEEDOFLIGHT
 from .data.observation import Observation
-from .polarization_space import polarization_converter
 from .global_config import epsilon, np_dtype, nthreads, verbosity, wgridding
+from .polarization_space import polarization_converter
 from .util import (assert_sky_domain, my_assert, my_assert_isinstance,
                    my_asserteq)
+
 
 def InterferometryResponse(observation, domain):
     R = _InterferometryResponse(observation, domain)
