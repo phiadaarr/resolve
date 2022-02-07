@@ -5,9 +5,9 @@ import matplotlib as mpl
 from matplotlib.ticker import PercentFormatter, StrMethodFormatter
 import nifty8 as ift
 import numpy as np
-from ...irg_space import IRGSpace
+from ..irg_space import IRGSpace
 
-from ...util import assert_sky_domain
+from ..util import assert_sky_domain
 
 
 def polarization_overview(sky_field, name=None, offset=None):

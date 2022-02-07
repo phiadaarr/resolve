@@ -14,7 +14,11 @@ setup(
     zip_safe=True,
     dependency_links=[],
     install_requires=["ducc0"],  # and nifty8
-    entry_points={"console_scripts": ["resolve=resolve.command_line.resolve:main"]},
+    entry_points={"console_scripts":
+        [
+            "resolve=resolve.command_line.resolve:main",
+            "plot-sky=resolve.ubik_tools.plot_sky_hdf5:cmdline_visualize_sky_hdf5",
+        ]},
     license="GPLv3",
     classifiers=[
         "Development Status :: 3 - Alpha",

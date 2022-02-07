@@ -1,4 +1,3 @@
-from . import ubik_tools
 from .calibration import CalibrationDistributor, calibration_distribution
 from .config_utils import *
 from .constants import *
@@ -30,3 +29,5 @@ from .simple_operators import *
 from .sky_model import *
 from .util import *
 from .weighting_model import *
+
+from . import ubik_tools
