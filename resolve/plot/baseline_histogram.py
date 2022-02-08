@@ -5,6 +5,7 @@
 import os
 from ..constants import ARCMIN2RAD
 from ..data.observation import unique_antennas
+from ..ubik_tools.plot_sky_hdf5 import _optimal_subplot_distribution
 
 import nifty8 as ift
 import numpy as np
@@ -13,7 +14,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 
 
-def baseline_histogram(file_name, vis, observation, bins, weight=None):
+def baseline_histogram(file_name, vis, observation, bins, weight):
     assert vis.domain == observation.vis.domain
     uvwlen = observation.effective_uvwlen().val
     pdom = vis.domain[0]
@@ -33,10 +34,7 @@ def baseline_histogram(file_name, vis, observation, bins, weight=None):
             lvis = np.abs(lvis)
             ax0.set_yscale("log")
 
-        if weight is None:
-            lweight = np.ones(lvis.shape)
-        else:
-            lweight = weight.val[ii]
+        lweight = weight.val[ii]
 
         ys = []
         nys = []
@@ -70,10 +68,7 @@ def _red_chi_sq_limits(mi, ma):
     return min([mi, 1e-1]), max([ma, 1e1])
 
 
-def antenna_matrix(file_name, vis, observation, weight=None, antenna_dct=None):
-    if antenna_dct is not None:
-        raise NotImplementedError
-
+def antenna_matrix(file_name, vis, observation, weight):
     ant1 = observation.ant1
     ant2 = observation.ant2
     pdom = vis.domain[0]
@@ -95,10 +90,7 @@ def antenna_matrix(file_name, vis, observation, weight=None, antenna_dct=None):
         lvis = vis.val[ii]
         if np.iscomplexobj(lvis):
             lvis = np.abs(lvis)
-        if weight is None:
-            lweight = np.ones(lvis.shape)
-        else:
-            lweight = weight.val[ii]
+        lweight = weight.val[ii]
 
         mat = np.empty((n_antennas, n_antennas))
         nmat = np.empty((n_antennas, n_antennas))
@@ -153,6 +145,32 @@ def antenna_matrix(file_name, vis, observation, weight=None, antenna_dct=None):
     plt.close()
 
 
+def scatter_vis(file_name, vis, observation, weight, lim):
+    fig, axs = plt.subplots(**_optimal_subplot_distribution(observation.npol))
+    axs = list(np.array(axs).ravel())
+    lim = abs(float(lim))
+    pdom = vis.domain[0]
+    for pp in pdom.labels:
+        ii = pdom.label2index(pp)
+        lvis = vis.val[ii]
+        lweight = weight.val[ii]
+        points = lvis * lweight
+        xs, ys = points.real, points.imag
+        xs = np.clip(xs, -0.95*lim, 0.95*lim)
+        ys = np.clip(ys, -0.95*lim, 0.95*lim)
+        axx = axs.pop(0)
+        axx.scatter(xs, ys, alpha=0.2, s=1)
+        axx.set_xlim([-lim, lim])
+        axx.set_ylim([-lim, lim])
+        axx.set_xlabel("Real")
+        axx.set_ylabel("Imag")
+        axx.set_aspect("equal")
+        axx.set_title(f"Weighted residuals ({pp})")
+    plt.tight_layout()
+    plt.savefig(file_name)
+    plt.close()
+
+
 def visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_directory, io):
     from ..response_new import InterferometryResponse
 
@@ -165,10 +183,13 @@ def visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_
             dd = os.path.join(output_directory, f"normlized data residuals obs{ii} (data weights)")
             os.makedirs(dd, exist_ok=True)
             fname = os.path.join(dd, f"baseline_data_weights_iter{iglobal}_obs{ii}.png")
-            baseline_histogram(fname, model_vis-oo.vis, oo, 100, weight=oo.weight)
+            baseline_histogram(fname, model_vis-oo.vis, oo, 100, oo.weight)
 
             fname = os.path.join(dd, f"antenna_data_weights_iter{iglobal}_obs{ii}.png")
-            antenna_matrix(fname, model_vis-oo.vis, oo, weight=oo.weight)
+            antenna_matrix(fname, model_vis-oo.vis, oo, oo.weight)
+
+            fname = os.path.join(dd, f"scatter_data_weights_iter{iglobal}_obs{ii}.png")
+            scatter_vis(fname, model_vis-oo.vis, oo, oo.weight, 10)
         # /data weights
 
         # learned weights
@@ -179,10 +200,13 @@ def visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_
         if io:
             os.makedirs(dd, exist_ok=True)
             fname = os.path.join(dd, f"baseline_model_weights_iter{iglobal}_obs{ii}.png")
-            baseline_histogram(fname, model_vis-oo.vis, oo, 100, weight=weights_mean)
+            baseline_histogram(fname, model_vis-oo.vis, oo, 100, weights_mean)
 
             fname = os.path.join(dd, f"antenna_model_weights_iter{iglobal}_obs{ii}.png")
-            antenna_matrix(fname, model_vis-oo.vis, oo, weight=weights_mean)
+            antenna_matrix(fname, model_vis-oo.vis, oo, weights_mean)
+
+            fname = os.path.join(dd, f"scatter_model_weights_iter{iglobal}_obs{ii}.png")
+            scatter_vis(fname, model_vis-oo.vis, oo, oo.weight, 10)
         # /learned weights
 
 

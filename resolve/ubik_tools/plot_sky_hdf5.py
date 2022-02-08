@@ -189,4 +189,7 @@ def _plot_with_mpl(fld, norm, vmin, vmax, output_file, dpi):
 
 
 def _optimal_subplot_distribution(n):
-    return {"nrows": n, "ncols": 1, "figsize": (10, 10)}
+    ny = int(np.ceil(np.sqrt(n)))
+    nx = int(np.ceil(n/ny))
+    assert nx*ny >= n
+    return {"nrows": ny, "ncols": nx, "figsize": (6*nx, 6*ny)}
