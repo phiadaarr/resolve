@@ -68,7 +68,7 @@ def weighting_model(cfg, obs, sky_domain):
         var = cfg.getfloat("var")
         alpha = cfg.getfloat("alpha")
         theta = cfg.getfloat("theta")
-        op = [ift.GammaOperator(oo.vis.domain, mean=mean, var=var, alpha=alpha, theta=theta)
+        op = [ift.makeOp(oo.weight) @ ift.GammaOperator(oo.vis.domain, mean=mean, var=var, alpha=alpha, theta=theta)
                 for iobs, oo in enumerate(obs)]
         op = [oo.ducktape(f"Observation {iobs}, invcov") for iobs, oo in enumerate(op)]
         return op, {}
