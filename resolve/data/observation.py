@@ -595,6 +595,22 @@ class Observation(BaseObservation):
             print(f"INFO: Flag baseline {ant1_name}-{ant2_name}, {np.sum(ind)}/{self.nrow} rows flagged.")
         return Observation(self._antpos, self._vis, wgt, self._polarization, self._freq, self._auxiliary_tables)
 
+    def flag_station(self, ant_index):
+        ant1 = self.antenna_positions.ant1
+        ant2 = self.antenna_positions.ant2
+        if ant1 is None or ant2 is None:
+            raise RuntimeError("The calibration information needed for flagging a baseline is not "
+                               "available. Please import the measurement set with "
+                               "`with_calib_info=True`.")
+        assert np.all(ant1 < ant2)
+        ind = np.logical_or(ant1 == ant_index, ant2 == ant_index)
+        wgt = self._weight.copy()
+        wgt[:, ind] = 0.
+        if np.sum(ind) > 0:
+            ant_name = self.auxiliary_table("ANTENNA")["STATION"][ant_index]
+            print(f"INFO: Flag station {ant_name}, {np.sum(ind)}/{self.nrow} rows flagged.")
+        return Observation(self._antpos, self._vis, wgt, self._polarization, self._freq, self._auxiliary_tables)
+
     @property
     def nbaselines(self):
         return len(self.baselines())
