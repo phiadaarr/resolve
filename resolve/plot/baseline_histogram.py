@@ -46,7 +46,7 @@ def baseline_histogram(file_name, vis, observation, bins, weight):
                                   luvwlen < ma)
             if np.sum(inds) == 0:
                 continue
-            weighted_average = np.mean(lvis[inds]* lvis[inds] * lweight[inds])
+            weighted_average = np.mean(lvis[inds] * lweight[inds] * lvis[inds])
             xs.append(mi + 0.5*(ma-mi))
             ys.append(weighted_average)
             nys.append(np.sum(lweight[inds] != 0.))
@@ -104,7 +104,7 @@ def antenna_matrix(file_name, vis, observation, weight):
                                      np.logical_and(ant1 == bb, ant2 == aa))
                 if np.sum(inds) == 0:
                     continue
-                weighted_average = np.mean(lvis[inds]*lvis[inds] * lweight[inds])
+                weighted_average = np.mean(lvis[inds] * lweight[inds] * lvis[inds])
                 mat[aa, bb] = mat[bb, aa] = weighted_average
                 nmat[aa, bb] = nmat[bb, aa] = np.sum(lweight[inds] != 0.)
         _zero_to_nan( mat)
@@ -154,7 +154,8 @@ def scatter_vis(file_name, vis, observation, weight, lim):
         ii = pdom.label2index(pp)
         lvis = vis.val[ii]
         lweight = weight.val[ii]
-        points = lvis * lweight
+        ind = lweight != 0.
+        points = lvis[ind] * np.sqrt(lweight[ind])
         xs, ys = points.real, points.imag
         xs = np.clip(xs, -0.95*lim, 0.95*lim)
         ys = np.clip(ys, -0.95*lim, 0.95*lim)
@@ -206,7 +207,7 @@ def visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_
             antenna_matrix(fname, model_vis-oo.vis, oo, weights_mean)
 
             fname = os.path.join(dd, f"scatter_model_weights_iter{iglobal}_obs{ii}.png")
-            scatter_vis(fname, model_vis-oo.vis, oo, oo.weight, 10)
+            scatter_vis(fname, model_vis-oo.vis, oo, weights_mean, 10)
         # /learned weights
 
 
