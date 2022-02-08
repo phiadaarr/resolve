@@ -113,8 +113,7 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}, inspect_call
             ["", "",
              f"Finished index: {iglobal}",
              f"Current datetime: {datetime.now()}",
-             ift.extra.minisanity(lh.data, lh.metric_at_pos, lh.model_data, sl,
-                                  terminal_colors=False),
+             ift.extra.minisanity(lh, sl, terminal_colors=False),
              ""]
             )
         if master:

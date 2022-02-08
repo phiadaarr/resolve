@@ -55,7 +55,7 @@ def _build_gauss_lh_nres(op, mean, invcov):
     my_assert_isinstance(mean, invcov, (ift.Field, ift.MultiField))
     my_asserteq(op.target, mean.domain, invcov.domain)
 
-    lh = ift.GaussianEnergy(mean=mean, inverse_covariance=ift.makeOp(invcov, sampling_dtype=mean.dtype)) @ op
+    lh = ift.GaussianEnergy(data=mean, inverse_covariance=ift.makeOp(invcov, sampling_dtype=mean.dtype)) @ op
     return _Likelihood(lh, mean, lambda x: ift.makeOp(invcov), op)
 
 
@@ -142,7 +142,7 @@ def ImagingLikelihood(
 
         if icov is None:
             icov = ift.makeOp(weight, sampling_dtype=dtype)
-            ee = ift.GaussianEnergy(mean=vis, inverse_covariance=icov) @ R
+            ee = ift.GaussianEnergy(data=vis, inverse_covariance=icov) @ R
             icov_at.append(lambda x: ift.BlockDiagonalOperator(ift.makeDomain({virtual_key: icov.domain}), {virtual_key: icov}))
         else:
             s0, s1 = "_resi", "_icov"
