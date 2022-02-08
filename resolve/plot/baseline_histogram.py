@@ -51,7 +51,7 @@ def baseline_histogram(file_name, vis, observation, bins, weight=None):
             weighted_average = np.mean(lvis[inds]* lvis[inds] * lweight[inds])
             xs.append(mi + 0.5*(ma-mi))
             ys.append(weighted_average)
-            nys.append(np.sum(inds))
+            nys.append(np.sum(lweight[inds] != 0.))
         xs = np.array(xs) * ARCMIN2RAD
         ax0.scatter(xs, ys, label=pp, alpha=0.5)
         ax1.scatter(xs, nys)
@@ -112,9 +112,13 @@ def antenna_matrix(file_name, vis, observation, weight=None, antenna_dct=None):
                                      np.logical_and(ant1 == bb, ant2 == aa))
                 if np.sum(inds) == 0:
                     continue
-                weighted_average = np.mean(lvis[inds]* lvis[inds] * lweight[inds])
+                weighted_average = np.mean(lvis[inds]*lvis[inds] * lweight[inds])
                 mat[aa, bb] = mat[bb, aa] = weighted_average
-                nmat[aa, bb] = nmat[bb, aa] = np.sum(inds)
+                nmat[aa, bb] = nmat[bb, aa] = np.sum(lweight[inds] != 0.)
+        _zero_to_nan( mat)
+        _zero_to_nan(nmat)
+        _zero_to_nan(lmat)
+
         axx = axs.pop(0)
         axx.set_xlabel("Antenna label")
         axx.set_ylabel("Antenna label")
@@ -180,3 +184,7 @@ def visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_
             fname = os.path.join(dd, f"antenna_model_weights_iter{iglobal}_obs{ii}.png")
             antenna_matrix(fname, model_vis-oo.vis, oo, weight=weights_mean)
         # /learned weights
+
+
+def _zero_to_nan(arr):
+    arr[arr == 0.] = np.nan
