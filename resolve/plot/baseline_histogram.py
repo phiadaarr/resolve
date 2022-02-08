@@ -88,7 +88,7 @@ def antenna_matrix(file_name, vis, observation, weight=None, antenna_dct=None):
             lmat[aa, bb] = lmat[bb, aa] = np.linalg.norm(coords[aa] - coords[bb])
     # /Compute antenna distances
 
-    fig, axs = plt.subplots(nrows=observation.npol, ncols=3, figsize=(12, 4*observation.npol))
+    fig, axs = plt.subplots(nrows=observation.npol, ncols=4, figsize=(12, 4*observation.npol))
     axs = list(np.array(axs).ravel())
     for pp in pdom.labels:
         ii = pdom.label2index(pp)
@@ -120,6 +120,15 @@ def antenna_matrix(file_name, vis, observation, weight=None, antenna_dct=None):
         axx.set_ylabel("Antenna label")
         im = axx.matshow(mat,
                 norm=LogNorm(*_red_chi_sq_limits(np.nanmin(mat), np.nanmax(mat))),
+                cmap="seismic"
+                )
+        plt.colorbar(im, ax=axx, orientation="horizontal", label=f"Normalized residuals ({pp})")
+
+        axx = axs.pop(0)
+        axx.set_xlabel("Antenna label")
+        axx.set_ylabel("Antenna label")
+        im = axx.matshow(mat,
+                norm=LogNorm(1e-1, 1e1),
                 cmap="seismic"
                 )
         plt.colorbar(im, ax=axx, orientation="horizontal", label=f"Normalized residuals ({pp})")
