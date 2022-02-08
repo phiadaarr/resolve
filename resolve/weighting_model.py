@@ -63,6 +63,15 @@ def weighting_model(cfg, obs, sky_domain):
             tmpop = ift.makeOp(oo.weight) @ (restructure @ linear_interpolation @ log_weights).scale(-2).exp()
             op.append(tmpop)
         return op, additional
+    if cfg["model"] == "independent gamma":
+        mean = cfg.getfloat("mean")
+        var = cfg.getfloat("var")
+        alpha = cfg.getfloat("alpha")
+        theta = cfg.getfloat("theta")
+        op = [ift.GammaOperator(oo.vis.domain, mean=mean, var=var, alpha=alpha, theta=theta)
+                for iobs, oo in enumerate(obs)]
+        op = [oo.ducktape(f"Observation {iobs}, invcov") for iobs, oo in enumerate(op)]
+        return op, {}
     raise NotImplementedError
 
 
