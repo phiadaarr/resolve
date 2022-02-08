@@ -88,7 +88,7 @@ def antenna_matrix(file_name, vis, observation, weight=None, antenna_dct=None):
             lmat[aa, bb] = lmat[bb, aa] = np.linalg.norm(coords[aa] - coords[bb])
     # /Compute antenna distances
 
-    fig, axs = plt.subplots(nrows=3, ncols=observation.npol, figsize=(4*observation.npol, 12))
+    fig, axs = plt.subplots(nrows=observation.npol, ncols=3, figsize=(12, 4*observation.npol))
     axs = list(np.array(axs).ravel())
     for pp in pdom.labels:
         ii = pdom.label2index(pp)
