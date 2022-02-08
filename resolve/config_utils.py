@@ -160,7 +160,10 @@ def _cfg_to_observations(cfg):
     for cc in cfg.split(","):
         if len(cc) == 0:
             continue
-        fname, options = cc.split(":")
+        if ":" in cc:
+            fname, options = cc.split(":")
+        else:
+            fname, options = cc, ""
         for ff in glob(os.path.expanduser(fname)):
             newcfg.append(f"{ff}:{options}")
     cfg = ",".join(newcfg)
