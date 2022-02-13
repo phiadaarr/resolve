@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright(C) 2021 Max-Planck-Society
+# Copyright(C) 2022 Philipp Arras
 # Author: Philipp Arras
 
 from functools import reduce
@@ -17,6 +18,17 @@ from .polarization_matrix_exponential import polarization_matrix_exponential
 from .polarization_space import PolarizationSpace
 from .simple_operators import MultiFieldStacker
 from .util import assert_sky_domain
+
+
+def _has_jax():
+    try:
+        import jax
+        print("Will use jax in double precision on the CPU")
+        jax.config.update("jax_platform_name", "cpu")
+        jax.config.update("jax_enable_x64", True)
+        return True
+    except ImportError:
+        return False
 
 
 def sky_model_diffuse(cfg, observations=[]):
@@ -48,7 +60,7 @@ def sky_model_diffuse(cfg, observations=[]):
         mfs = MultiFieldStacker((pdom, fdom, sdom), 0, pdom.labels)
     logsky = reduce(add, logsky)
 
-    mexp = polarization_matrix_exponential(tgt)
+    mexp = polarization_matrix_exponential(tgt, jax=_has_jax())
     sky = mexp @ (mfs @ logsky).ducktape_left(tgt)
     assert_sky_domain(sky.target)
 
@@ -90,7 +102,7 @@ def sky_model_points(cfg, observations=[]):
                 v = v.ducktape_left("V")
                 polsum = polsum + v
             iqu = MultiFieldStacker((pdom, points_domain), 0, pdom.labels) @ polsum
-            points = (polarization_matrix_exponential(iqu.target) @ iqu).ducktape_left(inserter.domain)
+            points = (polarization_matrix_exponential(iqu.target, jax=_has_jax()) @ iqu).ducktape_left(inserter.domain)
         else:
             raise NotImplementedError(f"single_frequency_sky does not support point sources on {pdom.labels} (yet?)")
 
