@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright(C) 2020-2021 Max-Planck-Society
+# Copyright(C) 2020-2022 Max-Planck-Society, Philipp Arras
 # Author: Philipp Arras
 
+from time import time
 import cProfile
 import io
 import pstats
@@ -169,13 +170,15 @@ def assert_data_domain(dom):
 
 
 def profile_function(func, inp, ntries):
+    t0 = time()
     with cProfile.Profile() as pr:
         for ii in range(ntries):
             func(inp)
+    wall_time = time() - t0
     s = io.StringIO()
     sortby = SortKey.TIME
     pstats.Stats(pr, stream=s).sort_stats(sortby).print_stats(10)
-    return s.getvalue()
+    return f"Wall time: {wall_time} s\n" + s.getvalue()
 
 
 def _obj2list(obj, cls):
