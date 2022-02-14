@@ -8,7 +8,6 @@ from .data.direction import *
 from .data.ms_import import *
 from .data.observation import *
 from .data.polarization import Polarization
-from .dirty_image import *
 from .extra import mpi_load
 from .fits import field2fits, fits2field
 from .global_config import *
