@@ -79,7 +79,7 @@ class PolarizationMatrixExponential {
 
 template<typename Tin, typename Tout>
 void add_linearization(py::module_ &msup, const string &name) {
-    py::class_<Linearization<Tin, Tout>>(msup, name)
+    py::class_<Linearization<Tin, Tout>>(msup, name.c_str())
        .def(py::init<const Tout &,
                      function<Tout(const Tin &)>,
                      function<Tin (const Tout &)>
