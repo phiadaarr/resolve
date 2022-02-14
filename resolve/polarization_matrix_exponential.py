@@ -18,7 +18,7 @@ def polarization_matrix_exponential(domain, jax=False):
     mfs = MultiFieldStacker(domain, 0, domain[0].labels)
     # ift.extra.check_linear_operator(mfs)
     if jax:
-        op = _jax_pol(mfs.domain)
+        return _jax_pol(domain)
     else:
         op = PolarizationMatrixExponential(mfs.domain)
     return mfs @ op @ mfs.inverse
@@ -61,22 +61,30 @@ class PolarizationMatrixExponential(ift.Operator):
 
 
 def _jax_pol(domain):
-    from jax.numpy import cosh, exp, sinh, sqrt
-    with_v = "V" in domain.keys()
+    from jax.numpy import cosh, exp, sinh, sqrt, empty, float64
+
+    pdom, _, _, _ = domain
+    with_v = "V" in pdom.labels
+
+    I = pdom.label2index("I")
+    Q = pdom.label2index("Q")
+    U = pdom.label2index("U")
+    if with_v:
+        V = pdom.label2index("V")
 
     def func(x):
-        res = {}
-        sq = x["Q"] ** 2 + x["U"] ** 2
+        sq = x[I] ** 2 + x[U] ** 2
         if with_v:
-            sq = sq + x["V"] ** 2
+            sq += x[V] ** 2
         log_p = sqrt(sq)
-        tmpi = exp(x["I"])
-        res["I"] = tmpi * cosh(log_p)
+        tmpi = exp(x[I])
+        res = empty(domain.shape, float64)
+        res.at[I].set(tmpi * cosh(log_p))
         tmp = tmpi * sinh(log_p) / log_p
-        res["U"] = tmp * x["U"]
-        res["Q"] = tmp * x["Q"]
+        res.at[U].set(tmp * x[U])
+        res.at[Q].set(tmp * x[Q])
         if with_v:
-            res["V"] = tmp * x["V"]
+            res.at[V].set(tmp * x[V])
         return res
 
     return ift.JaxOperator(domain, domain, func)
