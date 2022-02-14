@@ -9,18 +9,25 @@ from .simple_operators import MultiFieldStacker
 
 
 def polarization_matrix_exponential(domain, jax=False):
+    """
+
+    Parameters
+    ----------
+    domain : DomainTuple
+        DomainTuple of which the first entry is a PolarizationSpace.
+    """
     dom = ift.makeDomain(domain)
     pdom = dom[0]
     assert isinstance(pdom, PolarizationSpace)
+
     if pdom.labels_eq("I"):
         return ift.ScalingOperator(domain, 1.).exp()
 
-    mfs = MultiFieldStacker(domain, 0, domain[0].labels)
-    # ift.extra.check_linear_operator(mfs)
     if jax:
         return _jax_pol(domain)
-    else:
-        op = PolarizationMatrixExponential(mfs.domain)
+
+    mfs = MultiFieldStacker(domain, 0, domain[0].labels)
+    op = PolarizationMatrixExponential(mfs.domain)
     return mfs @ op @ mfs.inverse
 
 
@@ -61,9 +68,12 @@ class PolarizationMatrixExponential(ift.Operator):
 
 
 def _jax_pol(domain):
-    from jax.numpy import cosh, exp, sinh, sqrt, empty, float64
+    from jax.numpy import cosh, exp, sinh, sqrt, empty, float64, zeros
 
-    pdom, _, _, _ = domain
+    domain = ift.makeDomain(domain)
+    pdom = domain[0]
+    assert isinstance(pdom, PolarizationSpace)
+
     with_v = "V" in pdom.labels
 
     I = pdom.label2index("I")
@@ -73,18 +83,18 @@ def _jax_pol(domain):
         V = pdom.label2index("V")
 
     def func(x):
-        sq = x[I] ** 2 + x[U] ** 2
+        sq = x[Q] ** 2 + x[U] ** 2
         if with_v:
             sq += x[V] ** 2
         log_p = sqrt(sq)
         tmpi = exp(x[I])
         res = empty(domain.shape, float64)
-        res.at[I].set(tmpi * cosh(log_p))
+        res = res.at[I].set(tmpi * cosh(log_p))
         tmp = tmpi * sinh(log_p) / log_p
-        res.at[U].set(tmp * x[U])
-        res.at[Q].set(tmp * x[Q])
+        res = res.at[U].set(tmp * x[U])
+        res = res.at[Q].set(tmp * x[Q])
         if with_v:
-            res.at[V].set(tmp * x[V])
+            res = res.at[V].set(tmp * x[V])
         return res
 
     return ift.JaxOperator(domain, domain, func)
