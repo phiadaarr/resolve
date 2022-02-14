@@ -4,6 +4,7 @@ CXXFLAGS_MINI:= -std=c++20 -Wfatal-errors -Wall -Wextra -shared -fPIC $(shell py
 #CXXFLAGS:= -O3 -march=native -ffast-math $(CXXFLAGS_MINI)
 CXXFLAGS:= $(CXXFLAGS_MINI)
 
+
 OUT:= resolvelib$(shell python3-config --extension-suffix)
 
 $(OUT) : resolvelib.cpp

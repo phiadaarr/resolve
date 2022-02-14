@@ -55,49 +55,32 @@ class Linearization {
 class PolarizationMatrixExponential {
   public:
     PolarizationMatrixExponential() {}
-    py::array apply(const py::array &d) const {
+    py::array apply(const py::array &inp) const {
+      // Assume ordering: I, Q, U, V
         MR_fail("Not implemented yet");
-        auto x = d;
-        auto tmpmav = ducc0::to_cfmav<double>(x);
-        auto pyout = ducc0::make_Pyarr<double>(tmpmav.shape());
-
-        const auto xmav = ducc0::to_cfmav<double>(x);
-        auto outmav = ducc0::to_vfmav<double>(pyout);
-        mav_apply([&](double &elem, const double &xx) { elem = xx * xx; }, 1,
-                  outmav, xmav);
-        return pyout;
+        return inp;
     }
 
-    Linearization<py::array,py::array> apply_with_jac(const py::array &d) {
-        function<py::array(const py::array &)> f = [=](const py::array &inp) {
+    Linearization<py::array,py::array> apply_with_jac(const py::array &inp) {
+        function<py::array(const py::array &)> f =
+          [=](const py::array &inp2) {
             MR_fail("Not implemented yet");
-            auto x = d;
-            const auto positionmav = ducc0::to_cfmav<double>(x);
-            const auto inpmav = ducc0::to_cfmav<double>(inp);
-            py::array pyout{ducc0::make_Pyarr<double>(inpmav.shape())};
-            auto outmav = ducc0::to_vfmav<double>(pyout);
-
-            mav_apply([&](double &oo, const double &ii) { oo = 2. * ii; }, 1,
-                      outmav, inpmav);
-            mav_apply([&](double &oo, const double &pp) { oo *= pp; }, 1,
-                      outmav, positionmav);
-
-            return pyout;
+            return inp2;
         };
-
         function<py::array(const py::array &)> ftimes =
-            [=](const py::array &inp) { return f(inp); };
+            [=](const py::array &inp2) { return f(inp2); };
         function<py::array(const py::array &)> fadjtimes =
-            [=](const py::array &inp) { return f(inp); };
+            [=](const py::array &inp2) { return f(inp2); };
 
-        return Linearization<py::array,py::array> {apply(d), ftimes, fadjtimes};
+        return Linearization<py::array,py::array> {apply(inp), ftimes, fadjtimes};
     }
 };
 
 
 template<typename Tin, typename Tout>
 void add_linearization(py::module_ &msup, const string &name) {
-    py::class_<Linearization<Tin, Tout>>(msup, name);
+  Linearization<Tin, Tout> foo;
+    py::class_<Linearization<Tin, Tout>>(msup, name)
        .def(py::init<const Tout &,
                      function<Tout(const Tin &)>,
                      function<Tin (const Tout &)>
