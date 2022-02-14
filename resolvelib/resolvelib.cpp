@@ -43,7 +43,7 @@ class Linearization {
 
     Tout jac_times        (const Tin  &inp) const { return jt(inp); }
     Tin  jac_adjoint_times(const Tout &inp) const { return jat(inp); }
-    Tin  position() { return p; };
+    Tout position() { return p; };
 
   private:
     const Tout p;
@@ -56,6 +56,7 @@ class PolarizationMatrixExponential {
   public:
     PolarizationMatrixExponential() {}
     py::array apply(const py::array &d) const {
+        MR_fail("Not implemented yet");
         auto x = d;
         auto tmpmav = ducc0::to_cfmav<double>(x);
         auto pyout = ducc0::make_Pyarr<double>(tmpmav.shape());
@@ -69,6 +70,7 @@ class PolarizationMatrixExponential {
 
     Linearization<py::array,py::array> apply_with_jac(const py::array &d) {
         function<py::array(const py::array &)> f = [=](const py::array &inp) {
+            MR_fail("Not implemented yet");
             auto x = d;
             const auto positionmav = ducc0::to_cfmav<double>(x);
             const auto inpmav = ducc0::to_cfmav<double>(inp);
@@ -94,15 +96,15 @@ class PolarizationMatrixExponential {
 
 
 template<typename Tin, typename Tout>
-void add_linearization(py::module_ &msup, string &name) {
-    py::class_<Linearization<Tin, Tout>>(msup, name)
-        .def(py::init<const Tout &,
-                      function<Tout(const Tin &)>,
-                      function<Tin (const Tout &)>
-                      >())
-        .def("position",          &Linearization<Tin, Tout>::position)
-        .def("jac_times",         &Linearization<Tin, Tout>::jac_times)
-        .def("jac_adjoint_times", &Linearization<Tin, Tout>::jac_adjoint_times);
+void add_linearization(py::module_ &msup, const string &name) {
+    py::class_<Linearization<Tin, Tout>>(msup, name);
+       .def(py::init<const Tout &,
+                     function<Tout(const Tin &)>,
+                     function<Tin (const Tout &)>
+                     >())
+       .def("position",          &Linearization<Tin, Tout>::position)
+       .def("jac_times",         &Linearization<Tin, Tout>::jac_times)
+       .def("jac_adjoint_times", &Linearization<Tin, Tout>::jac_adjoint_times);
 }
 
 
