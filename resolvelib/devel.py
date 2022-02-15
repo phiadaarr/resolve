@@ -25,8 +25,12 @@ pdom = rve.PolarizationSpace(["I", "Q", "U"])
 sdom = ift.RGSpace([4, 4])
 
 dom = rve.default_sky_domain(pdom=pdom, sdom=sdom)
+dom = {kk: dom[1:] for kk in pdom.labels}
 
-op = Pybind11Operator(dom, dom, resolvelib.PolarizationMatrixExponential)
+op = Pybind11Operator(dom, dom, resolvelib.PolarizationMatrixExponential())
 
 loc = ift.from_random(op.domain)
+op(loc)
+exit()
+
 ift.extra.check_operator(op, loc)

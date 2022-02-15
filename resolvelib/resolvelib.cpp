@@ -55,25 +55,23 @@ class Linearization {
 class PolarizationMatrixExponential {
   public:
     PolarizationMatrixExponential() {}
-    py::array apply(const py::array &inp) const {
-      // Assume ordering: I, Q, U, V
+    py::array apply(const py::dict &inp) const {
         MR_fail("Not implemented yet");
         return inp;
     }
 
-    Linearization<py::array,py::array> apply_with_jac(const py::array &inp) {
-        function<py::array(const py::array &)> f =
-          [=](const py::array &inp2) {
-            MR_fail("Not implemented yet");
-            return inp2;
-        };
-        function<py::array(const py::array &)> ftimes =
-            [=](const py::array &inp2) { return f(inp2); };
-        function<py::array(const py::array &)> fadjtimes =
-            [=](const py::array &inp2) { return f(inp2); };
+    // Linearization<py::array,py::array> apply_with_jac(const py::dict &inp) {
+    //     function<py::array(const py::dict &)> f =
+    //       [=](const py::dict &inp2) {
+    //         MR_fail("Not implemented yet");
+    //     };
+    //     function<py::array(const py::dict &)> ftimes =
+    //         [=](const py::dict &inp2) { return f(inp2); };
+    //     function<py::dict(const py::array &)> fadjtimes =
+    //         [=](const py::array &inp2) { return f(inp2); };
 
-        return Linearization<py::array,py::array> {apply(inp), ftimes, fadjtimes};
-    }
+    //     return Linearization<py::dict,py::array> {apply(inp), ftimes, fadjtimes};
+    // }
 };
 
 
@@ -93,11 +91,11 @@ void add_linearization(py::module_ &msup, const char *name) {
 PYBIND11_MODULE(resolvelib, m) {
     py::class_<PolarizationMatrixExponential>(m, "PolarizationMatrixExponential")
         .def(py::init<>())
-        .def("apply", &PolarizationMatrixExponential::apply)
-        .def("apply_with_jac", &PolarizationMatrixExponential::apply_with_jac);
+        .def("apply", &PolarizationMatrixExponential::apply);
+        //.def("apply_with_jac", &PolarizationMatrixExponential::apply_with_jac);
 
-    add_linearization<py::array, py::array>(m, "Linearization_field2field");
-    add_linearization<py::array, py::dict >(m, "Linearization_field2mfield");
-    add_linearization<py::dict , py::array>(m, "Linearization_mfield2field");
-    add_linearization<py::dict , py::dict >(m, "Linearization_mfield2mfield");
+    // add_linearization<py::array, py::array>(m, "Linearization_field2field");
+    // add_linearization<py::array, py::dict >(m, "Linearization_field2mfield");
+    // add_linearization<py::dict , py::array>(m, "Linearization_mfield2field");
+    // add_linearization<py::dict , py::dict >(m, "Linearization_mfield2mfield");
 }
