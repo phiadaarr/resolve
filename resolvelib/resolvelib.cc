@@ -74,17 +74,17 @@ class PolarizationMatrixExponential {
       // /Instantiate output array
 
       ducc0::mav_apply([](const auto &ii,
-                                   const auto &qq,
-                                   const auto &uu,
-                                   const auto &vv,
-                                   auto &oii,
-                                   auto &oqq,
-                                   auto &ouu,
-                                   auto &ovv
-                                   ){
-              auto pol{qq*qq + uu*uu + vv*vv};
-              oii = 0.5 * (exp(ii+pol) + exp(ii-pol));
-              auto tmp{0.5 * (exp(ii+pol) - exp(ii-pol)) / sqrt(pol)};
+                          const auto &qq,
+                          const auto &uu,
+                          const auto &vv,
+                          auto &oii,
+                          auto &oqq,
+                          auto &ouu,
+                          auto &ovv
+                          ){
+              auto pol{sqrt(qq*qq + uu*uu + vv*vv)};
+              oii = exp(ii) * cosh(pol);
+              auto tmp{exp(ii) * sinh(pol) / pol};
               oqq = tmp * qq;
               ouu = tmp * uu;
               ovv = tmp * vv;

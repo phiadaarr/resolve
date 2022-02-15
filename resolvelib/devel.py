@@ -17,6 +17,7 @@
 import resolve as rve
 import nifty8 as ift
 import resolvelib
+import numpy as np
 
 from cpp2py import Pybind11Operator
 from time import time
@@ -30,16 +31,23 @@ dom = {kk: dom[1:] for kk in pdom.labels}
 
 tgt = rve.default_sky_domain(pdom=pdom, sdom=sdom)
 
+opold = rve.polarization_matrix_exponential(tgt) @ rve.MultiFieldStacker(tgt, 0, tgt[0].labels)
+
 nthreads = 1
 loc = ift.from_random(dom)
+res0 = opold(loc)
 ntries = 100
 for nthreads  in [8]:
 #for nthreads  in range(1, 9):
     op = Pybind11Operator(dom, tgt, resolvelib.PolarizationMatrixExponential(nthreads))
+    assert op.domain is opold.domain
+    assert op.target is opold.target
     t0 = time()
     for _ in range(ntries):
-        op(loc)
+        res = op(loc)
     print(f"Nthreads {nthreads}: {(time()-t0)/ntries:.2f} s")
+
+    np.testing.assert_allclose(res0.val, res.val)
 exit()
 op(loc)
 exit()
