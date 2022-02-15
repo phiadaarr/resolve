@@ -82,9 +82,11 @@ class PolarizationMatrixExponential {
                           auto &ouu,
                           auto &ovv
                           ){
-              auto pol{sqrt(qq*qq + uu*uu + vv*vv)};
-              oii = exp(ii) * cosh(pol);
-              auto tmp{exp(ii) * sinh(pol) / pol};
+              auto pol0{qq*qq + uu*uu + vv*vv};
+              auto pol1{-0.5*log(pol0)};
+              auto pol{sqrt(pol0)};
+              oii = 0.5 * (exp(ii+pol) + exp(ii-pol));
+              auto tmp{0.5 * (exp(ii+pol+pol1) - exp(ii-pol+pol1))};
               oqq = tmp * qq;
               ouu = tmp * uu;
               ovv = tmp * vv;

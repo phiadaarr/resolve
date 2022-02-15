@@ -34,9 +34,11 @@ tgt = rve.default_sky_domain(pdom=pdom, sdom=sdom)
 opold = rve.polarization_matrix_exponential(tgt) @ rve.MultiFieldStacker(tgt, 0, tgt[0].labels)
 
 nthreads = 1
-loc = ift.from_random(dom)
+loc = ift.full(dom, 1.2)
+t0 = time()
 res0 = opold(loc)
-ntries = 100
+print(f"Old implementation: {(time()-t0):.2f} s")
+ntries = 50
 for nthreads  in [8]:
 #for nthreads  in range(1, 9):
     op = Pybind11Operator(dom, tgt, resolvelib.PolarizationMatrixExponential(nthreads))
