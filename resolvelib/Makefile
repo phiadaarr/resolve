@@ -1,6 +1,6 @@
 .PHONY: build
 
-CXXFLAGS_MINI:= -std=c++20 -Wfatal-errors -Wall -Wextra -shared -fPIC $(shell python3 -m pybind11 --includes) -Iducc/src -fvisibility=hidden
+CXXFLAGS_MINI:= -std=c++17 -Wfatal-errors -Wall -Wextra -shared -fPIC $(shell python3 -m pybind11 --includes) -Iducc/src -Ipybind11/include -fvisibility=hidden
 CXXFLAGS:= -O3 -march=native -ffast-math $(CXXFLAGS_MINI)
 #CXXFLAGS:= $(CXXFLAGS_MINI)
 
