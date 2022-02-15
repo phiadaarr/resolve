@@ -23,8 +23,28 @@ from cpp2py import Pybind11Operator
 from time import time
 
 
+def operator_equality(op0, op1, ntries=20):
+    dom = op0.domain
+    assert op0.domain == op1.domain
+    assert op0.target == op1.target
+    for ii in range(ntries):
+        loc = ift.from_random(dom)
+        res0 = op0(loc)
+        res1 = op1(loc)
+        ift.extra.assert_allclose(res0, res1)
+
+        linloc = ift.Linearization.make_var(loc)
+        res0 = op0(linloc).jac(0.23*loc)
+        res1 = op1(linloc).jac(0.23*loc)
+        ift.extra.assert_allclose(res0, res1)
+
+    ift.extra.check_operator(op0, loc, ntries=ntries)
+    ift.extra.check_operator(op1, loc, ntries=ntries)
+
+
+
 pdom = rve.PolarizationSpace(["I", "Q", "U", "V"])
-sdom = ift.RGSpace([4000, 4000])
+sdom = ift.RGSpace([10, 10])
 
 dom = rve.default_sky_domain(pdom=pdom, sdom=sdom)
 dom = {kk: dom[1:] for kk in pdom.labels}
@@ -32,11 +52,11 @@ dom = {kk: dom[1:] for kk in pdom.labels}
 tgt = rve.default_sky_domain(pdom=pdom, sdom=sdom)
 
 opold = rve.polarization_matrix_exponential(tgt) @ rve.MultiFieldStacker(tgt, 0, tgt[0].labels)
+op = Pybind11Operator(dom, tgt, resolvelib.PolarizationMatrixExponential(1))
 
-nthreads = 1
-loc = ift.full(dom, 1.2)
-t0 = time()
-res0 = opold(loc)
+operator_equality(opold, op)
+exit()
+
 print(f"Old implementation: {(time()-t0):.2f} s")
 ntries = 50
 for nthreads  in [8]:
