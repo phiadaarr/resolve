@@ -52,12 +52,44 @@ class Linearization {
 };
 
 
+template<typename T, size_t ndim>
 class PolarizationMatrixExponential {
+  private:
+    const size_t nthreads;
   public:
-    PolarizationMatrixExponential() {}
+    PolarizationMatrixExponential(size_t nthreads_=1) : nthreads(nthreads_) {}
     py::array apply(const py::dict &inp) const {
-        MR_fail("Not implemented yet");
-        return inp;
+      auto I {ducc0::to_cmav<T, ndim>(inp["I"])},
+           Q {ducc0::to_cmav<T, ndim>(inp["Q"])},
+           U {ducc0::to_cmav<T, ndim>(inp["U"])},
+           V {ducc0::to_cmav<T, ndim>(inp["V"])};
+
+      // Instantiate output array
+      auto out_ = ducc0::make_Pyarr<T>({4, I.shape()[0], I.shape()[1], I.shape()[2], I.shape()[3]});
+      auto out  = ducc0::to_vmav<T, ndim+1>(out_);
+      auto outI = ducc0::subarray<ndim>(out, {{0}, {}, {}, {}, {}}),
+           outQ = ducc0::subarray<ndim>(out, {{1}, {}, {}, {}, {}}),
+           outU = ducc0::subarray<ndim>(out, {{2}, {}, {}, {}, {}}),
+           outV = ducc0::subarray<ndim>(out, {{3}, {}, {}, {}, {}});
+      // /Instantiate output array
+
+      ducc0::mav_apply([](const auto &ii,
+                                   const auto &qq,
+                                   const auto &uu,
+                                   const auto &vv,
+                                   auto &oii,
+                                   auto &oqq,
+                                   auto &ouu,
+                                   auto &ovv
+                                   ){
+              auto pol{qq*qq + uu*uu + vv*vv};
+              oii = 0.5 * (exp(ii+pol) + exp(ii-pol));
+              auto tmp{0.5 * (exp(ii+pol) - exp(ii-pol)) / sqrt(pol)};
+              oqq = tmp * qq;
+              ouu = tmp * uu;
+              ovv = tmp * vv;
+          }, nthreads, I, Q, U, V, outI, outQ, outU, outV);
+      return out_;
     }
 
     // Linearization<py::array,py::array> apply_with_jac(const py::dict &inp) {
@@ -89,9 +121,9 @@ void add_linearization(py::module_ &msup, const char *name) {
 
 
 PYBIND11_MODULE(resolvelib, m) {
-    py::class_<PolarizationMatrixExponential>(m, "PolarizationMatrixExponential")
-        .def(py::init<>())
-        .def("apply", &PolarizationMatrixExponential::apply);
+    py::class_<PolarizationMatrixExponential<double, 4>>(m, "PolarizationMatrixExponential")
+        .def(py::init<size_t>())
+        .def("apply", &PolarizationMatrixExponential<double, 4>::apply);
         //.def("apply_with_jac", &PolarizationMatrixExponential::apply_with_jac);
 
     // add_linearization<py::array, py::array>(m, "Linearization_field2field");

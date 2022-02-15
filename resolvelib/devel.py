@@ -19,17 +19,28 @@ import nifty8 as ift
 import resolvelib
 
 from cpp2py import Pybind11Operator
+from time import time
 
 
-pdom = rve.PolarizationSpace(["I", "Q", "U"])
-sdom = ift.RGSpace([4, 4])
+pdom = rve.PolarizationSpace(["I", "Q", "U", "V"])
+sdom = ift.RGSpace([4000, 4000])
 
 dom = rve.default_sky_domain(pdom=pdom, sdom=sdom)
 dom = {kk: dom[1:] for kk in pdom.labels}
 
-op = Pybind11Operator(dom, dom, resolvelib.PolarizationMatrixExponential())
+tgt = rve.default_sky_domain(pdom=pdom, sdom=sdom)
 
-loc = ift.from_random(op.domain)
+nthreads = 1
+loc = ift.from_random(dom)
+ntries = 100
+for nthreads  in [8]:
+#for nthreads  in range(1, 9):
+    op = Pybind11Operator(dom, tgt, resolvelib.PolarizationMatrixExponential(nthreads))
+    t0 = time()
+    for _ in range(ntries):
+        op(loc)
+    print(f"Nthreads {nthreads}: {(time()-t0)/ntries:.2f} s")
+exit()
 op(loc)
 exit()
 
