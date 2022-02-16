@@ -142,38 +142,32 @@ class PolarizationMatrixExponential {
         auto d33 = ducc0::vmav<T, ndim>(shp);
         // /Allocate Jacobian
 
-      //  // Derive + apply
-      //  ducc0::mav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
-      //                      auto &oii, auto &oqq, auto &ouu, auto &ovv,
-      //                      auto &oiiqq, auto &oiiuu, auto &oiivv,
-      //                      auto &oqqqq, auto &oqquu, auto &oqqvv,
-      //                      auto &ouuqq, auto &ouuuu, auto &ouuvv,
-      //                      auto &ovvqq, auto &ovvuu, auto &ovvvv
-
-      //                      ){
-
-      //      }, nthreads,
-      //         I, Q, U, V,
-      //         appliedI, appliedQ, appliedU, appliedV,
-      //         d01, d02, d03,
-      //         d11, d12, d13,
-      //         d21, d22, d23,
-      //         d31, d32, d33);
-
-
-
-        // Derive I
+        // Derive + apply
         ducc0::xmav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
-                                  auto &oii,       auto &oqq,       auto &ouu,       auto &ovv){
+                            auto &oii, auto &oqq, auto &ouu, auto &ovv,
+                            auto &oiiqq, auto &oiiuu, auto &oiivv,
+                            auto &oqqqq, auto &oqquu, auto &oqqvv,
+                            auto &ouuqq, auto &ouuuu, auto &ouuvv,
+                            auto &ovvqq, auto &ovvuu, auto &ovvvv
+
+                            ){
               auto pol0{qq*qq + uu*uu + vv*vv};
               auto pol{sqrt(pol0)};
               auto tmp2{0.5 / pol * (exp(ii+pol) - exp(ii-pol))};
-              oii = 0.5 * (exp(ii+pol) + exp(ii-pol));  // Same as in apply
-              oqq = tmp2 * qq;
-              ouu = tmp2 * uu;
-              ovv = tmp2 * vv;
-            }, nthreads, I, Q, U, V, d00, d01, d02, d03);
-        // /Derive I
+              oii = 0.5 * (exp(ii+pol) + exp(ii-pol));
+              oiiqq = tmp2 * qq;
+              oiiuu = tmp2 * uu;
+              oiivv = tmp2 * vv;
+
+            }, nthreads,
+               I, Q, U, V,
+               appliedI, appliedQ, appliedU, appliedV,
+               d01, d02, d03,
+               d11, d12, d13,
+               d21, d22, d23,
+               d31, d32, d33);
+
+
 
         // Derive Q
         ducc0::xmav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
