@@ -46,7 +46,7 @@ test_resolve:
 test_resolvelib:
   stage: testing
   script:
-    - cd resolvelib pytest-3 -q test
+    - cd resolvelib && pytest-3 -q test
 
 test_resolve_mpi:
   stage: testing
