@@ -143,16 +143,54 @@ class PolarizationMatrixExponential {
               ouu = tmp * uu;
               ovv = tmp * vv;
             }, nthreads, I, Q, U, V, d00, d01, d02, d03);
-
         // /Derive I
+
         // Derive Q
-        // FIXME
+        ducc0::mav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
+                                  auto &oii,       auto &oqq,       auto &ouu,       auto &ovv){
+              auto pol0{qq*qq + uu*uu + vv*vv};
+              auto pol{sqrt(pol0)};
+              auto pol1{log(pol)};
+              auto diff{ii-pol1};
+              auto tmp{0.5 * (exp(diff+pol) - exp(diff-pol))};
+              auto tmp3{0.5*qq/pol0 * (exp(diff+pol)*(pol-1.) + exp(diff-pol)*(pol+1.))};
+              oii = tmp * qq;
+              oqq = qq * tmp3 + tmp;
+              ouu = uu * tmp3;
+              ovv = vv * tmp3;
+            }, nthreads, I, Q, U, V, d10, d11, d12, d13);
         // /Derive Q
+
         // Derive U
-        // FIXME
+        ducc0::mav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
+                                  auto &oii,       auto &oqq,       auto &ouu,       auto &ovv){
+              auto pol0{qq*qq + uu*uu + vv*vv};
+              auto pol{sqrt(pol0)};
+              auto pol1{log(pol)};
+              auto diff{ii-pol1};
+              auto tmp{0.5 * (exp(diff+pol) - exp(diff-pol))};
+              auto tmp3{0.5*uu/pol0 * (exp(diff+pol)*(pol-1.) + exp(diff-pol)*(pol+1.))};
+              oii = tmp * uu;
+              oqq = qq * tmp3;
+              ouu = uu * tmp3 + tmp;
+              ovv = vv * tmp3;
+            }, nthreads, I, Q, U, V, d20, d21, d22, d23);
         // /Derive U
+
         // Derive V
-        // FIXME
+        ducc0::mav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
+                                  auto &oii,       auto &oqq,       auto &ouu,       auto &ovv){
+              auto pol0{qq*qq + uu*uu + vv*vv};
+              auto pol{sqrt(pol0)};
+              auto pol1{log(pol)};
+              auto diff{ii-pol1};
+              auto tmp{0.5 * (exp(diff+pol) - exp(diff-pol))};
+              auto tmp3{0.5*vv/pol0 * (exp(diff+pol)*(pol-1.) + exp(diff-pol)*(pol+1.))};
+              oii = tmp * vv;
+              oqq = qq * tmp3;
+              ouu = uu * tmp3;
+              ovv = vv * tmp3 + tmp;
+            }, nthreads, I, Q, U, V, d30, d31, d32, d33);
         // /Derive V
 
         function<py::array(const py::dict &)> ftimes =
@@ -208,7 +246,7 @@ class PolarizationMatrixExponential {
             };
 
         function<py::dict(const py::array &)> fadjtimes =
-            [&](const py::array &inp_) {
+            [=](const py::array &inp_) {
               // Parse input
               auto inp {ducc0::to_cmav<T, ndim+1>(inp_)};
               auto I {ducc0::subarray<ndim>(inp, {{0}, {}, {}, {}, {}})},

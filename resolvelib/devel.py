@@ -31,52 +31,40 @@ def operator_equality(op0, op1, ntries=20):
         loc = ift.from_random(dom)
         res0 = op0(loc)
         res1 = op1(loc)
-        print("Test apply")
         ift.extra.assert_allclose(res0, res1)
-        print("Done")
 
         linloc = ift.Linearization.make_var(loc)
-        print("Test jacobian application")
         res0 = op0(linloc).jac(0.23*loc)
         res1 = op1(linloc).jac(0.23*loc)
         ift.extra.assert_allclose(res0, res1)
-        print("Done")
-
-    print("Check operator")
     ift.extra.check_operator(op0, loc, ntries=ntries)
     ift.extra.check_operator(op1, loc, ntries=ntries)
-    print("Done")
 
 
 pdom = rve.PolarizationSpace(["I", "Q", "U", "V"])
 sdom = ift.RGSpace([10, 10])
-
 dom = rve.default_sky_domain(pdom=pdom, sdom=sdom)
 dom = {kk: dom[1:] for kk in pdom.labels}
-
 tgt = rve.default_sky_domain(pdom=pdom, sdom=sdom)
-
 opold = rve.polarization_matrix_exponential(tgt) @ rve.MultiFieldStacker(tgt, 0, tgt[0].labels)
 op = Pybind11Operator(dom, tgt, resolvelib.PolarizationMatrixExponential(1))
+#operator_equality(opold, op)
 
-operator_equality(opold, op)
-exit()
+pdom = rve.PolarizationSpace(["I", "Q", "U", "V"])
+sdom = ift.RGSpace([4000, 4000])
+dom = rve.default_sky_domain(pdom=pdom, sdom=sdom)
+dom = {kk: dom[1:] for kk in pdom.labels}
+tgt = rve.default_sky_domain(pdom=pdom, sdom=sdom)
+opold = rve.polarization_matrix_exponential(tgt)# @ rve.MultiFieldStacker(tgt, 0, tgt[0].labels)
+opold_jax = rve.polarization_matrix_exponential(tgt, jax=True)# @ rve.MultiFieldStacker(tgt, 0, tgt[0].labels)
 
-print(f"Old implementation: {(time()-t0):.2f} s")
-ntries = 50
-for nthreads  in [8]:
-#for nthreads  in range(1, 9):
+for nthreads in [1, 4, 8]:
     op = Pybind11Operator(dom, tgt, resolvelib.PolarizationMatrixExponential(nthreads))
-    assert op.domain is opold.domain
-    assert op.target is opold.target
-    t0 = time()
-    for _ in range(ntries):
-        res = op(loc)
-    print(f"Nthreads {nthreads}: {(time()-t0)/ntries:.2f} s")
-
-    np.testing.assert_allclose(res0.val, res.val)
-exit()
-op(loc)
-exit()
-
-ift.extra.check_operator(op, loc)
+    print(f"New implementation (nthreads={nthreads})")
+    ift.exec_time(op)
+    print()
+print("Old implementation")
+ift.exec_time(opold)
+print()
+print("Old implementation (jax)")
+ift.exec_time(opold_jax)
