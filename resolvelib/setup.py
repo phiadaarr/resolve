@@ -4,7 +4,7 @@ import itertools
 from glob import iglob
 import os
 
-from setuptools import setup, Extension
+from setuptools import setup, Extension, find_packages
 import pybind11
 
 pkgname = 'resolvelib'
@@ -103,9 +103,9 @@ depfiles = (_get_files_by_suffix('.', 'h') +
             _get_files_by_suffix('.', 'cc') +
             ['setup.py'])
 
-extensions = [Extension(pkgname,
+extensions = [Extension("resolvelib._cpp",
                         language='c++',
-                        sources=['src/cpp/resolvelib.cc', 'ducc/src/ducc0/infra/threading.cc'],
+                        sources=['src/resolvelib.cc', 'ducc/src/ducc0/infra/threading.cc'],
                         depends=depfiles,
                         include_dirs=include_dirs,
                         define_macros=define_macros,
@@ -117,16 +117,17 @@ this_directory = os.path.abspath(os.path.dirname(__file__))
 
 _print_env()
 
-setup(name=pkgname,
+
+setup(name="resolvelib",
       version=version,
       #description=description,
       #long_description=long_description,
       #long_description_content_type='text/markdown',
       url='https://gitlab.mpcdf.mpg.de/ift/resolve',
-      include_package_data=True,
+      #include_package_data=True,
       author='Philipp Arras',
       author_email='c@philipp-arras.de',
-      packages=["src/python"],
+      packages=find_packages(include=["resolvelib", "resolvelib.*"]),
       python_requires=">=3.7",
       ext_modules=extensions,
       install_requires=['numpy>=1.17.0'],

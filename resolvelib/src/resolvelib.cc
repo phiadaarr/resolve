@@ -312,7 +312,7 @@ class PolarizationMatrixExponential {
 
 
 
-PYBIND11_MODULE(resolvelib, m) {
+PYBIND11_MODULE(_cpp, m) {
     py::class_<PolarizationMatrixExponential<double, 4>>(m, "PolarizationMatrixExponential")
         .def(py::init<size_t>())
         .def("apply",          &PolarizationMatrixExponential<double, 4>::apply)
