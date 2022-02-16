@@ -31,16 +31,21 @@ def operator_equality(op0, op1, ntries=20):
         loc = ift.from_random(dom)
         res0 = op0(loc)
         res1 = op1(loc)
+        print("Test apply")
         ift.extra.assert_allclose(res0, res1)
+        print("Done")
 
         linloc = ift.Linearization.make_var(loc)
+        print("Test jacobian application")
         res0 = op0(linloc).jac(0.23*loc)
         res1 = op1(linloc).jac(0.23*loc)
         ift.extra.assert_allclose(res0, res1)
+        print("Done")
 
+    print("Check operator")
     ift.extra.check_operator(op0, loc, ntries=ntries)
     ift.extra.check_operator(op1, loc, ntries=ntries)
-
+    print("Done")
 
 
 pdom = rve.PolarizationSpace(["I", "Q", "U", "V"])

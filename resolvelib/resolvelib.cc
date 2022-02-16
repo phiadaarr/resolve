@@ -105,9 +105,57 @@ class PolarizationMatrixExponential {
     }
 
     Linearization<py::dict,py::array> apply_with_jac(const py::dict &loc_) {
+        // Parse input
+        auto I {ducc0::to_cmav<T, ndim>(loc_["I"])},
+             Q {ducc0::to_cmav<T, ndim>(loc_["Q"])},
+             U {ducc0::to_cmav<T, ndim>(loc_["U"])},
+             V {ducc0::to_cmav<T, ndim>(loc_["V"])};
+        // /Parse input
+
+        auto shp{I.shape()};
+
+        auto d00 = ducc0::vmav<T, ndim>(shp);
+        auto d01 = ducc0::vmav<T, ndim>(shp);
+        auto d02 = ducc0::vmav<T, ndim>(shp);
+        auto d03 = ducc0::vmav<T, ndim>(shp);
+        auto d10 = ducc0::vmav<T, ndim>(shp);
+        auto d11 = ducc0::vmav<T, ndim>(shp);
+        auto d12 = ducc0::vmav<T, ndim>(shp);
+        auto d13 = ducc0::vmav<T, ndim>(shp);
+        auto d20 = ducc0::vmav<T, ndim>(shp);
+        auto d21 = ducc0::vmav<T, ndim>(shp);
+        auto d22 = ducc0::vmav<T, ndim>(shp);
+        auto d23 = ducc0::vmav<T, ndim>(shp);
+        auto d30 = ducc0::vmav<T, ndim>(shp);
+        auto d31 = ducc0::vmav<T, ndim>(shp);
+        auto d32 = ducc0::vmav<T, ndim>(shp);
+        auto d33 = ducc0::vmav<T, ndim>(shp);
+
+        // Derive I
+        ducc0::mav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
+                                  auto &oii,       auto &oqq,       auto &ouu,       auto &ovv){
+              auto pol0{qq*qq + uu*uu + vv*vv};
+              auto pol{sqrt(pol0)};
+              auto tmp{0.5 / pol * (exp(ii+pol) - exp(ii-pol))};
+              oii = 0.5 * (exp(ii+pol) + exp(ii-pol));  // Same as in apply
+              oqq = tmp * qq;
+              ouu = tmp * uu;
+              ovv = tmp * vv;
+            }, nthreads, I, Q, U, V, d00, d01, d02, d03);
+
+        // /Derive I
+        // Derive Q
+        // FIXME
+        // /Derive Q
+        // Derive U
+        // FIXME
+        // /Derive U
+        // Derive V
+        // FIXME
+        // /Derive V
 
         function<py::array(const py::dict &)> ftimes =
-            [&](const py::dict &inp_) {
+            [=](const py::dict &inp_) {  // @mtr is this "=" expensive?
               // Parse input
               auto I {ducc0::to_cmav<T, ndim>(inp_["I"])},
                    Q {ducc0::to_cmav<T, ndim>(inp_["Q"])},
@@ -123,6 +171,37 @@ class PolarizationMatrixExponential {
                    outU = ducc0::subarray<ndim>(out, {{2}, {}, {}, {}, {}}),
                    outV = ducc0::subarray<ndim>(out, {{3}, {}, {}, {}, {}});
               // /Instantiate output array
+
+              // Matrix multiplication
+              ducc0::mav_apply([](const auto &ii0, const auto &qq0,
+                                  const auto &uu0, const auto &vv0,
+                                  const auto &ii,  const auto &qq,
+                                  const auto &uu,  const auto &vv,
+                                  auto &out){
+                    out = ii0*ii + qq0*qq + uu0*uu + vv0*vv;
+                  }, nthreads, d00, d01, d02, d03, I, Q, U, V, outI);
+              ducc0::mav_apply([](const auto &ii0, const auto &qq0,
+                                  const auto &uu0, const auto &vv0,
+                                  const auto &ii,  const auto &qq,
+                                  const auto &uu,  const auto &vv,
+                                  auto &out){
+                    out = ii0*ii + qq0*qq + uu0*uu + vv0*vv;
+                  }, nthreads, d10, d11, d12, d13, I, Q, U, V, outQ);
+              ducc0::mav_apply([](const auto &ii0, const auto &qq0,
+                                  const auto &uu0, const auto &vv0,
+                                  const auto &ii,  const auto &qq,
+                                  const auto &uu,  const auto &vv,
+                                  auto &out){
+                    out = ii0*ii + qq0*qq + uu0*uu + vv0*vv;
+                  }, nthreads, d20, d21, d22, d23, I, Q, U, V, outU);
+              ducc0::mav_apply([](const auto &ii0, const auto &qq0,
+                                  const auto &uu0, const auto &vv0,
+                                  const auto &ii,  const auto &qq,
+                                  const auto &uu,  const auto &vv,
+                                  auto &out){
+                    out = ii0*ii + qq0*qq + uu0*uu + vv0*vv;
+                  }, nthreads, d30, d31, d32, d33, I, Q, U, V, outV);
+              // /Matrix multiplication
 
               return out_;
             };
