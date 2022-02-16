@@ -162,11 +162,23 @@ class PolarizationMatrixExponential {
               auto pol1{log(pol)};
               auto diff{ii-pol1};
               auto tmp{0.5 * (exp(diff+pol) - exp(diff-pol))};
-              auto tmp3{0.5*qq/pol0 * (exp(diff+pol)*(pol-1.) + exp(diff-pol)*(pol+1.))};
+              auto tmpq{0.5*qq/pol0 * (exp(diff+pol)*(pol-1.) + exp(diff-pol)*(pol+1.))};
               oqq = tmp * qq;
-              oqqqq = qq * tmp3 + tmp;
-              oqquu = uu * tmp3;
-              oqqvv = vv * tmp3;
+              oqqqq = qq * tmpq + tmp;
+              oqquu = uu * tmpq;
+              oqqvv = vv * tmpq;
+
+              auto tmpu{0.5*uu/pol0 * (exp(diff+pol)*(pol-1.) + exp(diff-pol)*(pol+1.))};
+              ouu = tmp * uu;
+              ouuqq = qq * tmpu;
+              ouuuu = uu * tmpu + tmp;
+              ouuvv = vv * tmpu;
+
+              auto tmpv{0.5*vv/pol0 * (exp(diff+pol)*(pol-1.) + exp(diff-pol)*(pol+1.))};
+              ovv = tmp * vv;
+              ovvqq = qq * tmpv;
+              ovvuu = uu * tmpv;
+              ovvvv = vv * tmpv + tmp;
 
             }, nthreads,
                I, Q, U, V,
@@ -175,40 +187,7 @@ class PolarizationMatrixExponential {
                d11, d12, d13,
                d21, d22, d23,
                d31, d32, d33);
-
-
-
-        // Derive U
-        ducc0::xmav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
-                                  auto &oii,       auto &oqq,       auto &ouu,       auto &ovv){
-              auto pol0{qq*qq + uu*uu + vv*vv};
-              auto pol{sqrt(pol0)};
-              auto pol1{log(pol)};
-              auto diff{ii-pol1};
-              auto tmp{0.5 * (exp(diff+pol) - exp(diff-pol))};
-              auto tmp3{0.5*uu/pol0 * (exp(diff+pol)*(pol-1.) + exp(diff-pol)*(pol+1.))};
-              oii = tmp * uu;
-              oqq = qq * tmp3;
-              ouu = uu * tmp3 + tmp;
-              ovv = vv * tmp3;
-            }, nthreads, I, Q, U, V, d20, d21, d22, d23);
-        // /Derive U
-
-        // Derive V
-        ducc0::xmav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
-                                  auto &oii,       auto &oqq,       auto &ouu,       auto &ovv){
-              auto pol0{qq*qq + uu*uu + vv*vv};
-              auto pol{sqrt(pol0)};
-              auto pol1{log(pol)};
-              auto diff{ii-pol1};
-              auto tmp{0.5 * (exp(diff+pol) - exp(diff-pol))};
-              auto tmp3{0.5*vv/pol0 * (exp(diff+pol)*(pol-1.) + exp(diff-pol)*(pol+1.))};
-              oii = tmp * vv;
-              oqq = qq * tmp3;
-              ouu = uu * tmp3;
-              ovv = vv * tmp3 + tmp;
-            }, nthreads, I, Q, U, V, d30, d31, d32, d33);
-        // /Derive V
+        // /Derive + apply
 
         function<py::array(const py::dict &)> ftimes =
             [=](const py::dict &inp_) {
