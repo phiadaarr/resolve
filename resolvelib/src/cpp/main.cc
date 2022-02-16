@@ -159,6 +159,15 @@ class PolarizationMatrixExponential {
               oiiuu = tmp2 * uu;
               oiivv = tmp2 * vv;
 
+              auto pol1{log(pol)};
+              auto diff{ii-pol1};
+              auto tmp{0.5 * (exp(diff+pol) - exp(diff-pol))};
+              auto tmp3{0.5*qq/pol0 * (exp(diff+pol)*(pol-1.) + exp(diff-pol)*(pol+1.))};
+              oqq = tmp * qq;
+              oqqqq = qq * tmp3 + tmp;
+              oqquu = uu * tmp3;
+              oqqvv = vv * tmp3;
+
             }, nthreads,
                I, Q, U, V,
                appliedI, appliedQ, appliedU, appliedV,
@@ -168,22 +177,6 @@ class PolarizationMatrixExponential {
                d31, d32, d33);
 
 
-
-        // Derive Q
-        ducc0::xmav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
-                                  auto &oii,       auto &oqq,       auto &ouu,       auto &ovv){
-              auto pol0{qq*qq + uu*uu + vv*vv};
-              auto pol{sqrt(pol0)};
-              auto pol1{log(pol)};
-              auto diff{ii-pol1};
-              auto tmp{0.5 * (exp(diff+pol) - exp(diff-pol))};
-              auto tmp3{0.5*qq/pol0 * (exp(diff+pol)*(pol-1.) + exp(diff-pol)*(pol+1.))};
-              oii = tmp * qq;
-              oqq = qq * tmp3 + tmp;
-              ouu = uu * tmp3;
-              ovv = vv * tmp3;
-            }, nthreads, I, Q, U, V, d10, d11, d12, d13);
-        // /Derive Q
 
         // Derive U
         ducc0::xmav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
