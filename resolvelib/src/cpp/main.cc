@@ -160,8 +160,9 @@ class PolarizationMatrixExponential {
               oiivv = tmp2 * vv;
 
               auto diff{ii-log(pol)};
-              auto tmp{0.5 * (exp(diff+pol) - exp(diff-pol))};
-              auto tmp3{0.5/pol0 * (exp(diff+pol)*(pol-1.) + exp(diff-pol)*(pol+1.))};
+              auto eplus{exp(diff+pol)}, eminus{exp(diff-pol)};
+              auto tmp{0.5 * (eplus - eminus)};
+              auto tmp3{0.5/pol0 * (eplus*(pol-1.) + eminus*(pol+1.))};
 
               auto tmpq{tmp3*qq};
               oqq = tmp * qq;
