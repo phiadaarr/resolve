@@ -112,7 +112,7 @@ class PolarizationMatrixExponential {
              U {ducc0::to_cmav<T, ndim>(loc_["U"])},
              V {ducc0::to_cmav<T, ndim>(loc_["V"])};
         // /Parse input
-        
+
         // Instantiate output array
         auto applied_ = ducc0::make_Pyarr<T>(combine_shapes(4, I.shape()));
         auto applied  = ducc0::to_vmav<T, ndim+1>(applied_);
@@ -121,7 +121,6 @@ class PolarizationMatrixExponential {
              appliedU = ducc0::subarray<ndim>(applied, {{2}, {}, {}, {}, {}}),
              appliedV = ducc0::subarray<ndim>(applied, {{3}, {}, {}, {}, {}});
         // /Instantiate output array
-
 
         // Allocate Jacobian
         auto shp{I.shape()};
@@ -143,16 +142,36 @@ class PolarizationMatrixExponential {
         auto d33 = ducc0::vmav<T, ndim>(shp);
         // /Allocate Jacobian
 
+      //  // Derive + apply
+      //  ducc0::mav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
+      //                      auto &oii, auto &oqq, auto &ouu, auto &ovv,
+      //                      auto &oiiqq, auto &oiiuu, auto &oiivv,
+      //                      auto &oqqqq, auto &oqquu, auto &oqqvv,
+      //                      auto &ouuqq, auto &ouuuu, auto &ouuvv,
+      //                      auto &ovvqq, auto &ovvuu, auto &ovvvv
+
+      //                      ){
+
+      //      }, nthreads,
+      //         I, Q, U, V,
+      //         appliedI, appliedQ, appliedU, appliedV,
+      //         d01, d02, d03,
+      //         d11, d12, d13,
+      //         d21, d22, d23,
+      //         d31, d32, d33);
+
+
+
         // Derive I
         ducc0::xmav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
                                   auto &oii,       auto &oqq,       auto &ouu,       auto &ovv){
               auto pol0{qq*qq + uu*uu + vv*vv};
               auto pol{sqrt(pol0)};
-              auto tmp{0.5 / pol * (exp(ii+pol) - exp(ii-pol))};
+              auto tmp2{0.5 / pol * (exp(ii+pol) - exp(ii-pol))};
               oii = 0.5 * (exp(ii+pol) + exp(ii-pol));  // Same as in apply
-              oqq = tmp * qq;
-              ouu = tmp * uu;
-              ovv = tmp * vv;
+              oqq = tmp2 * qq;
+              ouu = tmp2 * uu;
+              ovv = tmp2 * vv;
             }, nthreads, I, Q, U, V, d00, d01, d02, d03);
         // /Derive I
 
