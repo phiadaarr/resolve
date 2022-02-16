@@ -2,6 +2,7 @@ image: $CONTAINER_TEST_IMAGE
 
 variables:
   CONTAINER_TEST_IMAGE: gitlab-registry.mpcdf.mpg.de/$CI_PROJECT_PATH:$CI_BUILD_REF_NAME
+  GIT_SUBMODULE_STRATEGY: recursive
 
 stages:
   - build_docker
