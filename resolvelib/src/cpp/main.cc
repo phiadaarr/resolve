@@ -87,7 +87,7 @@ class PolarizationMatrixExponential {
            outV = ducc0::subarray<ndim>(out, {{3}, {}, {}, {}, {}});
       // /Instantiate output array
 
-      ducc0::mav_apply([](const auto &ii, const auto &qq,
+      ducc0::xmav_apply([](const auto &ii, const auto &qq,
                           const auto &uu, const auto &vv,
                           auto &oii, auto &oqq,
                           auto &ouu, auto &ovv
@@ -133,7 +133,7 @@ class PolarizationMatrixExponential {
         auto d33 = ducc0::vmav<T, ndim>(shp);
 
         // Derive I
-        ducc0::mav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
+        ducc0::xmav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
                                   auto &oii,       auto &oqq,       auto &ouu,       auto &ovv){
               auto pol0{qq*qq + uu*uu + vv*vv};
               auto pol{sqrt(pol0)};
@@ -146,7 +146,7 @@ class PolarizationMatrixExponential {
         // /Derive I
 
         // Derive Q
-        ducc0::mav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
+        ducc0::xmav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
                                   auto &oii,       auto &oqq,       auto &ouu,       auto &ovv){
               auto pol0{qq*qq + uu*uu + vv*vv};
               auto pol{sqrt(pol0)};
@@ -162,7 +162,7 @@ class PolarizationMatrixExponential {
         // /Derive Q
 
         // Derive U
-        ducc0::mav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
+        ducc0::xmav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
                                   auto &oii,       auto &oqq,       auto &ouu,       auto &ovv){
               auto pol0{qq*qq + uu*uu + vv*vv};
               auto pol{sqrt(pol0)};
@@ -178,7 +178,7 @@ class PolarizationMatrixExponential {
         // /Derive U
 
         // Derive V
-        ducc0::mav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
+        ducc0::xmav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
                                   auto &oii,       auto &oqq,       auto &ouu,       auto &ovv){
               auto pol0{qq*qq + uu*uu + vv*vv};
               auto pol{sqrt(pol0)};
@@ -212,28 +212,28 @@ class PolarizationMatrixExponential {
               // /Instantiate output array
 
               // Matrix multiplication
-              ducc0::mav_apply([](const auto &ii0, const auto &qq0,
+              ducc0::xmav_apply([](const auto &ii0, const auto &qq0,
                                   const auto &uu0, const auto &vv0,
                                   const auto &ii,  const auto &qq,
                                   const auto &uu,  const auto &vv,
                                   auto &out){
                     out = ii0*ii + qq0*qq + uu0*uu + vv0*vv;
                   }, nthreads, d00, d01, d02, d03, I, Q, U, V, outI);
-              ducc0::mav_apply([](const auto &ii0, const auto &qq0,
+              ducc0::xmav_apply([](const auto &ii0, const auto &qq0,
                                   const auto &uu0, const auto &vv0,
                                   const auto &ii,  const auto &qq,
                                   const auto &uu,  const auto &vv,
                                   auto &out){
                     out = ii0*ii + qq0*qq + uu0*uu + vv0*vv;
                   }, nthreads, d10, d11, d12, d13, I, Q, U, V, outQ);
-              ducc0::mav_apply([](const auto &ii0, const auto &qq0,
+              ducc0::xmav_apply([](const auto &ii0, const auto &qq0,
                                   const auto &uu0, const auto &vv0,
                                   const auto &ii,  const auto &qq,
                                   const auto &uu,  const auto &vv,
                                   auto &out){
                     out = ii0*ii + qq0*qq + uu0*uu + vv0*vv;
                   }, nthreads, d20, d21, d22, d23, I, Q, U, V, outU);
-              ducc0::mav_apply([](const auto &ii0, const auto &qq0,
+              ducc0::xmav_apply([](const auto &ii0, const auto &qq0,
                                   const auto &uu0, const auto &vv0,
                                   const auto &ii,  const auto &qq,
                                   const auto &uu,  const auto &vv,
@@ -268,28 +268,28 @@ class PolarizationMatrixExponential {
               // /Instantiate output
 
               // Adjoint matrix multiplication
-              ducc0::mav_apply([](const auto &ii0, const auto &qq0,
+              ducc0::xmav_apply([](const auto &ii0, const auto &qq0,
                                   const auto &uu0, const auto &vv0,
                                   const auto &ii,  const auto &qq,
                                   const auto &uu,  const auto &vv,
                                   auto &out){
                     out = ii0*ii + qq0*qq + uu0*uu + vv0*vv;
                   }, nthreads, d00, d10, d20, d30, I, Q, U, V, outI);
-              ducc0::mav_apply([](const auto &ii0, const auto &qq0,
+              ducc0::xmav_apply([](const auto &ii0, const auto &qq0,
                                   const auto &uu0, const auto &vv0,
                                   const auto &ii,  const auto &qq,
                                   const auto &uu,  const auto &vv,
                                   auto &out){
                     out = ii0*ii + qq0*qq + uu0*uu + vv0*vv;
                   }, nthreads, d01, d11, d21, d31, I, Q, U, V, outQ);
-              ducc0::mav_apply([](const auto &ii0, const auto &qq0,
+              ducc0::xmav_apply([](const auto &ii0, const auto &qq0,
                                   const auto &uu0, const auto &vv0,
                                   const auto &ii,  const auto &qq,
                                   const auto &uu,  const auto &vv,
                                   auto &out){
                     out = ii0*ii + qq0*qq + uu0*uu + vv0*vv;
                   }, nthreads, d02, d12, d22, d32, I, Q, U, V, outU);
-              ducc0::mav_apply([](const auto &ii0, const auto &qq0,
+              ducc0::xmav_apply([](const auto &ii0, const auto &qq0,
                                   const auto &uu0, const auto &vv0,
                                   const auto &ii,  const auto &qq,
                                   const auto &uu,  const auto &vv,
