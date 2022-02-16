@@ -29,8 +29,6 @@ namespace py = pybind11;
 auto None = py::none();
 // Includes related to pybind11
 
-#include "shape_helper.h"
-
 using namespace std;
 
 template<typename Tin, typename Tout>
