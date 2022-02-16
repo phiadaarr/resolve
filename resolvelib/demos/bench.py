@@ -19,7 +19,6 @@ import nifty8 as ift
 import resolvelib
 import numpy as np
 
-from cpp2py import Pybind11Operator
 from time import time
 
 
@@ -47,7 +46,7 @@ dom = rve.default_sky_domain(pdom=pdom, sdom=sdom)
 dom = {kk: dom[1:] for kk in pdom.labels}
 tgt = rve.default_sky_domain(pdom=pdom, sdom=sdom)
 opold = rve.polarization_matrix_exponential(tgt) @ rve.MultiFieldStacker(tgt, 0, tgt[0].labels)
-op = Pybind11Operator(dom, tgt, resolvelib.PolarizationMatrixExponential(1))
+op = resolvelib.PolarizationMatrixExponential(tgt, 1)
 #operator_equality(opold, op)
 
 pdom = rve.PolarizationSpace(["I", "Q", "U", "V"])
@@ -60,14 +59,14 @@ opold_jax = rve.polarization_matrix_exponential(tgt, jax=True)
 
 
 if False:
-    op = Pybind11Operator(dom, tgt, resolvelib.PolarizationMatrixExponential(8))
+    op = resolvelib.PolarizationMatrixExponential(tgt, 8)
     loc = ift.from_random(op.domain)
     for ii in range(10000):
         print(ii)
         op(ift.Linearization.make_var(loc))
 
 for nthreads in [1, 4, 8]:
-    op = Pybind11Operator(dom, tgt, resolvelib.PolarizationMatrixExponential(nthreads))
+    op = resolvelib.PolarizationMatrixExponential(tgt, nthreads)
     print(f"New implementation (nthreads={nthreads})")
     ift.exec_time(op)
     print()

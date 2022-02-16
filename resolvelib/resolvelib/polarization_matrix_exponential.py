@@ -17,11 +17,11 @@
 import numpy as np
 import nifty8 as ift
 
-from . import _cpp
 from . import Pybind11Operator
 
 
 def PolarizationMatrixExponential(target, nthreads=1):
+    from . import _cpp
     pdom = target[0]
     dom = {kk: target[1:] for kk in pdom.labels}
     return Pybind11Operator(dom, target, _cpp.PolarizationMatrixExponential(nthreads))
