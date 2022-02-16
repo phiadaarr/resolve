@@ -55,8 +55,16 @@ sdom = ift.RGSpace([4000, 4000])
 dom = rve.default_sky_domain(pdom=pdom, sdom=sdom)
 dom = {kk: dom[1:] for kk in pdom.labels}
 tgt = rve.default_sky_domain(pdom=pdom, sdom=sdom)
-opold = rve.polarization_matrix_exponential(tgt)# @ rve.MultiFieldStacker(tgt, 0, tgt[0].labels)
-opold_jax = rve.polarization_matrix_exponential(tgt, jax=True)# @ rve.MultiFieldStacker(tgt, 0, tgt[0].labels)
+opold = rve.polarization_matrix_exponential(tgt)
+opold_jax = rve.polarization_matrix_exponential(tgt, jax=True)
+
+
+if False:
+    op = Pybind11Operator(dom, tgt, resolvelib.PolarizationMatrixExponential(8))
+    loc = ift.from_random(op.domain)
+    for ii in range(10000):
+        print(ii)
+        op(ift.Linearization.make_var(loc))
 
 for nthreads in [1, 4, 8]:
     op = Pybind11Operator(dom, tgt, resolvelib.PolarizationMatrixExponential(nthreads))
