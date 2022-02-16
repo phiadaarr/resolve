@@ -159,22 +159,23 @@ class PolarizationMatrixExponential {
               oiiuu = tmp2 * uu;
               oiivv = tmp2 * vv;
 
-              auto pol1{log(pol)};
-              auto diff{ii-pol1};
+              auto diff{ii-log(pol)};
               auto tmp{0.5 * (exp(diff+pol) - exp(diff-pol))};
-              auto tmpq{0.5*qq/pol0 * (exp(diff+pol)*(pol-1.) + exp(diff-pol)*(pol+1.))};
+              auto tmp3{0.5/pol0 * (exp(diff+pol)*(pol-1.) + exp(diff-pol)*(pol+1.))};
+
+              auto tmpq{tmp3*qq};
               oqq = tmp * qq;
               oqqqq = qq * tmpq + tmp;
               oqquu = uu * tmpq;
               oqqvv = vv * tmpq;
 
-              auto tmpu{0.5*uu/pol0 * (exp(diff+pol)*(pol-1.) + exp(diff-pol)*(pol+1.))};
+              auto tmpu{tmp3*uu};
               ouu = tmp * uu;
               ouuqq = qq * tmpu;
               ouuuu = uu * tmpu + tmp;
               ouuvv = vv * tmpu;
 
-              auto tmpv{0.5*vv/pol0 * (exp(diff+pol)*(pol-1.) + exp(diff-pol)*(pol+1.))};
+              auto tmpv{tmp3*vv};
               ovv = tmp * vv;
               ovvqq = qq * tmpv;
               ovvuu = uu * tmpv;
