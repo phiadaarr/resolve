@@ -70,7 +70,7 @@ class PolarizationMatrixExponential {
     const size_t nthreads;
   public:
     PolarizationMatrixExponential(size_t nthreads_=1) : nthreads(nthreads_) {}
-    py::array apply(const py::dict &inp_) const {
+    py::dict apply(const py::dict &inp_) const {
       // Parse input
       auto I {ducc0::to_cmav<T, ndim>(inp_["I"])},
            Q {ducc0::to_cmav<T, ndim>(inp_["Q"])},
@@ -78,14 +78,17 @@ class PolarizationMatrixExponential {
            V {ducc0::to_cmav<T, ndim>(inp_["V"])};
       // /Parse input
 
-      // Instantiate output array
-      auto out_ = ducc0::make_Pyarr<T>(combine_shapes(4, I.shape()));
-      auto out  = ducc0::to_vmav<T, ndim+1>(out_);
-      auto outI = ducc0::subarray<ndim>(out, {{0}, {}, {}, {}, {}}),
-           outQ = ducc0::subarray<ndim>(out, {{1}, {}, {}, {}, {}}),
-           outU = ducc0::subarray<ndim>(out, {{2}, {}, {}, {}, {}}),
-           outV = ducc0::subarray<ndim>(out, {{3}, {}, {}, {}, {}});
-      // /Instantiate output array
+      // Instantiate output
+      py::dict out_;
+      out_["I"] = ducc0::make_Pyarr<T>(I.shape()),
+      out_["Q"] = ducc0::make_Pyarr<T>(I.shape()),
+      out_["U"] = ducc0::make_Pyarr<T>(I.shape()),
+      out_["V"] = ducc0::make_Pyarr<T>(I.shape());
+      auto outI = ducc0::to_vmav<T, ndim>(out_["I"]),
+           outQ = ducc0::to_vmav<T, ndim>(out_["Q"]),
+           outU = ducc0::to_vmav<T, ndim>(out_["U"]),
+           outV = ducc0::to_vmav<T, ndim>(out_["V"]);
+      // /Instantiate output
 
       ducc0::xmav_apply([](const auto &ii, const auto &qq,
                           const auto &uu, const auto &vv,
@@ -105,7 +108,7 @@ class PolarizationMatrixExponential {
       return out_;
     }
 
-    Linearization<py::dict,py::array> apply_with_jac(const py::dict &loc_) {
+    Linearization<py::dict,py::dict> apply_with_jac(const py::dict &loc_) {
         // Parse input
         auto I {ducc0::to_cmav<T, ndim>(loc_["I"])},
              Q {ducc0::to_cmav<T, ndim>(loc_["Q"])},
@@ -113,14 +116,17 @@ class PolarizationMatrixExponential {
              V {ducc0::to_cmav<T, ndim>(loc_["V"])};
         // /Parse input
 
-        // Instantiate output array
-        auto applied_ = ducc0::make_Pyarr<T>(combine_shapes(4, I.shape()));
-        auto applied  = ducc0::to_vmav<T, ndim+1>(applied_);
-        auto appliedI = ducc0::subarray<ndim>(applied, {{0}, {}, {}, {}, {}}),
-             appliedQ = ducc0::subarray<ndim>(applied, {{1}, {}, {}, {}, {}}),
-             appliedU = ducc0::subarray<ndim>(applied, {{2}, {}, {}, {}, {}}),
-             appliedV = ducc0::subarray<ndim>(applied, {{3}, {}, {}, {}, {}});
-        // /Instantiate output array
+        // Instantiate output
+        py::dict applied_;
+        applied_["I"] = ducc0::make_Pyarr<T>(I.shape()),
+        applied_["Q"] = ducc0::make_Pyarr<T>(I.shape()),
+        applied_["U"] = ducc0::make_Pyarr<T>(I.shape()),
+        applied_["V"] = ducc0::make_Pyarr<T>(I.shape());
+        auto appliedI = ducc0::to_vmav<T, ndim>(applied_["I"]),
+             appliedQ = ducc0::to_vmav<T, ndim>(applied_["Q"]),
+             appliedU = ducc0::to_vmav<T, ndim>(applied_["U"]),
+             appliedV = ducc0::to_vmav<T, ndim>(applied_["V"]);
+        // /Instantiate output
 
         // Allocate Jacobian
         auto shp{I.shape()};
@@ -192,7 +198,7 @@ class PolarizationMatrixExponential {
                d31, d32, d33);
         // /Derive + apply
 
-        function<py::array(const py::dict &)> ftimes =
+        function<py::dict(const py::dict &)> ftimes =
             [=](const py::dict &inp_) {
               // Parse input
               auto I {ducc0::to_cmav<T, ndim>(inp_["I"])},
@@ -201,14 +207,17 @@ class PolarizationMatrixExponential {
                    V {ducc0::to_cmav<T, ndim>(inp_["V"])};
               // /Parse input
 
-              // Instantiate output array
-              auto out_ = ducc0::make_Pyarr<T>(combine_shapes(4, I.shape()));
-              auto out  = ducc0::to_vmav<T, ndim+1>(out_);
-              auto outI = ducc0::subarray<ndim>(out, {{0}, {}, {}, {}, {}}),
-                   outQ = ducc0::subarray<ndim>(out, {{1}, {}, {}, {}, {}}),
-                   outU = ducc0::subarray<ndim>(out, {{2}, {}, {}, {}, {}}),
-                   outV = ducc0::subarray<ndim>(out, {{3}, {}, {}, {}, {}});
-              // /Instantiate output array
+              // Instantiate output
+              py::dict out_;
+              out_["I"] = ducc0::make_Pyarr<T>(I.shape()),
+              out_["Q"] = ducc0::make_Pyarr<T>(I.shape()),
+              out_["U"] = ducc0::make_Pyarr<T>(I.shape()),
+              out_["V"] = ducc0::make_Pyarr<T>(I.shape());
+              auto outI = ducc0::to_vmav<T, ndim>(out_["I"]),
+                   outQ = ducc0::to_vmav<T, ndim>(out_["Q"]),
+                   outU = ducc0::to_vmav<T, ndim>(out_["U"]),
+                   outV = ducc0::to_vmav<T, ndim>(out_["V"]);
+              // /Instantiate output
 
               // Matrix multiplication
               ducc0::xmav_apply([](const auto &ii0, const auto &qq0,
@@ -244,26 +253,25 @@ class PolarizationMatrixExponential {
               return out_;
             };
 
-        function<py::dict(const py::array &)> fadjtimes =
-            [=](const py::array &inp_) {
+        function<py::dict(const py::dict &)> fadjtimes =
+            [=](const py::dict &inp_) {
               // Parse input
-              auto inp {ducc0::to_cmav<T, ndim+1>(inp_)};
-              auto I {ducc0::subarray<ndim>(inp, {{0}, {}, {}, {}, {}})},
-                   Q {ducc0::subarray<ndim>(inp, {{1}, {}, {}, {}, {}})},
-                   U {ducc0::subarray<ndim>(inp, {{2}, {}, {}, {}, {}})},
-                   V {ducc0::subarray<ndim>(inp, {{3}, {}, {}, {}, {}})};
+              auto I = ducc0::to_cmav<T, ndim>(inp_["I"]),
+                   Q = ducc0::to_cmav<T, ndim>(inp_["Q"]),
+                   U = ducc0::to_cmav<T, ndim>(inp_["U"]),
+                   V = ducc0::to_cmav<T, ndim>(inp_["V"]);
               // /Parse input
 
               // Instantiate output
-              auto outI_ = ducc0::make_Pyarr<T>(I.shape());
-              auto outQ_ = ducc0::make_Pyarr<T>(I.shape());
-              auto outU_ = ducc0::make_Pyarr<T>(I.shape());
-              auto outV_ = ducc0::make_Pyarr<T>(I.shape());
-
-              auto outI {ducc0::to_vmav<T, ndim>(outI_)},
-                   outQ {ducc0::to_vmav<T, ndim>(outQ_)},
-                   outU {ducc0::to_vmav<T, ndim>(outU_)},
-                   outV {ducc0::to_vmav<T, ndim>(outV_)};
+              py::dict out_;
+              out_["I"] = ducc0::make_Pyarr<T>(I.shape());
+              out_["Q"] = ducc0::make_Pyarr<T>(I.shape());
+              out_["U"] = ducc0::make_Pyarr<T>(I.shape());
+              out_["V"] = ducc0::make_Pyarr<T>(I.shape());
+              auto outI {ducc0::to_vmav<T, ndim>(out_["I"])},
+                   outQ {ducc0::to_vmav<T, ndim>(out_["Q"])},
+                   outU {ducc0::to_vmav<T, ndim>(out_["U"])},
+                   outV {ducc0::to_vmav<T, ndim>(out_["V"])};
               // /Instantiate output
 
               // Adjoint matrix multiplication
@@ -296,18 +304,10 @@ class PolarizationMatrixExponential {
                     out = ii0*ii + qq0*qq + uu0*uu + vv0*vv;
                   }, nthreads, d03, d13, d23, d33, I, Q, U, V, outV);
               // /Adjoint matrix multiplication
-
-              // Pack into dictionary
-              py::dict out_;
-              out_["I"] = outI_;
-              out_["Q"] = outQ_;
-              out_["U"] = outU_;
-              out_["V"] = outV_;
-              // /Pack into dictionary
               return out_;
             };
 
-        return Linearization<py::dict,py::array>(applied_, ftimes, fadjtimes);
+        return Linearization<py::dict,py::dict>(applied_, ftimes, fadjtimes);
     }
 };
 

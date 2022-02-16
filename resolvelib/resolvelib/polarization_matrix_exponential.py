@@ -20,8 +20,7 @@ import nifty8 as ift
 from . import Pybind11Operator
 
 
-def PolarizationMatrixExponential(target, nthreads=1):
+def PolarizationMatrixExponential(domain, nthreads=1):
     from . import _cpp
-    pdom = target[0]
-    dom = {kk: target[1:] for kk in pdom.labels}
-    return Pybind11Operator(dom, target, _cpp.PolarizationMatrixExponential(nthreads))
+    domain = ift.MultiDomain.make(domain)
+    return Pybind11Operator(domain, domain, _cpp.PolarizationMatrixExponential(nthreads))

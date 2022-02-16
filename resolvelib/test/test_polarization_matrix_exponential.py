@@ -35,8 +35,6 @@ def operator_equality(op0, op1, ntries=20):
         linloc = ift.Linearization.make_var(loc)
         res0 = op0(linloc).jac(0.23*loc)
         res1 = op1(linloc).jac(0.23*loc)
-        print(res0.val.ravel())
-        print(res1.val.ravel())
         ift.extra.assert_allclose(res0, res1)
     ift.extra.check_operator(op0, loc, ntries=ntries)
     ift.extra.check_operator(op1, loc, ntries=ntries)
@@ -49,6 +47,7 @@ def test_polarization_matrix_exponential():
     dom = rve.default_sky_domain(pdom=pdom, sdom=sdom)
     dom = {kk: dom[1:] for kk in pdom.labels}
     tgt = rve.default_sky_domain(pdom=pdom, sdom=sdom)
-    opold = rve.polarization_matrix_exponential(tgt) @ rve.MultiFieldStacker(tgt, 0, tgt[0].labels)
-    op = resolvelib.PolarizationMatrixExponential(tgt, nthreads)
+    mfs = rve.MultiFieldStacker(tgt, 0, tgt[0].labels)
+    opold = mfs.inverse @ rve.polarization_matrix_exponential(tgt) @ mfs
+    op = resolvelib.PolarizationMatrixExponential(dom, nthreads)
     operator_equality(opold, op)
