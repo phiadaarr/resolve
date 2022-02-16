@@ -19,7 +19,6 @@ import nifty8 as ift
 import resolvelib
 import numpy as np
 
-from cpp2py import Pybind11Operator
 from time import time
 
 
@@ -50,5 +49,5 @@ def test_polarization_matrix_exponential():
     dom = {kk: dom[1:] for kk in pdom.labels}
     tgt = rve.default_sky_domain(pdom=pdom, sdom=sdom)
     opold = rve.polarization_matrix_exponential(tgt) @ rve.MultiFieldStacker(tgt, 0, tgt[0].labels)
-    op = Pybind11Operator(dom, tgt, resolvelib.PolarizationMatrixExponential(1))
+    op = resolvelib.Pybind11Operator(dom, tgt, resolvelib.PolarizationMatrixExponential(1))
     operator_equality(opold, op)
