@@ -7,9 +7,6 @@ import os
 from setuptools import setup, Extension, find_packages
 import pybind11
 
-pkgname = 'resolvelib'
-version = '0.0.0'
-
 tmp = os.getenv("DUCC0_CFLAGS", "").split(" ")
 user_cflags = [x for x in tmp if x != ""]
 tmp = os.getenv("DUCC0_LFLAGS", "").split(" ")
@@ -44,7 +41,7 @@ def _get_files_by_suffix(directory, suffix):
     return list(itertools.chain.from_iterable(iterable_sources))
 
 
-include_dirs = ['.', './ducc/src',
+include_dirs = ['./ducc/src',
                 pybind11.get_include(True),
                 pybind11.get_include(False)]
 
@@ -64,9 +61,6 @@ if do_native:
     extra_compile_args += ['-march=native']
 
 python_module_link_args = []
-
-define_macros = [("PKGNAME", pkgname),
-                 ("PKGVERSION", version)]
 
 if sys.platform == 'darwin':
     import distutils.sysconfig
@@ -105,10 +99,9 @@ depfiles = (_get_files_by_suffix('.', 'h') +
 
 extensions = [Extension("resolvelib._cpp",
                         language='c++',
-                        sources=['src/cpp/resolvelib.cc', 'ducc/src/ducc0/infra/threading.cc'],
+                        sources=['src/cpp/main.cc', 'ducc/src/ducc0/infra/threading.cc'],
                         depends=depfiles,
                         include_dirs=include_dirs,
-                        define_macros=define_macros,
                         extra_compile_args=extra_compile_args,
                         extra_link_args=python_module_link_args)]
 
@@ -119,7 +112,7 @@ _print_env()
 
 
 setup(name="resolvelib",
-      version=version,
+      version="0.0.0",
       #description=description,
       #long_description=long_description,
       #long_description_content_type='text/markdown',
@@ -127,7 +120,7 @@ setup(name="resolvelib",
       #include_package_data=True,
       author='Philipp Arras',
       author_email='c@philipp-arras.de',
-      packages=find_packages(include=["src.py", "src.py.*"]),
+      packages=find_packages(include=["resolvelib", "resolvelib.*"]),
       python_requires=">=3.7",
       ext_modules=extensions,
       install_requires=['numpy>=1.17.0'],

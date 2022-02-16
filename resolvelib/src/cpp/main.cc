@@ -94,8 +94,9 @@ class PolarizationMatrixExponential {
                           ){
               auto pol0{qq*qq + uu*uu + vv*vv};
               auto pol{sqrt(pol0)};
+              auto pol1{log(pol)};
               oii = 0.5 * (exp(ii+pol) + exp(ii-pol));
-              auto diff{ii-log(pol)};
+              auto diff{ii-pol1};
               auto tmp{0.5 * (exp(diff+pol) - exp(diff-pol))};
               oqq = tmp * qq;
               ouu = tmp * uu;
@@ -112,84 +113,85 @@ class PolarizationMatrixExponential {
              V {ducc0::to_cmav<T, ndim>(loc_["V"])};
         // /Parse input
 
-        // Instantiate output array
-        auto applied_ = ducc0::make_Pyarr<T>(combine_shapes(4, I.shape()));
-        auto applied  = ducc0::to_vmav<T, ndim+1>(applied_);
-        auto appliedI = ducc0::subarray<ndim>(applied, {{0}, {}, {}, {}, {}}),
-             appliedQ = ducc0::subarray<ndim>(applied, {{1}, {}, {}, {}, {}}),
-             appliedU = ducc0::subarray<ndim>(applied, {{2}, {}, {}, {}, {}}),
-             appliedV = ducc0::subarray<ndim>(applied, {{3}, {}, {}, {}, {}});
-        // /Instantiate output array
-
-        // Allocate Jacobian
         auto shp{I.shape()};
-        auto d00 = appliedI;
-        auto d10 = appliedQ;
-        auto d20 = appliedU;
-        auto d30 = appliedV;
+
+        auto d00 = ducc0::vmav<T, ndim>(shp);
         auto d01 = ducc0::vmav<T, ndim>(shp);
         auto d02 = ducc0::vmav<T, ndim>(shp);
         auto d03 = ducc0::vmav<T, ndim>(shp);
+        auto d10 = ducc0::vmav<T, ndim>(shp);
         auto d11 = ducc0::vmav<T, ndim>(shp);
         auto d12 = ducc0::vmav<T, ndim>(shp);
         auto d13 = ducc0::vmav<T, ndim>(shp);
+        auto d20 = ducc0::vmav<T, ndim>(shp);
         auto d21 = ducc0::vmav<T, ndim>(shp);
         auto d22 = ducc0::vmav<T, ndim>(shp);
         auto d23 = ducc0::vmav<T, ndim>(shp);
+        auto d30 = ducc0::vmav<T, ndim>(shp);
         auto d31 = ducc0::vmav<T, ndim>(shp);
         auto d32 = ducc0::vmav<T, ndim>(shp);
         auto d33 = ducc0::vmav<T, ndim>(shp);
-        // / Allocate Jacobian
 
-        // Derive + apply
+        // Derive I
         ducc0::mav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
-                            auto &oii, auto &oqq, auto &ouu, auto &ovv,
-                            auto &oiiqq, auto &oiiuu, auto &oiivv,
-                            auto &oqqqq, auto &oqquu, auto &oqqvv,
-                            auto &ouuqq, auto &ouuuu, auto &ouuvv,
-                            auto &ovvqq, auto &ovvuu, auto &ovvvv
-                            ){
+                                  auto &oii,       auto &oqq,       auto &ouu,       auto &ovv){
               auto pol0{qq*qq + uu*uu + vv*vv};
               auto pol{sqrt(pol0)};
-              auto eplus {exp(ii+pol)},
-                   eminus{exp(ii-pol)};
-              auto diff{ii-log(pol)};
-              auto tmp1{0.5 * (exp(diff+pol) - exp(diff-pol))};
+              auto tmp{0.5 / pol * (exp(ii+pol) - exp(ii-pol))};
+              oii = 0.5 * (exp(ii+pol) + exp(ii-pol));  // Same as in apply
+              oqq = tmp * qq;
+              ouu = tmp * uu;
+              ovv = tmp * vv;
+            }, nthreads, I, Q, U, V, d00, d01, d02, d03);
+        // /Derive I
 
-              oii = 0.5 * (eplus + eminus);
-              oqq = tmp1 * qq;
-              ouu = tmp1 * uu;
-              ovv = tmp1 * vv;
+        // Derive Q
+        ducc0::mav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
+                                  auto &oii,       auto &oqq,       auto &ouu,       auto &ovv){
+              auto pol0{qq*qq + uu*uu + vv*vv};
+              auto pol{sqrt(pol0)};
+              auto pol1{log(pol)};
+              auto diff{ii-pol1};
+              auto tmp{0.5 * (exp(diff+pol) - exp(diff-pol))};
+              auto tmp3{0.5*qq/pol0 * (exp(diff+pol)*(pol-1.) + exp(diff-pol)*(pol+1.))};
+              oii = tmp * qq;
+              oqq = qq * tmp3 + tmp;
+              ouu = uu * tmp3;
+              ovv = vv * tmp3;
+            }, nthreads, I, Q, U, V, d10, d11, d12, d13);
+        // /Derive Q
 
-              auto tmp{oii / pol};
-              oiiqq = tmp * qq;
-              oiiuu = tmp * uu;
-              oiivv = tmp * vv;
+        // Derive U
+        ducc0::mav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
+                                  auto &oii,       auto &oqq,       auto &ouu,       auto &ovv){
+              auto pol0{qq*qq + uu*uu + vv*vv};
+              auto pol{sqrt(pol0)};
+              auto pol1{log(pol)};
+              auto diff{ii-pol1};
+              auto tmp{0.5 * (exp(diff+pol) - exp(diff-pol))};
+              auto tmp3{0.5*uu/pol0 * (exp(diff+pol)*(pol-1.) + exp(diff-pol)*(pol+1.))};
+              oii = tmp * uu;
+              oqq = qq * tmp3;
+              ouu = uu * tmp3 + tmp;
+              ovv = vv * tmp3;
+            }, nthreads, I, Q, U, V, d20, d21, d22, d23);
+        // /Derive U
 
-              auto tmp2{0.5*qq/pol0 * (exp(diff+pol)*(pol-1.) + exp(diff-pol)*(pol+1.))};
-              auto tmpq{qq*tmp2};
-              auto tmpu{qq*tmp2};
-              auto tmpv{qq*tmp2};
-
-              oqqqq = qq * tmpq + tmp1;
-              oqquu = uu * tmpq;
-              oqqvv = vv * tmpq;
-
-              ouuqq = qq * tmpu;
-              ouuuu = uu * tmpu + tmp1;
-              ouuvv = vv * tmpu;
-
-              ovvqq = qq * tmpv;
-              ovvuu = uu * tmpv;
-              ovvvv = vv * tmpv + tmp1;
-            }, nthreads,
-               I, Q, U, V,
-               appliedI, appliedQ, appliedU, appliedV,
-               d01, d02, d03,
-               d11, d12, d13,
-               d21, d22, d23,
-               d31, d32, d33);
-        // /Derive + apply
+        // Derive V
+        ducc0::mav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
+                                  auto &oii,       auto &oqq,       auto &ouu,       auto &ovv){
+              auto pol0{qq*qq + uu*uu + vv*vv};
+              auto pol{sqrt(pol0)};
+              auto pol1{log(pol)};
+              auto diff{ii-pol1};
+              auto tmp{0.5 * (exp(diff+pol) - exp(diff-pol))};
+              auto tmp3{0.5*vv/pol0 * (exp(diff+pol)*(pol-1.) + exp(diff-pol)*(pol+1.))};
+              oii = tmp * vv;
+              oqq = qq * tmp3;
+              ouu = uu * tmp3;
+              ovv = vv * tmp3 + tmp;
+            }, nthreads, I, Q, U, V, d30, d31, d32, d33);
+        // /Derive V
 
         function<py::array(const py::dict &)> ftimes =
             [=](const py::dict &inp_) {  // @mtr is this "=" expensive?
@@ -201,7 +203,7 @@ class PolarizationMatrixExponential {
               // /Parse input
 
               // Instantiate output array
-              auto out_ = ducc0::make_Pyarr<T>(combine_shapes(4, shp));
+              auto out_ = ducc0::make_Pyarr<T>(combine_shapes(4, I.shape()));
               auto out  = ducc0::to_vmav<T, ndim+1>(out_);
               auto outI = ducc0::subarray<ndim>(out, {{0}, {}, {}, {}, {}}),
                    outQ = ducc0::subarray<ndim>(out, {{1}, {}, {}, {}, {}}),
@@ -306,13 +308,14 @@ class PolarizationMatrixExponential {
               return out_;
             };
 
-        return Linearization<py::dict,py::array>(applied_, ftimes, fadjtimes);
+        return Linearization<py::dict,py::array>(apply(loc_), ftimes, fadjtimes);
     }
 };
 
 
 
 PYBIND11_MODULE(_cpp, m) {
+    m.attr("__name__") = "resolvelib._cpp";
     py::class_<PolarizationMatrixExponential<double, 4>>(m, "PolarizationMatrixExponential")
         .def(py::init<size_t>())
         .def("apply",          &PolarizationMatrixExponential<double, 4>::apply)

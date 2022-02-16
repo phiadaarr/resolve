@@ -43,11 +43,12 @@ def operator_equality(op0, op1, ntries=20):
 
 
 def test_polarization_matrix_exponential():
+    nthreads = 1
     pdom = rve.PolarizationSpace(["I", "Q", "U", "V"])
     sdom = ift.RGSpace([2, 2])
     dom = rve.default_sky_domain(pdom=pdom, sdom=sdom)
     dom = {kk: dom[1:] for kk in pdom.labels}
     tgt = rve.default_sky_domain(pdom=pdom, sdom=sdom)
     opold = rve.polarization_matrix_exponential(tgt) @ rve.MultiFieldStacker(tgt, 0, tgt[0].labels)
-    op = resolvelib.Pybind11Operator(dom, tgt, resolvelib.PolarizationMatrixExponential(1))
+    op = resolvelib.PolarizationMatrixExponential(tgt, nthreads)
     operator_equality(opold, op)
