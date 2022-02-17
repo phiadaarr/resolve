@@ -47,6 +47,7 @@ test_resolvelib:
   stage: testing
   script:
     - cd resolvelib && pytest-3 -q test
+    - python3 demos/bench.py quick
 
 test_resolve_mpi:
   stage: testing

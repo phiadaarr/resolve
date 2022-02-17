@@ -14,7 +14,6 @@
 # Copyright(C) 2021-2022 Max-Planck-Society, Philipp Arras
 # Author: Philipp Arras, Jakob Roth
 
-import numpy as np
 import nifty8 as ift
 
 
@@ -46,3 +45,10 @@ class Pybind11Jacobian(ift.LinearOperator):
         self._check_input(x, mode)
         res = (self._times if mode == self.TIMES else self._adj_times)(x.val)
         return ift.makeField(self._tgt(mode), res)
+
+
+def PolarizationMatrixExponential(domain, nthreads=1):
+    from . import _cpp
+
+    domain = ift.MultiDomain.make(domain)
+    return Pybind11Operator(domain, domain, _cpp.PolarizationMatrixExponential(nthreads))

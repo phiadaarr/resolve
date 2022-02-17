@@ -14,6 +14,8 @@
 # Copyright(C) 2021-2022 Max-Planck-Society, Philipp Arras
 # Author: Philipp Arras
 
+import sys
+
 import resolve as rve
 import nifty8 as ift
 import resolvelib
@@ -21,9 +23,13 @@ import numpy as np
 
 from time import time
 
+if len(sys.argv) == 2 and sys.argv[1] == "quick":
+    npix = 10
+else:
+    npix = 4000
 
 pdom = rve.PolarizationSpace(["I", "Q", "U", "V"])
-sdom = ift.RGSpace([4000, 4000])
+sdom = ift.RGSpace([npix, npix])
 dom = rve.default_sky_domain(pdom=pdom, sdom=sdom)
 dom = {kk: dom[1:] for kk in pdom.labels}
 tgt = rve.default_sky_domain(pdom=pdom, sdom=sdom)
