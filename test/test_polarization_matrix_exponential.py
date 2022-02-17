@@ -33,17 +33,22 @@ restdom = list2fixture([[ift.UnstructuredDomain(7)],
                         ])
 
 
-def test_jax_vs_nifty(pdom, restdom):
+def test_different_implementations(pdom, restdom):
     dom = tuple((pdom,)) + tuple(restdom)
     op0 = rve.polarization_matrix_exponential(dom, False)
     op1 = rve.polarization_matrix_exponential(dom, True)
+    op2 = rve.polarization_matrix_exponential_mf2f({kk: restdom for kk in pdom.labels})
 
     loc = ift.from_random(op0.domain)
 
     ift.extra.check_operator(op0, loc, ntries=3)
     ift.extra.check_operator(op1, loc, ntries=3)
-
     ift.extra.assert_allclose(op0(loc), op1(loc))
+
+    if len(restdom) == 3:
+        op2 = op2 @ rve.MultiFieldStacker(dom, 0, pdom.labels).inverse
+        ift.extra.check_operator(op2, loc, ntries=3)
+        ift.extra.assert_allclose(op0(loc), op2(loc))
 
 
 @pmp("pol", ("I", ["I", "Q", "U"], ["I", "Q", "U", "V"]))

@@ -6,6 +6,7 @@ import nifty8 as ift
 
 from .polarization_space import PolarizationSpace
 from .simple_operators import MultiFieldStacker
+from .global_config import nthreads
 
 
 def polarization_matrix_exponential(domain, jax=False):
@@ -29,6 +30,19 @@ def polarization_matrix_exponential(domain, jax=False):
     mfs = MultiFieldStacker(domain, 0, domain[0].labels)
     op = PolarizationMatrixExponential(mfs.domain)
     return mfs @ op @ mfs.inverse
+
+
+def polarization_matrix_exponential_mf2f(domain):
+    """
+
+    Note
+    ----
+    In contrast to polarization_matrix_exponential this takes a MultiField as
+    an input and returns a Field.
+    """
+    import resolvelib
+
+    return resolvelib.PolarizationMatrixExponential(domain, nthreads())
 
 
 class PolarizationMatrixExponential(ift.Operator):
