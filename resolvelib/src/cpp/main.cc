@@ -190,7 +190,7 @@ class PolarizationMatrixExponential {
         // /Derive + apply
 
         function<py::array(const py::dict &)> ftimes =
-            [=](const py::dict &inp_) {
+            [nthreads=nthreads,appliedI,appliedQ,appliedU,appliedV,mat](const py::dict &inp_) {
               // Parse input
               auto I {ducc0::to_cmav<T, ndim>(inp_["I"])},
                    Q {ducc0::to_cmav<T, ndim>(inp_["Q"])},
@@ -226,7 +226,7 @@ class PolarizationMatrixExponential {
             };
 
         function<py::dict(const py::array &)> fadjtimes =
-            [=](const py::array &inp_) {
+            [nthreads=nthreads,appliedI,appliedQ,appliedU,appliedV,mat](const py::array &inp_) {
               // Parse input
               auto inp {ducc0::to_cmav<T, ndim+1>(inp_)};
               auto I {ducc0::subarray<ndim>(inp, {{0}, {}, {}, {}, {}})},
