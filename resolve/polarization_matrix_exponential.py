@@ -1,6 +1,21 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright(C) 2019-2021 Max-Planck-Society
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright(C) 2019-2022 Max-Planck-Society
 # Author: Philipp Arras
+
+from warnings import warn
 
 import nifty8 as ift
 
@@ -9,14 +24,36 @@ from .simple_operators import MultiFieldStacker
 from .global_config import nthreads
 
 
+def polarization_matrix_exponential_mf2f(domain):
+    """
+
+    Note
+    ----
+    In contrast to polarization_matrix_exponential this takes a MultiField as
+    an input and returns a Field.
+    """
+
+    import resolvelib
+
+    return resolvelib.PolarizationMatrixExponential(domain, nthreads())
+
+
 def polarization_matrix_exponential(domain, jax=False):
     """
+
+    Deprecated.
 
     Parameters
     ----------
     domain : DomainTuple
         DomainTuple of which the first entry is a PolarizationSpace.
     """
+    try:
+        import resolvelib
+        warn("You have resolvelib installed that provides a much faster version of "
+             "polarization_matrix_exponential. Use it with polarization_matrix_exponential_mf2f.")
+    except ImportError:
+        pass
     dom = ift.makeDomain(domain)
     pdom = dom[0]
     assert isinstance(pdom, PolarizationSpace)
@@ -30,19 +67,6 @@ def polarization_matrix_exponential(domain, jax=False):
     mfs = MultiFieldStacker(domain, 0, domain[0].labels)
     op = PolarizationMatrixExponential(mfs.domain)
     return mfs @ op @ mfs.inverse
-
-
-def polarization_matrix_exponential_mf2f(domain):
-    """
-
-    Note
-    ----
-    In contrast to polarization_matrix_exponential this takes a MultiField as
-    an input and returns a Field.
-    """
-    import resolvelib
-
-    return resolvelib.PolarizationMatrixExponential(domain, nthreads())
 
 
 class PolarizationMatrixExponential(ift.Operator):
