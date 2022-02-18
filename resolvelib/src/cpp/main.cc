@@ -32,9 +32,6 @@ auto None = py::none();
 #include "shape_helper.h"
 using namespace std;
 
-#define NEW_VERSION
-
-
 template<typename Tin, typename Tout>
 class Linearization {
   public:
@@ -96,20 +93,11 @@ class PolarizationMatrixExponential {
                           auto &oii, auto &oqq,
                           auto &ouu, auto &ovv
                           ){
-#ifdef NEW_VERSION
               auto pol{sqrt(qq*qq + uu*uu + vv*vv)};
               auto expii{exp(ii)};
               auto exppol{exp(pol)};
               oii = 0.5 * (expii*exppol + expii/exppol);
               auto tmp{0.5 * ((expii/pol)*exppol - (expii/pol)/exppol)};
-#else
-              auto pol0{qq*qq + uu*uu + vv*vv};
-              auto pol{sqrt(pol0)};
-              auto pol1{log(pol)};
-              oii = 0.5 * (exp(ii+pol) + exp(ii-pol));
-              auto diff{ii-pol1};
-              auto tmp{0.5 * (exp(diff+pol) - exp(diff-pol))};
-#endif
               oqq = tmp * qq;
               ouu = tmp * uu;
               ovv = tmp * vv;
@@ -117,7 +105,6 @@ class PolarizationMatrixExponential {
       return out_;
     }
 
-#ifdef NEW_VERSION
     Linearization<py::dict,py::array> apply_with_jac(const py::dict &loc_) {
         // Parse input
         auto I {ducc0::to_cmav<T, ndim>(loc_["I"])},
@@ -267,207 +254,7 @@ class PolarizationMatrixExponential {
 
         return Linearization<py::dict,py::array>(applied_, ftimes, fadjtimes);
     }
-#else
-    Linearization<py::dict,py::array> apply_with_jac(const py::dict &loc_) {
-        // Parse input
-        auto I {ducc0::to_cmav<T, ndim>(loc_["I"])},
-             Q {ducc0::to_cmav<T, ndim>(loc_["Q"])},
-             U {ducc0::to_cmav<T, ndim>(loc_["U"])},
-             V {ducc0::to_cmav<T, ndim>(loc_["V"])};
-        // /Parse input
-
-        // Instantiate output array
-        auto applied_ = ducc0::make_Pyarr<T>(combine_shapes(4, I.shape()));
-        auto applied  = ducc0::to_vmav<T, ndim+1>(applied_);
-        auto appliedI = ducc0::subarray<ndim>(applied, {{0}, {}, {}, {}, {}}),
-             appliedQ = ducc0::subarray<ndim>(applied, {{1}, {}, {}, {}, {}}),
-             appliedU = ducc0::subarray<ndim>(applied, {{2}, {}, {}, {}, {}}),
-             appliedV = ducc0::subarray<ndim>(applied, {{3}, {}, {}, {}, {}});
-        // /Instantiate output array
-
-        // Allocate Jacobian
-        auto shp{I.shape()};
-        auto d00 = appliedI;
-        auto d10 = appliedQ;
-        auto d20 = appliedU;
-        auto d30 = appliedV;
-        auto d01 = ducc0::vmav<T, ndim>(shp);
-        auto d02 = ducc0::vmav<T, ndim>(shp);
-        auto d03 = ducc0::vmav<T, ndim>(shp);
-        auto d11 = ducc0::vmav<T, ndim>(shp);
-        auto d12 = ducc0::vmav<T, ndim>(shp);
-        auto d13 = ducc0::vmav<T, ndim>(shp);
-        auto d21 = ducc0::vmav<T, ndim>(shp);
-        auto d22 = ducc0::vmav<T, ndim>(shp);
-        auto d23 = ducc0::vmav<T, ndim>(shp);
-        auto d31 = ducc0::vmav<T, ndim>(shp);
-        auto d32 = ducc0::vmav<T, ndim>(shp);
-        auto d33 = ducc0::vmav<T, ndim>(shp);
-        // /Allocate Jacobian
-
-        // Derive + apply
-        ducc0::mav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
-                            auto &oii, auto &oqq, auto &ouu, auto &ovv,
-                            auto &oiiqq, auto &oiiuu, auto &oiivv,
-                            auto &oqqqq, auto &oqquu, auto &oqqvv,
-                            auto &ouuqq, auto &ouuuu, auto &ouuvv,
-                            auto &ovvqq, auto &ovvuu, auto &ovvvv
-
-                            ){
-              auto pol0{qq*qq + uu*uu + vv*vv};
-              auto pol{sqrt(pol0)};
-              auto eplus0{exp(ii+pol)}, eminus0{exp(ii-pol)};
-              auto tmp2{0.5 / pol * (eplus0 - eminus0)};
-              oii = 0.5 * (eplus0 + eminus0);
-              oiiqq = tmp2 * qq;
-              oiiuu = tmp2 * uu;
-              oiivv = tmp2 * vv;
-
-              auto diff{ii-log(pol)};
-              auto eplus{exp(diff+pol)}, eminus{exp(diff-pol)};
-              auto tmp{0.5 * (eplus - eminus)};
-              auto tmp3{0.5/pol0 * (eplus*(pol-1.) + eminus*(pol+1.))};
-
-              auto tmpq{tmp3*qq};
-              oqq = tmp * qq;
-              oqqqq = qq * tmpq + tmp;
-              oqquu = uu * tmpq;
-              oqqvv = vv * tmpq;
-
-              auto tmpu{tmp3*uu};
-              ouu = tmp * uu;
-              ouuqq = qq * tmpu;
-              ouuuu = uu * tmpu + tmp;
-              ouuvv = vv * tmpu;
-
-              auto tmpv{tmp3*vv};
-              ovv = tmp * vv;
-              ovvqq = qq * tmpv;
-              ovvuu = uu * tmpv;
-              ovvvv = vv * tmpv + tmp;
-
-            }, nthreads,
-               I, Q, U, V,
-               appliedI, appliedQ, appliedU, appliedV,
-               d01, d02, d03,
-               d11, d12, d13,
-               d21, d22, d23,
-               d31, d32, d33);
-        // /Derive + apply
-
-        function<py::array(const py::dict &)> ftimes =
-            [=](const py::dict &inp_) {
-              // Parse input
-              auto I {ducc0::to_cmav<T, ndim>(inp_["I"])},
-                   Q {ducc0::to_cmav<T, ndim>(inp_["Q"])},
-                   U {ducc0::to_cmav<T, ndim>(inp_["U"])},
-                   V {ducc0::to_cmav<T, ndim>(inp_["V"])};
-              // /Parse input
-
-              // Instantiate output array
-              auto out_ = ducc0::make_Pyarr<T>(combine_shapes(4, I.shape()));
-              auto out  = ducc0::to_vmav<T, ndim+1>(out_);
-              auto outI = ducc0::subarray<ndim>(out, {{0}, {}, {}, {}, {}}),
-                   outQ = ducc0::subarray<ndim>(out, {{1}, {}, {}, {}, {}}),
-                   outU = ducc0::subarray<ndim>(out, {{2}, {}, {}, {}, {}}),
-                   outV = ducc0::subarray<ndim>(out, {{3}, {}, {}, {}, {}});
-              // /Instantiate output array
-
-              // Matrix multiplication
-              ducc0::mav_apply([](const auto &ii0, const auto &qq0,
-                                  const auto &uu0, const auto &vv0,
-                                  const auto &ii,  const auto &qq,
-                                  const auto &uu,  const auto &vv,
-                                  auto &out){
-                    out = ii0*ii + qq0*qq + uu0*uu + vv0*vv;
-                  }, nthreads, d00, d01, d02, d03, I, Q, U, V, outI);
-              ducc0::mav_apply([](const auto &ii0, const auto &qq0,
-                                  const auto &uu0, const auto &vv0,
-                                  const auto &ii,  const auto &qq,
-                                  const auto &uu,  const auto &vv,
-                                  auto &out){
-                    out = ii0*ii + qq0*qq + uu0*uu + vv0*vv;
-                  }, nthreads, d10, d11, d12, d13, I, Q, U, V, outQ);
-              ducc0::mav_apply([](const auto &ii0, const auto &qq0,
-                                  const auto &uu0, const auto &vv0,
-                                  const auto &ii,  const auto &qq,
-                                  const auto &uu,  const auto &vv,
-                                  auto &out){
-                    out = ii0*ii + qq0*qq + uu0*uu + vv0*vv;
-                  }, nthreads, d20, d21, d22, d23, I, Q, U, V, outU);
-              ducc0::mav_apply([](const auto &ii0, const auto &qq0,
-                                  const auto &uu0, const auto &vv0,
-                                  const auto &ii,  const auto &qq,
-                                  const auto &uu,  const auto &vv,
-                                  auto &out){
-                    out = ii0*ii + qq0*qq + uu0*uu + vv0*vv;
-                  }, nthreads, d30, d31, d32, d33, I, Q, U, V, outV);
-              // /Matrix multiplication
-
-              return out_;
-            };
-
-        function<py::dict(const py::array &)> fadjtimes =
-            [=](const py::array &inp_) {
-              // Parse input
-              auto inp {ducc0::to_cmav<T, ndim+1>(inp_)};
-              auto I {ducc0::subarray<ndim>(inp, {{0}, {}, {}, {}, {}})},
-                   Q {ducc0::subarray<ndim>(inp, {{1}, {}, {}, {}, {}})},
-                   U {ducc0::subarray<ndim>(inp, {{2}, {}, {}, {}, {}})},
-                   V {ducc0::subarray<ndim>(inp, {{3}, {}, {}, {}, {}})};
-              // /Parse input
-
-              // Instantiate output
-              py::dict out_;
-              out_["I"] = ducc0::make_Pyarr<T>(I.shape());
-              out_["Q"] = ducc0::make_Pyarr<T>(I.shape());
-              out_["U"] = ducc0::make_Pyarr<T>(I.shape());
-              out_["V"] = ducc0::make_Pyarr<T>(I.shape());
-              auto outI {ducc0::to_vmav<T, ndim>(out_["I"])},
-                   outQ {ducc0::to_vmav<T, ndim>(out_["Q"])},
-                   outU {ducc0::to_vmav<T, ndim>(out_["U"])},
-                   outV {ducc0::to_vmav<T, ndim>(out_["V"])};
-              // /Instantiate output
-
-              // Adjoint matrix multiplication
-              ducc0::mav_apply([](const auto &ii0, const auto &qq0,
-                                  const auto &uu0, const auto &vv0,
-                                  const auto &ii,  const auto &qq,
-                                  const auto &uu,  const auto &vv,
-                                  auto &out){
-                    out = ii0*ii + qq0*qq + uu0*uu + vv0*vv;
-                  }, nthreads, d00, d10, d20, d30, I, Q, U, V, outI);
-              ducc0::mav_apply([](const auto &ii0, const auto &qq0,
-                                  const auto &uu0, const auto &vv0,
-                                  const auto &ii,  const auto &qq,
-                                  const auto &uu,  const auto &vv,
-                                  auto &out){
-                    out = ii0*ii + qq0*qq + uu0*uu + vv0*vv;
-                  }, nthreads, d01, d11, d21, d31, I, Q, U, V, outQ);
-              ducc0::mav_apply([](const auto &ii0, const auto &qq0,
-                                  const auto &uu0, const auto &vv0,
-                                  const auto &ii,  const auto &qq,
-                                  const auto &uu,  const auto &vv,
-                                  auto &out){
-                    out = ii0*ii + qq0*qq + uu0*uu + vv0*vv;
-                  }, nthreads, d02, d12, d22, d32, I, Q, U, V, outU);
-              ducc0::mav_apply([](const auto &ii0, const auto &qq0,
-                                  const auto &uu0, const auto &vv0,
-                                  const auto &ii,  const auto &qq,
-                                  const auto &uu,  const auto &vv,
-                                  auto &out){
-                    out = ii0*ii + qq0*qq + uu0*uu + vv0*vv;
-                  }, nthreads, d03, d13, d23, d33, I, Q, U, V, outV);
-              // /Adjoint matrix multiplication
-              return out_;
-            };
-
-        return Linearization<py::dict,py::array>(applied_, ftimes, fadjtimes);
-    }
-#endif
 };
-
-
 
 PYBIND11_MODULE(_cpp, m) {
     m.attr("__name__") = "resolvelib._cpp";
