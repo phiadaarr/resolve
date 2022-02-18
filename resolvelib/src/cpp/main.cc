@@ -138,8 +138,7 @@ class PolarizationMatrixExponential {
           T iq, iu, iv, qq, qu, qv, uq, uu, uv, vq, vu, vv; };
 
         // Allocate Jacobian
-        auto shp{I.shape()};
-        auto mat = ducc0::vmav<mtx, ndim>(shp);
+        auto mat = ducc0::vmav<mtx, ndim>(I.shape());
         // /Allocate Jacobian
 
         // Derive + apply
@@ -219,10 +218,11 @@ class PolarizationMatrixExponential {
                                   const auto &uu, const auto &vv,
                                   auto &iiout, auto &qqout,
                                   auto &uuout, auto &vvout){
-                    iiout = dii*ii + d.iq*qq + d.iu*uu + d.iv*vv;
-                    qqout = dqi*ii + d.qq*qq + d.qu*uu + d.qv*vv;
-                    uuout = dui*ii + d.uq*qq + d.uu*uu + d.uv*vv;
-                    vvout = dvi*ii + d.vq*qq + d.vu*uu + d.vv*vv;
+                    auto ti = dii*ii + d.iq*qq + d.iu*uu + d.iv*vv;
+                    auto tq = dqi*ii + d.qq*qq + d.qu*uu + d.qv*vv;
+                    auto tu = dui*ii + d.uq*qq + d.uu*uu + d.uv*vv;
+                    auto tv = dvi*ii + d.vq*qq + d.vu*uu + d.vv*vv;
+                    iiout = ti; qqout = tq; uuout = tu; vvout = tv;
                   }, nthreads, appliedI, appliedQ, appliedU, appliedV,mat,I,Q,U,V,outI,outQ,outU,outV);
               // /Matrix multiplication
 
@@ -264,10 +264,11 @@ class PolarizationMatrixExponential {
                                   const auto &uu, const auto &vv,
                                   auto &iiout, auto &qqout,
                                   auto &uuout, auto &vvout){
-                    iiout = dii *ii  + dqi *qq  + dui *uu  + dvi *vv;
-                    qqout = d.iq*ii + d.qq*qq + d.uq*uu + d.vq*vv;
-                    uuout = d.iu*ii + d.qu*qq + d.uu*uu + d.vu*vv;
-                    vvout = d.iv*ii + d.qv*qq + d.uv*uu + d.vv*vv;
+                    auto ti = dii *ii + dqi *qq + dui *uu + dvi *vv;
+                    auto tq = d.iq*ii + d.qq*qq + d.uq*uu + d.vq*vv;
+                    auto tu = d.iu*ii + d.qu*qq + d.uu*uu + d.vu*vv;
+                    auto tv = d.iv*ii + d.qv*qq + d.uv*uu + d.vv*vv;
+                    iiout = ti; qqout = tq; uuout = tu; vvout = tv;
                   }, nthreads, appliedI, appliedQ, appliedU, appliedV,mat,I,Q,U,V,outI,outQ,outU,outV);
               // /Adjoint matrix multiplication
               return out_;
@@ -276,8 +277,6 @@ class PolarizationMatrixExponential {
         return Linearization<py::dict,py::array>(applied_, ftimes, fadjtimes);
     }
 };
-
-
 
 PYBIND11_MODULE(_cpp, m) {
     m.attr("__name__") = "resolvelib._cpp";
