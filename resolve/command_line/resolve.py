@@ -17,7 +17,6 @@ from ..likelihood import ImagingLikelihood
 from ..mpi import barrier, comm, master
 from ..plot.baseline_histogram import visualize_weighted_residuals
 from ..sky_model import sky_model_diffuse, sky_model_points
-from ..util import profile_function
 from ..weighting_model import weighting_model
 
 
