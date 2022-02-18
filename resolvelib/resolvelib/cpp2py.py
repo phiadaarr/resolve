@@ -49,6 +49,12 @@ class Pybind11Jacobian(ift.LinearOperator):
 
 def PolarizationMatrixExponential(domain, nthreads=1):
     from . import _cpp
+    import resolve as rve
 
     domain = ift.MultiDomain.make(domain)
-    return Pybind11Operator(domain, domain, _cpp.PolarizationMatrixExponential(nthreads))
+    pdom = rve.PolarizationSpace(["I", "Q", "U", "V"])
+    assert pdom.labels_eq(domain.keys())
+    restdom = domain.values()[0]
+    target = (pdom,) + tuple(restdom)
+    print(len(resdom.shape))
+    return Pybind11Operator(domain, target, _cpp.PolarizationMatrixExponential2(nthreads))

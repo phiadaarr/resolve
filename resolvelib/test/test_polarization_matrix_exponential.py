@@ -48,6 +48,8 @@ def test_polarization_matrix_exponential():
     dom = {kk: dom[1:] for kk in pdom.labels}
     tgt = rve.default_sky_domain(pdom=pdom, sdom=sdom)
     mfs = rve.MultiFieldStacker(tgt, 0, tgt[0].labels)
-    opold = mfs.inverse @ rve.polarization_matrix_exponential(tgt) @ mfs
-    op = resolvelib.PolarizationMatrixExponential(dom, nthreads)
+    opold = rve.polarization_matrix_exponential(tgt) @ mfs
+    op = resolvelib.PolarizationMatrixExponential(opold.domain, nthreads)
+    assert isinstance(op.domain, ift.MultiDomain)
+    assert isinstance(op.target, ift.DomainTuple)
     operator_equality(opold, op)
