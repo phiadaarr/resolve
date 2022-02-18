@@ -21,11 +21,11 @@ import nifty8 as ift
 
 from .polarization_space import PolarizationSpace
 from .simple_operators import MultiFieldStacker
-from .global_config import nthreads
 from .cpp import Pybind11Operator
+from .global_config import nthreads as global_nthreads
 
 
-def polarization_matrix_exponential_mf2f(domain):
+def polarization_matrix_exponential_mf2f(domain, nthreads=None):
     """
 
     Note
@@ -53,7 +53,9 @@ def polarization_matrix_exponential_mf2f(domain):
         f = _cpp.PolarizationMatrixExponential4
     else:
         raise NotImplementedError("Not compiled for this shape")
-    return Pybind11Operator(domain, target, f(nthreads()))
+    if nthreads is None:
+        nthreads = global_nthreads()
+    return Pybind11Operator(domain, target, f(nthreads))
 
 
 def polarization_matrix_exponential(domain, jax=False):

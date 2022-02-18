@@ -49,6 +49,11 @@ test_resolve_mpi:
   script:
     - mpiexec -n 2 --bind-to none pytest-3 -q test/test_mpi
 
+test_bench:
+  stage: testing
+  script:
+    - python3 bench/polarization_matrix_exponential.py quick
+
 pages:
   stage: release
   script:

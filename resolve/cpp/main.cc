@@ -17,7 +17,7 @@
  */
 
 /* Copyright (C) 2021-2022 Max-Planck-Society, Philipp Arras
-   Authors: Philipp Arras, Jakob Roth */
+   Authors: Philipp Arras */
 
 // Includes related to pybind11
 #include <pybind11/numpy.h>

@@ -44,7 +44,7 @@ if False:
         op(ift.Linearization.make_var(loc))
 
 for nthreads in [1, 4, 8]:
-    op = rve.cpp.PolarizationMatrixExponential(dom, nthreads)
+    op = rve.polarization_matrix_exponential_mf2f(dom, nthreads)
     print(f"New implementation (nthreads={nthreads})")
     ift.exec_time(op)
     print()
