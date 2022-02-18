@@ -45,26 +45,3 @@ class Pybind11Jacobian(ift.LinearOperator):
         self._check_input(x, mode)
         res = (self._times if mode == self.TIMES else self._adj_times)(x.val)
         return ift.makeField(self._tgt(mode), res)
-
-
-def PolarizationMatrixExponential(domain, nthreads=1):
-    from . import _cpp
-    import resolve as rve
-
-    domain = ift.MultiDomain.make(domain)
-    pdom = rve.PolarizationSpace(["I", "Q", "U", "V"])
-    assert pdom.labels_eq(domain.keys())
-    restdom = domain.values()[0]
-    assert all(dd == restdom for dd in domain.values())
-    target = (pdom,) + tuple(restdom)
-    if len(restdom.shape) == 1:
-        f = _cpp.PolarizationMatrixExponential1
-    elif len(restdom.shape) == 2:
-        f = _cpp.PolarizationMatrixExponential2
-    elif len(restdom.shape) == 3:
-        f = _cpp.PolarizationMatrixExponential3
-    elif len(restdom.shape) == 4:
-        f = _cpp.PolarizationMatrixExponential4
-    else:
-        raise NotImplementedError("Not compiled for this shape")
-    return Pybind11Operator(domain, target, f(nthreads))

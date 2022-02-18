@@ -18,7 +18,6 @@ import sys
 
 import resolve as rve
 import nifty8 as ift
-import resolvelib
 import numpy as np
 
 from time import time
@@ -38,14 +37,14 @@ opold_jax = rve.polarization_matrix_exponential(tgt, jax=True)
 
 
 if False:
-    op = resolvelib.PolarizationMatrixExponential(dom, 8)
+    op = rve.cpp.PolarizationMatrixExponential(dom, 8)
     loc = ift.from_random(op.domain)
     for ii in range(10000):
         print(ii)
         op(ift.Linearization.make_var(loc))
 
 for nthreads in [1, 4, 8]:
-    op = resolvelib.PolarizationMatrixExponential(dom, nthreads)
+    op = rve.cpp.PolarizationMatrixExponential(dom, nthreads)
     print(f"New implementation (nthreads={nthreads})")
     ift.exec_time(op)
     print()
