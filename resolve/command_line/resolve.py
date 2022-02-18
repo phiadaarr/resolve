@@ -26,6 +26,7 @@ def main():
     parser.add_argument("config_file")
     parser.add_argument("-j", type=int, default=1,
                         help="Number of threads for thread parallelization")
+    parser.add_argument("--profile-only", action="store_true")
     args = parser.parse_args()
 
     cfg = ConfigParser()
@@ -77,6 +78,8 @@ def main():
         os.makedirs(outdir, exist_ok=True)
         with ift.random.Context(12):
             ift.exec_time(lhs["full"], verbose=True)
+        if args.profile_only:
+            exit()
         with open(os.path.join(outdir, "log.txt"), "a") as f:
             f.write(s)
         print(s)
