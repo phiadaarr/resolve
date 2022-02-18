@@ -307,10 +307,10 @@ class PolarizationMatrixExponential {
 
 PYBIND11_MODULE(_cpp, m) {
     m.attr("__name__") = "resolvelib._cpp";
-    py::class_<PolarizationMatrixExponential<double, 2>>(m, "PolarizationMatrixExponential2")
+    py::class_<PolarizationMatrixExponential<double, 4>>(m, "PolarizationMatrixExponential")
         .def(py::init<size_t>())
-        .def("apply",          &PolarizationMatrixExponential<double, 2>::apply)
-        .def("apply_with_jac", &PolarizationMatrixExponential<double, 2>::apply_with_jac);
+        .def("apply",          &PolarizationMatrixExponential<double, 4>::apply)
+        .def("apply_with_jac", &PolarizationMatrixExponential<double, 4>::apply_with_jac);
 
     add_linearization<py::array, py::array>(m, "Linearization_field2field");
     add_linearization<py::array, py::dict >(m, "Linearization_field2mfield");

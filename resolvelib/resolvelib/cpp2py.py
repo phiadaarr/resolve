@@ -56,5 +56,4 @@ def PolarizationMatrixExponential(domain, nthreads=1):
     assert pdom.labels_eq(domain.keys())
     restdom = domain.values()[0]
     target = (pdom,) + tuple(restdom)
-    print(len(resdom.shape))
-    return Pybind11Operator(domain, target, _cpp.PolarizationMatrixExponential2(nthreads))
+    return Pybind11Operator(domain, target, _cpp.PolarizationMatrixExponential(nthreads))
