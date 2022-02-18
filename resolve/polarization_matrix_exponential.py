@@ -54,7 +54,7 @@ def polarization_matrix_exponential(domain, jax=False):
              "polarization_matrix_exponential. Use it with polarization_matrix_exponential_mf2f.")
     except ImportError:
         pass
-    dom = ift.makeDomain(domain)
+    dom = ift.DomainTuple.make(domain)
     pdom = dom[0]
     assert isinstance(pdom, PolarizationSpace)
 

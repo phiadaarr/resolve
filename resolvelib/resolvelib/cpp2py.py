@@ -55,5 +55,8 @@ def PolarizationMatrixExponential(domain, nthreads=1):
     pdom = rve.PolarizationSpace(["I", "Q", "U", "V"])
     assert pdom.labels_eq(domain.keys())
     restdom = domain.values()[0]
+    assert all(dd == restdom for dd in domain.values())
     target = (pdom,) + tuple(restdom)
+    if not len(restdom.shape) == 4:
+        raise NotImplementedError("The entries of `domain` need to have four dimensions.")
     return Pybind11Operator(domain, target, _cpp.PolarizationMatrixExponential(nthreads))
