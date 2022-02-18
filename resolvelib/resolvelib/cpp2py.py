@@ -57,6 +57,14 @@ def PolarizationMatrixExponential(domain, nthreads=1):
     restdom = domain.values()[0]
     assert all(dd == restdom for dd in domain.values())
     target = (pdom,) + tuple(restdom)
-    if not len(restdom.shape) == 4:
-        raise NotImplementedError("The entries of `domain` need to have four dimensions.")
-    return Pybind11Operator(domain, target, _cpp.PolarizationMatrixExponential(nthreads))
+    if len(restdom.shape) == 1:
+        f = _cpp.PolarizationMatrixExponential1
+    elif len(restdom.shape) == 2:
+        f = _cpp.PolarizationMatrixExponential2
+    elif len(restdom.shape) == 3:
+        f = _cpp.PolarizationMatrixExponential3
+    elif len(restdom.shape) == 4:
+        f = _cpp.PolarizationMatrixExponential4
+    else:
+        raise NotImplementedError("Not compiled for this shape")
+    return Pybind11Operator(domain, target, f(nthreads))

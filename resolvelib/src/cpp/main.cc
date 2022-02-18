@@ -80,10 +80,15 @@ class PolarizationMatrixExponential {
       // Instantiate output array
       auto out_ = ducc0::make_Pyarr<T>(combine_shapes(4, I.shape()));
       auto out  = ducc0::to_vmav<T, ndim+1>(out_);
-      auto outI = ducc0::subarray<ndim>(out, {{0}, {}, {}, {}, {}}),
-           outQ = ducc0::subarray<ndim>(out, {{1}, {}, {}, {}, {}}),
-           outU = ducc0::subarray<ndim>(out, {{2}, {}, {}, {}, {}}),
-           outV = ducc0::subarray<ndim>(out, {{3}, {}, {}, {}, {}});
+      vector<ducc0::slice> slcs(ndim+1);
+      slcs[0] = ducc0::slice(0);
+      auto outI = ducc0::subarray<ndim>(out, slcs);
+      slcs[0] = ducc0::slice(1);
+      auto outQ = ducc0::subarray<ndim>(out, slcs);
+      slcs[0] = ducc0::slice(2);
+      auto outU = ducc0::subarray<ndim>(out, slcs);
+      slcs[0] = ducc0::slice(3);
+      auto outV = ducc0::subarray<ndim>(out, slcs);
       // /Instantiate output array
 
 
@@ -116,10 +121,16 @@ class PolarizationMatrixExponential {
         // Instantiate output array
         auto applied_ = ducc0::make_Pyarr<T>(combine_shapes(4, I.shape()));
         auto applied  = ducc0::to_vmav<T, ndim+1>(applied_);
-        auto appliedI = ducc0::subarray<ndim>(applied, {{0}, {}, {}, {}, {}}),
-             appliedQ = ducc0::subarray<ndim>(applied, {{1}, {}, {}, {}, {}}),
-             appliedU = ducc0::subarray<ndim>(applied, {{2}, {}, {}, {}, {}}),
-             appliedV = ducc0::subarray<ndim>(applied, {{3}, {}, {}, {}, {}});
+
+        vector<ducc0::slice> slcs(ndim+1);
+        slcs[0] = ducc0::slice(0);
+        auto appliedI = ducc0::subarray<ndim>(applied, slcs);
+        slcs[0] = ducc0::slice(1);
+        auto appliedQ = ducc0::subarray<ndim>(applied, slcs);
+        slcs[0] = ducc0::slice(2);
+        auto appliedU = ducc0::subarray<ndim>(applied, slcs);
+        slcs[0] = ducc0::slice(3);
+        auto appliedV = ducc0::subarray<ndim>(applied, slcs);
         // /Instantiate output array
 
         // Allocate Jacobian
@@ -204,10 +215,15 @@ class PolarizationMatrixExponential {
               // Instantiate output array
               auto out_ = ducc0::make_Pyarr<T>(combine_shapes(4, I.shape()));
               auto out  = ducc0::to_vmav<T, ndim+1>(out_);
-              auto outI = ducc0::subarray<ndim>(out, {{0}, {}, {}, {}, {}}),
-                   outQ = ducc0::subarray<ndim>(out, {{1}, {}, {}, {}, {}}),
-                   outU = ducc0::subarray<ndim>(out, {{2}, {}, {}, {}, {}}),
-                   outV = ducc0::subarray<ndim>(out, {{3}, {}, {}, {}, {}});
+              vector<ducc0::slice> slcs(ndim+1);
+              slcs[0] = ducc0::slice(0);
+              auto outI = ducc0::subarray<ndim>(out, slcs);
+              slcs[0] = ducc0::slice(1);
+              auto outQ = ducc0::subarray<ndim>(out, slcs);
+              slcs[0] = ducc0::slice(2);
+              auto outU = ducc0::subarray<ndim>(out, slcs);
+              slcs[0] = ducc0::slice(3);
+              auto outV = ducc0::subarray<ndim>(out, slcs);
               // /Instantiate output array
 
               // Matrix multiplication
@@ -248,10 +264,15 @@ class PolarizationMatrixExponential {
             [=](const py::array &inp_) {
               // Parse input
               auto inp {ducc0::to_cmav<T, ndim+1>(inp_)};
-              auto I {ducc0::subarray<ndim>(inp, {{0}, {}, {}, {}, {}})},
-                   Q {ducc0::subarray<ndim>(inp, {{1}, {}, {}, {}, {}})},
-                   U {ducc0::subarray<ndim>(inp, {{2}, {}, {}, {}, {}})},
-                   V {ducc0::subarray<ndim>(inp, {{3}, {}, {}, {}, {}})};
+              vector<ducc0::slice> slcs(ndim+1);
+              slcs[0] = ducc0::slice(0);
+              auto I {ducc0::subarray<ndim>(inp, slcs)};
+              slcs[0] = ducc0::slice(1);
+              auto Q {ducc0::subarray<ndim>(inp, slcs)};
+              slcs[0] = ducc0::slice(2);
+              auto U {ducc0::subarray<ndim>(inp, slcs)};
+              slcs[0] = ducc0::slice(3);
+              auto V {ducc0::subarray<ndim>(inp, slcs)};
               // /Parse input
 
               // Instantiate output
@@ -307,7 +328,19 @@ class PolarizationMatrixExponential {
 
 PYBIND11_MODULE(_cpp, m) {
     m.attr("__name__") = "resolvelib._cpp";
-    py::class_<PolarizationMatrixExponential<double, 4>>(m, "PolarizationMatrixExponential")
+    py::class_<PolarizationMatrixExponential<double, 1>>(m, "PolarizationMatrixExponential1")
+        .def(py::init<size_t>())
+        .def("apply",          &PolarizationMatrixExponential<double, 1>::apply)
+        .def("apply_with_jac", &PolarizationMatrixExponential<double, 1>::apply_with_jac);
+    py::class_<PolarizationMatrixExponential<double, 2>>(m, "PolarizationMatrixExponential2")
+        .def(py::init<size_t>())
+        .def("apply",          &PolarizationMatrixExponential<double, 2>::apply)
+        .def("apply_with_jac", &PolarizationMatrixExponential<double, 2>::apply_with_jac);
+    py::class_<PolarizationMatrixExponential<double, 3>>(m, "PolarizationMatrixExponential3")
+        .def(py::init<size_t>())
+        .def("apply",          &PolarizationMatrixExponential<double, 3>::apply)
+        .def("apply_with_jac", &PolarizationMatrixExponential<double, 3>::apply_with_jac);
+    py::class_<PolarizationMatrixExponential<double, 4>>(m, "PolarizationMatrixExponential4")
         .def(py::init<size_t>())
         .def("apply",          &PolarizationMatrixExponential<double, 4>::apply)
         .def("apply_with_jac", &PolarizationMatrixExponential<double, 4>::apply_with_jac);

@@ -70,18 +70,19 @@ def main():
 
     # Profiling
     position = 0.1 * ift.from_random(lhs["full"].domain)
-    set_verbosity(True)
+    #set_verbosity(True)
     barrier(comm)
-    s = "\n\nProfile likelihood\n" + profile_function(lhs["full"], position, 1)
     if master:
         # FIXME Use python's logger module for this
         os.makedirs(outdir, exist_ok=True)
+        with ift.random.Context(12):
+            ift.exec_time(lhs["full"], verbose=True)
         with open(os.path.join(outdir, "log.txt"), "a") as f:
             f.write(s)
         print(s)
     del position
     barrier(comm)
-    set_verbosity(False)
+    #set_verbosity(False)
     # /Profiling
 
     def inspect_callback(sl, iglobal, position):
