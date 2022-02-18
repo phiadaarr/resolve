@@ -68,12 +68,8 @@ def polarization_matrix_exponential(domain, jax=False):
     domain : DomainTuple
         DomainTuple of which the first entry is a PolarizationSpace.
     """
-    try:
-        import resolvelib
-        warn("You have resolvelib installed that provides a much faster version of "
-             "polarization_matrix_exponential. Use it with polarization_matrix_exponential_mf2f.")
-    except ImportError:
-        pass
+    warn("polarization_matrix_exponential is deprecated. "
+         "Use polarization_matrix_exponential_mf2f instead.", DeprecationWarning)
     dom = ift.DomainTuple.make(domain)
     pdom = dom[0]
     assert isinstance(pdom, PolarizationSpace)
