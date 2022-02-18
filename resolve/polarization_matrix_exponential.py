@@ -37,7 +37,7 @@ def polarization_matrix_exponential_mf2f(domain, nthreads=None):
 
     domain = ift.MultiDomain.make(domain)
     if list(domain.keys()) == ["I"]:
-        return ift.ducktape(domain, None, "I").adjoint
+        return ift.ducktape(domain, None, "I").adjoint.exp()
     pdom = PolarizationSpace(["I", "Q", "U", "V"])
     assert pdom.labels_eq(domain.keys())
     restdom = domain.values()[0]
