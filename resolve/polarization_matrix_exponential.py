@@ -22,7 +22,6 @@ import nifty8 as ift
 from .polarization_space import PolarizationSpace
 from .simple_operators import MultiFieldStacker
 from .global_config import nthreads
-from . import _cpp
 from .cpp import Pybind11Operator
 
 
@@ -34,6 +33,7 @@ def polarization_matrix_exponential_mf2f(domain):
     In contrast to polarization_matrix_exponential this takes a MultiField as
     an input and returns a Field.
     """
+    from . import _cpp
 
     domain = ift.MultiDomain.make(domain)
     pdom = PolarizationSpace(["I", "Q", "U", "V"])
