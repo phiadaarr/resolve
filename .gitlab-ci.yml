@@ -35,19 +35,12 @@ build_docker_from_cache:
 
 before_script:
   - pip3 install --user .
-  - cd resolvelib && pip3 install --user . && cd ..
 
 test_resolve:
   stage: testing
   script:
     - pytest-3 -q --cov=resolve test
   coverage: '/^TOTAL.+?(\d+\%)$/'
-
-test_resolvelib:
-  stage: testing
-  script:
-    - cd resolvelib && pytest-3 -q test
-    - python3 demos/bench.py quick
 
 test_resolve_mpi:
   stage: testing
