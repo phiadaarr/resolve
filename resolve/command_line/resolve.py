@@ -27,6 +27,7 @@ def main():
     parser.add_argument("-j", type=int, default=1,
                         help="Number of threads for thread parallelization")
     parser.add_argument("--profile-only", action="store_true")
+    parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
     cfg = ConfigParser()
@@ -71,21 +72,20 @@ def main():
 
     # Profiling
     position = 0.1 * ift.from_random(lhs["full"].domain)
-    #set_verbosity(True)
     barrier(comm)
     if master:
-        # FIXME Use python's logger module for this
         os.makedirs(outdir, exist_ok=True)
         with ift.random.Context(12):
-            ift.exec_time(lhs["full"], verbose=True)
+            if args.verbose:
+                set_verbosity(True)
+                ift.exec_time(lhs["full"], verbose=True)
+                set_verbosity(False)
+            else:
+                ift.exec_time(lhs["full"])
         if args.profile_only:
             exit()
-        with open(os.path.join(outdir, "log.txt"), "a") as f:
-            f.write(s)
-        print(s)
     del position
     barrier(comm)
-    #set_verbosity(False)
     # /Profiling
 
     def inspect_callback(sl, iglobal, position):
