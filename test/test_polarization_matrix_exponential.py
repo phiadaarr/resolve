@@ -20,7 +20,6 @@ import pytest
 import resolve as rve
 
 from .common import list2fixture
-import resolve as rve
 import nifty8 as ift
 import numpy as np
 
