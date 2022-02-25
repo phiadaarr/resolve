@@ -45,7 +45,7 @@ def _get_files_by_suffix(directory, suffix):
     return list(itertools.chain.from_iterable(iterable_sources))
 
 
-include_dirs = ['./resolve/cpp/ducc/src',
+include_dirs = ['./resolvelib/ducc/src',
                 pybind11.get_include(True),
                 pybind11.get_include(False)]
 
@@ -101,16 +101,13 @@ depfiles = (_get_files_by_suffix('.', 'h') +
             _get_files_by_suffix('.', 'cc') +
             ['setup.py'])
 
-extensions = [Extension("resolve._cpp",
-                        language='c++',
-                        sources=['resolve/cpp/main.cc', 'resolve/cpp/ducc/src/ducc0/infra/threading.cc'],
+extensions = [Extension("resolvelib",
+                        sources=['resolvelib/resolvelib.cc',
+                                 'resolvelib/ducc/src/ducc0/infra/threading.cc'],
                         depends=depfiles,
                         include_dirs=include_dirs,
                         extra_compile_args=extra_compile_args,
                         extra_link_args=python_module_link_args)]
-
-
-this_directory = os.path.abspath(os.path.dirname(__file__))
 
 _print_env()
 

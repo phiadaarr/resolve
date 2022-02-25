@@ -35,14 +35,6 @@ tgt = rve.default_sky_domain(pdom=pdom, sdom=sdom)
 opold = rve.polarization_matrix_exponential(tgt)
 opold_jax = rve.polarization_matrix_exponential(tgt, jax=True)
 
-
-if False:
-    op = rve.cpp.PolarizationMatrixExponential(dom, 8)
-    loc = ift.from_random(op.domain)
-    for ii in range(10000):
-        print(ii)
-        op(ift.Linearization.make_var(loc))
-
 for nthreads in [1, 4, 8]:
     op = rve.polarization_matrix_exponential_mf2f(dom, nthreads)
     print(f"New implementation (nthreads={nthreads})")

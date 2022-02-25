@@ -18,10 +18,11 @@
 from warnings import warn
 
 import nifty8 as ift
+import resolvelib
 
 from .polarization_space import PolarizationSpace
 from .simple_operators import MultiFieldStacker
-from .cpp import Pybind11Operator
+from .cpp2py import Pybind11Operator
 from .global_config import nthreads as global_nthreads
 
 
@@ -33,8 +34,6 @@ def polarization_matrix_exponential_mf2f(domain, nthreads=None):
     In contrast to polarization_matrix_exponential this takes a MultiField as
     an input and returns a Field.
     """
-    from . import _cpp
-
     domain = ift.MultiDomain.make(domain)
     if list(domain.keys()) == ["I"]:
         return ift.ducktape(domain, None, "I").adjoint.exp()
@@ -44,13 +43,13 @@ def polarization_matrix_exponential_mf2f(domain, nthreads=None):
     assert all(dd == restdom for dd in domain.values())
     target = (pdom,) + tuple(restdom)
     if len(restdom.shape) == 1:
-        f = _cpp.PolarizationMatrixExponential1
+        f = resolvelib.PolarizationMatrixExponential1
     elif len(restdom.shape) == 2:
-        f = _cpp.PolarizationMatrixExponential2
+        f = resolvelib.PolarizationMatrixExponential2
     elif len(restdom.shape) == 3:
-        f = _cpp.PolarizationMatrixExponential3
+        f = resolvelib.PolarizationMatrixExponential3
     elif len(restdom.shape) == 4:
-        f = _cpp.PolarizationMatrixExponential4
+        f = resolvelib.PolarizationMatrixExponential4
     else:
         raise NotImplementedError("Not compiled for this shape")
     if nthreads is None:

@@ -1,3 +1,3 @@
-[submodule "resolve/cpp/ducc"]
-	path = resolve/cpp/ducc
+[submodule "resolvelib/ducc"]
+	path = resolvelib/ducc
 	url = https://gitlab.mpcdf.mpg.de/mtr/ducc
