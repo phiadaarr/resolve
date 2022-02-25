@@ -14,7 +14,8 @@ from .integrated_wiener_process import (IntWProcessInitialConditions,
                                         WienerIntegrations)
 from .irg_space import IRGSpace
 from .points import PointInserter
-from .polarization_matrix_exponential import polarization_matrix_exponential_mf2f
+from .polarization_matrix_exponential import \
+    polarization_matrix_exponential_mf2f
 from .polarization_space import PolarizationSpace
 from .simple_operators import MultiFieldStacker
 from .util import assert_sky_domain

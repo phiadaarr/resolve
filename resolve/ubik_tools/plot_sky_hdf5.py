@@ -12,15 +12,15 @@ import matplotlib.pyplot as plt
 import nifty8 as ift
 import numpy as np
 from matplotlib.colors import CenteredNorm, LogNorm, Normalize
-
-from ..sky_model import assert_sky_domain, default_sky_domain
-from .fits import field2fits
-
 # For eval() spaces
 from nifty8 import DomainTuple, MultiDomain
 from nifty8.domains import *
+
 from ..irg_space import IRGSpace
 from ..polarization_space import PolarizationSpace
+from ..sky_model import assert_sky_domain, default_sky_domain
+from .fits import field2fits
+
 # /For eval() spaces
 
 

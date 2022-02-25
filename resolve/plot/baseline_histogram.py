@@ -3,15 +3,15 @@
 # Author: Philipp Arras
 
 import os
+
+import matplotlib.pyplot as plt
+import nifty8 as ift
+import numpy as np
+from matplotlib.colors import LogNorm
+
 from ..constants import ARCMIN2RAD
 from ..data.observation import unique_antennas
 from ..ubik_tools.plot_sky_hdf5 import _optimal_subplot_distribution
-
-import nifty8 as ift
-import numpy as np
-
-import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
 
 
 def baseline_histogram(file_name, vis, observation, bins, weight):

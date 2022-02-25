@@ -2,11 +2,11 @@
 # Copyright(C) 2020-2022 Max-Planck-Society, Philipp Arras
 # Author: Philipp Arras
 
-from time import time
 import cProfile
 import io
 import pstats
 from pstats import SortKey
+from time import time
 
 import matplotlib.pyplot as plt
 import nifty8 as ift
@@ -181,3 +181,11 @@ def _duplicate(lst, n):
     if len(lst) == 1:
         return n*lst
     raise RuntimeError
+
+
+def is_single_precision(dtype):
+    if dtype in [np.float32, np.complex64]:
+        return True
+    elif dtype in [np.float64, np.complex128]:
+        return False
+    raise TypeError(f"DType {dtype} is not a floating point dtype.")

@@ -19,12 +19,13 @@
 from warnings import warn
 
 import nifty8 as ift
+
 import resolvelib
 
-from .polarization_space import PolarizationSpace
-from .simple_operators import MultiFieldStacker
 from .cpp2py import Pybind11Operator
 from .global_config import nthreads as global_nthreads
+from .polarization_space import PolarizationSpace
+from .simple_operators import MultiFieldStacker
 
 
 def polarization_matrix_exponential_mf2f(domain, nthreads=None):
@@ -122,7 +123,7 @@ class PolarizationMatrixExponential(ift.Operator):
 
 
 def _jax_pol(domain):
-    from jax.numpy import cosh, exp, sinh, sqrt, empty, float64, zeros
+    from jax.numpy import cosh, empty, exp, float64, sinh, sqrt, zeros
 
     domain = ift.makeDomain(domain)
     pdom = domain[0]

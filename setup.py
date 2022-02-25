@@ -3,14 +3,14 @@
 # Copyright(C) 2022 Max-Planck-Society, Philipp Arras
 # Author: Philipp Arras
 
-import sys
-import os.path
 import itertools
-from glob import iglob
 import os
+import os.path
+import sys
+from glob import iglob
 
-from setuptools import setup, Extension, find_packages
 import pybind11
+from setuptools import Extension, find_packages, setup
 
 tmp = os.getenv("DUCC0_CFLAGS", "").split(" ")
 user_cflags = [x for x in tmp if x != ""]

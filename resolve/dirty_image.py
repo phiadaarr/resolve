@@ -5,7 +5,7 @@
 import nifty8 as ift
 import numpy as np
 
-from .constants import str2rad, SPEEDOFLIGHT
+from .constants import SPEEDOFLIGHT, str2rad
 from .global_config import set_epsilon, set_wgridding
 from .irg_space import IRGSpace
 from .polarization_space import PolarizationSpace
