@@ -20,7 +20,6 @@ import pytest
 import resolve as rve
 
 from .common import list2fixture
-import nifty8 as ift
 import numpy as np
 
 from time import time
