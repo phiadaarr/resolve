@@ -12,7 +12,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright(C) 2019-2022 Max-Planck-Society
+# Copyright(C) 2019-2021 Max-Planck-Society
+# Copyright(C) 2019-2022 Max-Planck-Society, Philipp Arras
 # Author: Philipp Arras
 
 from warnings import warn
