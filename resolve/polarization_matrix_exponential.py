@@ -1,22 +1,76 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 # Copyright(C) 2019-2021 Max-Planck-Society
+# Copyright(C) 2019-2022 Max-Planck-Society, Philipp Arras
 # Author: Philipp Arras
 
+from warnings import warn
+
 import nifty8 as ift
+import resolvelib
 
 from .polarization_space import PolarizationSpace
 from .simple_operators import MultiFieldStacker
+from .cpp2py import Pybind11Operator
+from .global_config import nthreads as global_nthreads
+
+
+def polarization_matrix_exponential_mf2f(domain, nthreads=None):
+    """
+
+    Note
+    ----
+    In contrast to polarization_matrix_exponential this takes a MultiField as
+    an input and returns a Field.
+    """
+    domain = ift.MultiDomain.make(domain)
+    if list(domain.keys()) == ["I"]:
+        return ift.ducktape(domain, None, "I").adjoint.exp()
+    pdom = PolarizationSpace(["I", "Q", "U", "V"])
+    assert pdom.labels_eq(domain.keys())
+    restdom = domain.values()[0]
+    assert all(dd == restdom for dd in domain.values())
+    target = (pdom,) + tuple(restdom)
+    if len(restdom.shape) == 1:
+        f = resolvelib.PolarizationMatrixExponential1
+    elif len(restdom.shape) == 2:
+        f = resolvelib.PolarizationMatrixExponential2
+    elif len(restdom.shape) == 3:
+        f = resolvelib.PolarizationMatrixExponential3
+    elif len(restdom.shape) == 4:
+        f = resolvelib.PolarizationMatrixExponential4
+    else:
+        raise NotImplementedError("Not compiled for this shape")
+    if nthreads is None:
+        nthreads = global_nthreads()
+    return Pybind11Operator(domain, target, f(nthreads))
 
 
 def polarization_matrix_exponential(domain, jax=False):
     """
+
+    Deprecated.
 
     Parameters
     ----------
     domain : DomainTuple
         DomainTuple of which the first entry is a PolarizationSpace.
     """
-    dom = ift.makeDomain(domain)
+    warn("polarization_matrix_exponential is deprecated. "
+         "Use polarization_matrix_exponential_mf2f instead.", DeprecationWarning)
+    dom = ift.DomainTuple.make(domain)
     pdom = dom[0]
     assert isinstance(pdom, PolarizationSpace)
 

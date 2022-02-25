@@ -169,18 +169,6 @@ def assert_data_domain(dom):
     my_assert_isinstance(fdom, IRGSpace)
 
 
-def profile_function(func, inp, ntries):
-    t0 = time()
-    with cProfile.Profile() as pr:
-        for ii in range(ntries):
-            func(inp)
-    wall_time = time() - t0
-    s = io.StringIO()
-    sortby = SortKey.TIME
-    pstats.Stats(pr, stream=s).sort_stats(sortby).print_stats(10)
-    return f"Wall time: {wall_time} s\n" + s.getvalue()
-
-
 def _obj2list(obj, cls):
     if isinstance(obj, cls) or obj is None:
         return [obj]

@@ -11,7 +11,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright(C) 2022 Max-Planck-Society, Philipp Arras
+# Copyright(C) 2021-2022 Max-Planck-Society, Philipp Arras
 # Author: Philipp Arras
 
 import nifty8 as ift
@@ -20,6 +20,9 @@ import pytest
 import resolve as rve
 
 from .common import list2fixture
+import numpy as np
+
+from time import time
 
 pmp = pytest.mark.parametrize
 
@@ -33,7 +36,7 @@ restdom = list2fixture([[ift.UnstructuredDomain(7)],
                         ])
 
 
-def test_jax_vs_nifty(pdom, restdom):
+def test_different_implementations(pdom, restdom):
     dom = tuple((pdom,)) + tuple(restdom)
     op0 = rve.polarization_matrix_exponential(dom, False)
     op1 = rve.polarization_matrix_exponential(dom, True)
@@ -42,5 +45,61 @@ def test_jax_vs_nifty(pdom, restdom):
 
     ift.extra.check_operator(op0, loc, ntries=3)
     ift.extra.check_operator(op1, loc, ntries=3)
-
     ift.extra.assert_allclose(op0(loc), op1(loc))
+
+    if pdom.labels_eq(["I", "Q", "U", "V"]):
+        op2 = rve.polarization_matrix_exponential_mf2f({kk: restdom for kk in pdom.labels})
+        op2 = op2 @ rve.MultiFieldStacker(dom, 0, pdom.labels).inverse
+        ift.extra.check_operator(op2, loc, ntries=3)
+        ift.extra.assert_allclose(op0(loc), op2(loc))
+
+
+@pmp("pol", ("I", ["I", "Q", "U"], ["I", "Q", "U", "V"]))
+def test_polarization(pol):
+    dom = rve.PolarizationSpace(pol), rve.IRGSpace([0]), rve.IRGSpace([0]), ift.RGSpace([10, 20])
+    op = rve.polarization_matrix_exponential(dom, False)
+    pos = ift.from_random(op.domain)
+    ift.extra.check_operator(op, pos, ntries=5)
+    try:
+        op_jax = rve.polarization_matrix_exponential(dom, True)
+
+        assert op.domain is op_jax.domain
+        assert op.target is op_jax.target
+
+        ift.extra.assert_allclose(op(pos), op_jax(pos))
+        ift.extra.check_operator(op_jax, pos, ntries=5)
+    except ImportError:
+        pass
+
+
+def operator_equality(op0, op1, ntries=20):
+    dom = op0.domain
+    assert op0.domain == op1.domain
+    assert op0.target == op1.target
+    for ii in range(ntries):
+        loc = ift.from_random(dom)
+        res0 = op0(loc)
+        res1 = op1(loc)
+        ift.extra.assert_allclose(res0, res1)
+
+        linloc = ift.Linearization.make_var(loc)
+        res0 = op0(linloc).jac(0.23*loc)
+        res1 = op1(linloc).jac(0.23*loc)
+        ift.extra.assert_allclose(res0, res1)
+    ift.extra.check_operator(op0, loc, ntries=ntries)
+    ift.extra.check_operator(op1, loc, ntries=ntries)
+
+
+def test_polarization_matrix_exponential():
+    nthreads = 1
+    pdom = rve.PolarizationSpace(["I", "Q", "U", "V"])
+    sdom = ift.RGSpace([2, 2])
+    dom = rve.default_sky_domain(pdom=pdom, sdom=sdom)
+    dom = {kk: dom[1:] for kk in pdom.labels}
+    tgt = rve.default_sky_domain(pdom=pdom, sdom=sdom)
+    mfs = rve.MultiFieldStacker(tgt, 0, tgt[0].labels)
+    opold = rve.polarization_matrix_exponential(tgt) @ mfs
+    op = rve.polarization_matrix_exponential_mf2f(opold.domain, nthreads)
+    assert isinstance(op.domain, ift.MultiDomain)
+    assert isinstance(op.target, ift.DomainTuple)
+    operator_equality(opold, op)

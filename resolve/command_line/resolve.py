@@ -17,7 +17,6 @@ from ..likelihood import ImagingLikelihood
 from ..mpi import barrier, comm, master
 from ..plot.baseline_histogram import visualize_weighted_residuals
 from ..sky_model import sky_model_diffuse, sky_model_points
-from ..util import profile_function
 from ..weighting_model import weighting_model
 
 
@@ -26,6 +25,8 @@ def main():
     parser.add_argument("config_file")
     parser.add_argument("-j", type=int, default=1,
                         help="Number of threads for thread parallelization")
+    parser.add_argument("--profile-only", action="store_true")
+    parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
     cfg = ConfigParser()
@@ -70,18 +71,20 @@ def main():
 
     # Profiling
     position = 0.1 * ift.from_random(lhs["full"].domain)
-    set_verbosity(True)
     barrier(comm)
-    s = "\n\nProfile likelihood\n" + profile_function(lhs["full"], position, 1)
     if master:
-        # FIXME Use python's logger module for this
         os.makedirs(outdir, exist_ok=True)
-        with open(os.path.join(outdir, "log.txt"), "a") as f:
-            f.write(s)
-        print(s)
+        with ift.random.Context(12):
+            if args.verbose:
+                set_verbosity(True)
+                ift.exec_time(lhs["full"], verbose=True)
+                set_verbosity(False)
+            else:
+                ift.exec_time(lhs["full"])
+        if args.profile_only:
+            exit()
     del position
     barrier(comm)
-    set_verbosity(False)
     # /Profiling
 
     def inspect_callback(sl, iglobal, position):

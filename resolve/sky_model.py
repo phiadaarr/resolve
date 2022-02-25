@@ -14,7 +14,7 @@ from .integrated_wiener_process import (IntWProcessInitialConditions,
                                         WienerIntegrations)
 from .irg_space import IRGSpace
 from .points import PointInserter
-from .polarization_matrix_exponential import polarization_matrix_exponential
+from .polarization_matrix_exponential import polarization_matrix_exponential_mf2f
 from .polarization_space import PolarizationSpace
 from .simple_operators import MultiFieldStacker
 from .util import assert_sky_domain
@@ -37,7 +37,7 @@ def sky_model_diffuse(cfg, observations=[]):
 
     additional = {}
 
-    logsky = []
+    logsky = {}
     for lbl in pdom.labels:
         pol_lbl = f"{lbl.upper()}"
         if cfg["freq mode"] == "single":
@@ -49,19 +49,19 @@ def sky_model_diffuse(cfg, observations=[]):
             op, aa = _multi_freq_logsky_integrated_wiener_process(cfg, sdom, pol_lbl, freq)
         else:
             raise RuntimeError
-        logsky.append(op.ducktape_left(pol_lbl))
+        logsky[lbl] = op
         additional = {**additional, **aa}
     if cfg["freq mode"] == "single":
         tgt = default_sky_domain(pdom=pdom, sdom=sdom)
-        mfs = MultiFieldStacker((pdom, sdom), 0, pdom.labels)
     else:
         fdom = op.target[0]
         tgt = default_sky_domain(pdom=pdom, fdom=fdom, sdom=sdom)
-        mfs = MultiFieldStacker((pdom, fdom, sdom), 0, pdom.labels)
-    logsky = reduce(add, logsky)
 
-    mexp = polarization_matrix_exponential(tgt, jax=_has_jax())
-    sky = mexp @ (mfs @ logsky).ducktape_left(tgt)
+    logsky = reduce(add, (oo.ducktape_left(lbl) for lbl, oo in logsky.items()))
+    mexp = polarization_matrix_exponential_mf2f(logsky.target)
+    sky = mexp @ logsky
+
+    sky = sky.ducktape_left(tgt)
     assert_sky_domain(sky.target)
 
     return sky, additional
@@ -101,8 +101,8 @@ def sky_model_points(cfg, observations=[]):
                 v = ift.NormalTransform(cfg["point sources stokesv log mean"], cfg["point sources stokesv log stddev"], "points V", npoints)
                 v = v.ducktape_left("V")
                 polsum = polsum + v
-            iqu = MultiFieldStacker((pdom, points_domain), 0, pdom.labels) @ polsum
-            points = (polarization_matrix_exponential(iqu.target, jax=_has_jax()) @ iqu).ducktape_left(inserter.domain)
+            points = polarization_matrix_exponential_mf2f(polsum.target) @ polsum
+            points = points.ducktape_left(inserter.domain)
         else:
             raise NotImplementedError(f"single_frequency_sky does not support point sources on {pdom.labels} (yet?)")
 
