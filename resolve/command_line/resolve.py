@@ -12,11 +12,7 @@ from operator import add
 import nifty8 as ift
 
 from ..config_utils import parse_data_config, parse_optimize_kl_config
-<<<<<<< HEAD
-from ..global_config import set_nthreads, set_verbosity
-=======
-from ..global_config import set_nthreads, set_verbosity, set_gpu, verbosity
->>>>>>> 12629da (Verbosity configuration)
+from ..global_config import set_nthreads, set_verbosity, verbosity
 from ..likelihood import ImagingLikelihood
 from ..mpi import barrier, comm, master
 from ..plot.baseline_histogram import visualize_weighted_residuals
