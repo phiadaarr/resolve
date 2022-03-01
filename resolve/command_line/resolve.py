@@ -12,7 +12,11 @@ from operator import add
 import nifty8 as ift
 
 from ..config_utils import parse_data_config, parse_optimize_kl_config
+<<<<<<< HEAD
 from ..global_config import set_nthreads, set_verbosity
+=======
+from ..global_config import set_nthreads, set_verbosity, set_gpu, verbosity
+>>>>>>> 12629da (Verbosity configuration)
 from ..likelihood import ImagingLikelihood
 from ..mpi import barrier, comm, master
 from ..plot.baseline_histogram import visualize_weighted_residuals
@@ -26,12 +30,13 @@ def main():
     parser.add_argument("-j", type=int, default=1,
                         help="Number of threads for thread parallelization")
     parser.add_argument("--profile-only", action="store_true")
-    parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument("--verbose", "-v", action="count", default=0)
     args = parser.parse_args()
 
     cfg = ConfigParser()
     cfg.read(args.config_file)
     set_nthreads(args.j)
+    set_verbosity(args.verbose)
 
     obs_calib_flux, obs_calib_phase, obs_science = parse_data_config(cfg)
 
@@ -75,12 +80,7 @@ def main():
     if master:
         os.makedirs(outdir, exist_ok=True)
         with ift.random.Context(12):
-            if args.verbose:
-                set_verbosity(True)
-                ift.exec_time(lhs["full"], verbose=True)
-                set_verbosity(False)
-            else:
-                ift.exec_time(lhs["full"])
+            ift.exec_time(lhs["full"], verbose=verbosity() >= 1)
         if args.profile_only:
             exit()
     del position

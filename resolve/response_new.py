@@ -169,16 +169,16 @@ class SingleResponse(ift.LinearOperator):
         return self._ofac
 
     def _times(self, x):
-        if verbosity():
-            print(f"\nINFO: Oversampling factors in response: {self.oversampling_factors()}\n")
-        return dirty2vis(dirty=x, verbosity=verbosity(), **self._args)
+        if verbosity() >= 2:
+            print(f"INFO: Oversampling factors in response: {self.oversampling_factors()}")
+        return dirty2vis(dirty=x, verbosity=verbosity() >= 3, **self._args)
 
     def _adjoint(self, x):
         #my_assert(x.flags["C_CONTIGUOUS"])
         nx, ny = self._domain.shape
-        if verbosity():
-            print(f"\nINFO: Oversampling factors in response: {self.oversampling_factors()}\n")
-        return vis2dirty(vis=x, npix_x=nx, npix_y=ny, verbosity=verbosity(), **self._args)
+        if verbosity() >= 2:
+            print(f"INFO: Oversampling factors in response: {self.oversampling_factors()}")
+        return vis2dirty(vis=x, npix_x=nx, npix_y=ny, verbosity=verbosity() >= 3, **self._args)
 
     def _facet_times(self, x):
         nfacets_x, nfacets_y = self._facets

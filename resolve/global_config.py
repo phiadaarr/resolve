@@ -8,7 +8,7 @@ import numpy as np
 _wgridding = None
 _epsilon = None
 _nthreads = 1
-_verbosity = False
+_verbosity = 0
 _double_precision = True
 
 
@@ -46,7 +46,7 @@ def set_nthreads(val):
 
 def set_verbosity(val):
     global _verbosity
-    _verbosity = bool(val)
+    _verbosity = int(val)
 
 
 def verbosity():
