@@ -77,8 +77,8 @@ def main():
         os.makedirs(outdir, exist_ok=True)
         with ift.random.Context(12):
             ift.exec_time(lhs["full"], verbose=verbosity() >= 1)
-        if args.profile_only:
-            exit()
+    if args.profile_only:
+        exit()
     del position
     barrier(comm)
     # /Profiling
