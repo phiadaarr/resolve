@@ -12,6 +12,7 @@ from .data.observation import Observation
 from .response_new import InterferometryResponse
 from .util import (_duplicate, _obj2list, my_assert, my_assert_isinstance,
                    my_asserteq)
+from .energy_operators import DiagonalGaussianLikelihood
 
 
 def _get_mask(observation):
@@ -55,7 +56,7 @@ def _build_gauss_lh_nres(op, mean, invcov):
     my_assert_isinstance(mean, invcov, (ift.Field, ift.MultiField))
     my_asserteq(op.target, mean.domain, invcov.domain)
 
-    lh = ift.GaussianEnergy(data=mean, inverse_covariance=ift.makeOp(invcov, sampling_dtype=mean.dtype)) @ op
+    lh = DiagonalGaussianLikelihood(data=mean, inverse_covariance=invcov) @ op
     return _Likelihood(lh, mean, lambda x: ift.makeOp(invcov), op)
 
 
@@ -141,8 +142,7 @@ def ImagingLikelihood(
         R = mask @ R  # Apply flags
 
         if icov is None:
-            icov = ift.makeOp(weight, sampling_dtype=dtype)
-            ee = ift.GaussianEnergy(data=vis, inverse_covariance=icov) @ R
+            ee = DiagonalGaussianLikelihood(data=vis, inverse_covariance=weight) @ R
             icov_at.append(lambda x: ift.BlockDiagonalOperator(ift.makeDomain({virtual_key: icov.domain}), {virtual_key: icov}))
         else:
             s0, s1 = "_resi", "_icov"
