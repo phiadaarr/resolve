@@ -107,22 +107,6 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}, inspect_call
     def callback(sl, iglobal, position):
         if inspect_callback is not None:
             inspect_callback(sl, iglobal, position)
-        # Minisanity
-        lh = res["likelihood_energy"](iglobal)
-        s = "\n".join(
-            ["", "",
-             f"Finished index: {iglobal}",
-             f"Current datetime: {datetime.now()}",
-             ift.extra.minisanity(lh, sl, terminal_colors=False),
-             ""]
-            )
-        if master:
-            # FIXME Use python's logger module for this
-            with open(os.path.join(res["output_directory"], "log.txt"), "a") as f:
-                f.write(s)
-            print(s)
-        # /Minisanity
-
         # Reset parts of the latent space
         if reset[iglobal] is not None:
             reset_domain = constants_dct[reset[iglobal]]
