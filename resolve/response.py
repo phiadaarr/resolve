@@ -7,6 +7,7 @@ from operator import add
 
 import nifty8 as ift
 import numpy as np
+from warnings import warn
 
 from .data.observation import Observation
 from .irg_space import IRGSpace
@@ -15,6 +16,8 @@ from .util import my_assert, my_assert_isinstance, my_asserteq
 
 
 def StokesIResponse(observation, domain):
+    warn("`StokesIResponse` won't be part of the next release. "
+         "Switch to `InterferometryResponse`.", category=DeprecationWarning)
     if isinstance(observation, dict):
         # TODO Possibly add subpixel offset here
         d = ift.MultiDomain.make(domain)
@@ -43,6 +46,8 @@ def StokesIResponse(observation, domain):
 
 class FullPolResponse(ift.LinearOperator):
     def __init__(self, observation, domain):
+        warn("`FullPolResponse` won't be part of the next release. "
+             "Switch to `InterferometryResponse`.", category=DeprecationWarning)
         my_assert_isinstance(observation, Observation)
         domain = ift.MultiDomain.make(domain)
         self._domain = domain
@@ -113,6 +118,8 @@ class MfResponse(ift.LinearOperator):
     """
 
     def __init__(self, observation, frequency_domain, position_domain, log_freq=False):
+        warn("`MfResponse` won't be part of the next release. "
+             "Switch to `InterferometryResponse`.", category=DeprecationWarning)
         my_assert_isinstance(observation, Observation)
         # FIXME Add polarization support
         my_assert(observation.npol in [1, 2])
@@ -192,6 +199,9 @@ class MfResponse(ift.LinearOperator):
 
 class ResponseDistributor(ift.LinearOperator):
     def __init__(self, iterating_target_space, *ops):
+        warn("`ResponseDistributor` won't be part of the next release. "
+             "Switch to `InterferometryResponse`. If this does not work for you, please report.",
+             category=DeprecationWarning)
         dom, tgt = ops[0].domain, ops[0].target
         cap = self.TIMES | self.ADJOINT_TIMES
         for op in ops:
