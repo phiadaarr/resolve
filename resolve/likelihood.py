@@ -41,23 +41,11 @@ def get_mask_multi_field(weight):
     return op
 
 
-def _Likelihood(operator, data, metric_at_pos, model_data):
-    my_assert_isinstance(operator, model_data, ift.Operator)
-    my_asserteq(operator.target, ift.DomainTuple.scalar_domain())
-    my_asserteq(model_data.target, data.domain)
-    operator.data = data
-    operator.metric_at_pos = metric_at_pos
-    operator.model_data = model_data
-    return operator
-
-
 def _build_gauss_lh_nres(op, mean, invcov):
     my_assert_isinstance(op, ift.Operator)
     my_assert_isinstance(mean, invcov, (ift.Field, ift.MultiField))
     my_asserteq(op.target, mean.domain, invcov.domain)
-
-    lh = DiagonalGaussianLikelihood(data=mean, inverse_covariance=invcov) @ op
-    return _Likelihood(lh, mean, lambda x: ift.makeOp(invcov), op)
+    return DiagonalGaussianLikelihood(data=mean, inverse_covariance=invcov) @ op
 
 
 def _varcov(observation, Rs, inverse_covariance_operator):
@@ -69,10 +57,7 @@ def _varcov(observation, Rs, inverse_covariance_operator):
     inverse_covariance_operator = mask @ inverse_covariance_operator
     dtype = observation.vis.dtype
     op = residual.ducktape_left(s0) + inverse_covariance_operator.ducktape_left(s1)
-    lh = ift.VariableCovarianceGaussianEnergy(residual.target, s0, s1, dtype) @ op
-    model_data = mask @ Rs
-    icov_at = lambda x: ift.makeOp(inverse_covariance_operator.force(x))
-    return _Likelihood(lh, vis, icov_at, model_data)
+    return ift.VariableCovarianceGaussianEnergy(residual.target, s0, s1, dtype) @ op
 
 
 def ImagingLikelihood(
@@ -160,11 +145,7 @@ def ImagingLikelihood(
         used_keys.append(virtual_key)
 
     sky_operator = sky_operator.ducktape_left("_sky")
-    energy = reduce(add, energy).partial_insert(sky_operator)
-    data = ift.MultiField.union(data)
-    model_data = reduce(add, model_data).partial_insert(sky_operator)
-    total_icov_at = lambda x: reduce(add, (iicc(x) for iicc in icov_at))
-    return _Likelihood(energy, data, total_icov_at, model_data)
+    return reduce(add, energy).partial_insert(sky_operator)
 
 
 def CalibrationLikelihood(

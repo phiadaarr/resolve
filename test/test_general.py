@@ -20,11 +20,11 @@ rve.set_epsilon(1e-4)
 rve.set_wgridding(False)
 OBS = []
 for polmode in ["all", "stokesi", "stokesiavg"]:
-    OBS.append(
-        rve.ms2observations(
+    oo = rve.ms2observations(
             f"{direc}CYG-ALL-2052-2MHZ.ms", "DATA", True, 0, polarizations=polmode
         )[0]
-    )
+    # OBS.append(oo.to_single_precision())
+    OBS.append(oo.to_double_precision())
 npix, fov = 256, 1 * rve.DEG2RAD
 sdom = ift.RGSpace((npix, npix), (fov / npix, fov / npix))
 sky = ift.SimpleCorrelatedField(sdom, 21, (1, 0.1), (5, 1), (1.2, 0.4), (0.2, 0.2), (-2, 0.5)).exp()

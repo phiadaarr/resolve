@@ -20,13 +20,16 @@ def InterferometryResponse(observation, domain):
     R = _InterferometryResponse(observation, domain)
     pol = polarization_converter(R.target, observation.vis.domain)
     if observation.double_precision:
-        dtype = _DtypeConverter(domain, np.float64, np.float64)  # do nothing
-        dtype_check0 = _DtypeConverter(pol.target, np.complex128, np.complex128)  # do nothing
-        dtype_check1 = _DtypeConverter(pol.domain, np.complex128, np.complex128)  # do nothing
+        dtype = _DtypeConverter(domain, np.float64, np.float64, "Response input")  # do nothing
+        dtype_check0 = _DtypeConverter(pol.target, np.complex128, np.complex128, "Response output")  # do nothing
+        dtype_check0 = _DtypeConverter(pol.target, np.complex128, None, "Response output", casting="unsafe")  # FIXME THIS IS TEMPORARY
+        dtype_check1 = _DtypeConverter(pol.domain, np.complex128, np.complex128, "Polarization converter output")  # do nothing
     else:
-        dtype = _DtypeConverter(domain, np.float64, np.float32)
-        dtype_check0 = _DtypeConverter(pol.target, np.complex64, np.complex64)  # do nothing
-        dtype_check1 = _DtypeConverter(pol.domain, np.complex64, np.complex64)  # do nothing
+        dtype = _DtypeConverter(domain, np.float64, np.float32, "Response input")
+        dtype = _DtypeConverter(domain, np.float64, np.float32, "Response input")
+        dtype_check0 = _DtypeConverter(pol.target, np.complex64, np.complex64, "Response output")  # do nothing
+        dtype_check0 = _DtypeConverter(pol.target, np.complex64, None, "Response output", casting="unsafe")  # FIXME THIS IS TEMPORARY
+        dtype_check1 = _DtypeConverter(pol.domain, np.complex64, np.complex64, "Polarization converter output")  # do nothing
     return dtype_check0 @ pol @ dtype_check1 @ R @ dtype
 
 
@@ -213,11 +216,13 @@ class SingleResponse(ift.LinearOperator):
 
 
 class _DtypeConverter(ift.EndomorphicOperator):
-    def __init__(self, domain, domain_dtype, target_dtype):
+    def __init__(self, domain, domain_dtype, target_dtype, hint="", casting="same_kind"):
         self._domain = ift.DomainTuple.make(domain)
         self._ddt = domain_dtype
         self._tdt = target_dtype
         self._capability = self.TIMES | self.ADJOINT_TIMES
+        self._hint = hint
+        self._casting = casting
 
     def apply(self, x, mode):
         self._check_input(x, mode)
@@ -226,7 +231,12 @@ class _DtypeConverter(ift.EndomorphicOperator):
             inp, out = self._ddt, self._tdt
         else:
             out, inp = self._ddt, self._tdt
-        my_asserteq(x.dtype, inp)
+        if inp is not None and x.dtype != inp:
+            s = ["Dtypes not compatible", str(self.domain),
+                 f"Input: {x.dtype}, should be: {inp}", self._hint]
+            raise ValueError("\n".join(s))
         # /Sanity check
+        if inp is None:
+            return x
         return ift.makeField(self._tgt(mode),
-                             x.val.astype(out, casting="same_kind", copy=False))
+                             x.val.astype(out, casting=self._casting, copy=False))

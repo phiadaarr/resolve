@@ -86,7 +86,7 @@ class BaseObservation:
         nifty8.Field
             Flagged field defined on a one-dimensional
             `nifty8.UnstructuredDomain`."""
-        return ift.MaskOperator(self.flags)(field)
+        return self.mask_operator(field)
 
     @property
     def flags(self):
