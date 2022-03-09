@@ -8,7 +8,7 @@ import numpy as np
 from ..constants import AS2RAD, DEG2RAD, SPEEDOFLIGHT
 from ..mpi import onlymaster
 from ..util import (compare_attributes, my_assert, my_assert_isinstance,
-                    my_asserteq)
+                    my_asserteq, is_single_precision)
 from .antenna_positions import AntennaPositions
 from .auxiliary_table import AuxiliaryTable
 from .direction import Direction, Directions
@@ -284,13 +284,12 @@ class Observation(BaseObservation):
         my_asserteq(weight.shape, vis.shape)
         my_asserteq(vis.shape, (len(polarization), nrows, len(freq)))
         my_asserteq(nrows, vis.shape[1])
-        #my_asserteq(vis.dtype, np.complex64)
-        #my_asserteq(weight.dtype, np.float32)
         my_assert(np.all(weight >= 0.0))
         my_assert(np.all(np.isfinite(vis[weight > 0.])))
         my_assert(np.all(np.isfinite(weight)))
-
         my_assert(np.all(np.diff(freq)))
+
+        my_assert(not (is_single_precision(vis.dtype) ^ is_single_precision(weight.dtype)))
 
         vis.flags.writeable = False
         weight.flags.writeable = False
@@ -423,6 +422,22 @@ class Observation(BaseObservation):
             obs_list.append(full_obs.get_freqs_by_slice(slc))
         nu0 = global_freqs.mean()
         return obs_list, nu0
+
+    def to_double_precision(self):
+        return Observation(self._antpos,
+                           self._vis.astype(np.complex128, casting="same_kind", copy=False),
+                           self._weight.astype(np.float64, casting="same_kind", copy=False),
+                           self._polarization, self._freq, self._auxiliary_tables)
+
+    def to_single_precision(self):
+        return Observation(self._antpos,
+                           self._vis.astype(np.complex64, casting="same_kind", copy=False),
+                           self._weight.astype(np.float32, casting="same_kind", copy=False),
+                           self._polarization, self._freq, self._auxiliary_tables)
+
+    @property
+    def double_precision(self):
+        return self._vis.dtype == np.complex128
 
     def __getitem__(self, slc, copy=False):
         # FIXME Do I need to change something in self._auxiliary_tables?

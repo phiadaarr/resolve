@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright(C) 2021 Max-Planck-Society
+# Copyright(C) 2022 Max-Planck-Society, Philipp Arras
 # Author: Philipp Arras
 
 import os
@@ -12,18 +13,19 @@ import numpy as np
 
 from .data.ms_import import ms2observations
 from .data.observation import Observation
-from .global_config import set_double_precision, set_epsilon, set_wgridding
+from .global_config import set_epsilon, set_wgridding
 from .mpi import master
 
 
 def parse_data_config(cfg):
     set_epsilon(cfg["response"].getfloat("epsilon"))
     set_wgridding(strtobool(cfg["response"]["wgridding"]))
-    set_double_precision(cfg["response"].getboolean("double precision"))
 
-    obs_calib_phase = _cfg_to_observations(cfg["data"]["phase calibrator"])
-    obs_calib_flux = _cfg_to_observations(cfg["data"]["flux calibrator"])
-    obs_science = _cfg_to_observations(cfg["data"]["science target"])
+    dprec = cfg["response"].getboolean("double precision")
+
+    obs_calib_phase = _cfg_to_observations(cfg["data"]["phase calibrator"], dprec)
+    obs_calib_flux = _cfg_to_observations(cfg["data"]["flux calibrator"], dprec)
+    obs_science = _cfg_to_observations(cfg["data"]["science target"], dprec)
 
     s = "number of randomly sampled rows"
     comm = ift.utilities.get_MPI_params()[0]
@@ -138,7 +140,7 @@ def _parse_cst(cfg, total_iterations, constants_dct):
     return tuple(cst_keys)
 
 
-def _cfg_to_observations(cfg):
+def _cfg_to_observations(cfg, double_precision):
     newcfg = []
     for cc in cfg.split(","):
         if len(cc) == 0:
@@ -173,6 +175,10 @@ def _cfg_to_observations(cfg):
             obs = obs[0]
         else:
             raise RuntimeError("Paths with ':' and ',' are not allowed")
+        if double_precision:
+            obs = obs.to_double_precision()
+        else:
+            obs = obs.to_single_precision()
         res.append(obs)
     return res
 

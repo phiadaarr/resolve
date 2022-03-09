@@ -10,16 +10,24 @@ from ducc0.wgridder.experimental import dirty2vis, vis2dirty
 
 from .constants import SPEEDOFLIGHT
 from .data.observation import Observation
-from .global_config import epsilon, np_dtype, nthreads, verbosity, wgridding
+from .global_config import epsilon, nthreads, verbosity, wgridding
 from .polarization_space import polarization_converter
 from .util import (assert_sky_domain, my_assert, my_assert_isinstance,
-                   my_asserteq)
+                   my_asserteq, dtype_complex2float, dtype_float2complex)
 
 
 def InterferometryResponse(observation, domain):
     R = _InterferometryResponse(observation, domain)
     pol = polarization_converter(R.target, observation.vis.domain)
-    return pol @ R
+    if observation.double_precision:
+        dtype = _DtypeConverter(domain, np.float64, np.float64)  # do nothing
+        dtype_check0 = _DtypeConverter(pol.target, np.complex128, np.complex128)  # do nothing
+        dtype_check1 = _DtypeConverter(pol.domain, np.complex128, np.complex128)  # do nothing
+    else:
+        dtype = _DtypeConverter(domain, np.float64, np.float32)
+        dtype_check0 = _DtypeConverter(pol.target, np.complex64, np.complex64)  # do nothing
+        dtype_check1 = _DtypeConverter(pol.domain, np.complex64, np.complex64)  # do nothing
+    return dtype_check0 @ pol @ dtype_check1 @ R @ dtype
 
 
 class _InterferometryResponse(ift.LinearOperator):
@@ -79,7 +87,7 @@ class _InterferometryResponse(ift.LinearOperator):
         return ift.makeField(self._tgt(mode), (self._times if tim else self._adj_times)(x.val))
 
     def _times(self, x):
-        res = np.empty(self.target.shape, np.complex128)
+        res = np.empty(self.target.shape, dtype_float2complex(x.dtype))
         for pp in range(self.domain.shape[0]):
             for tt in range(self.domain.shape[1]):
                 for ff in range(self.domain.shape[2]):
@@ -91,7 +99,7 @@ class _InterferometryResponse(ift.LinearOperator):
         return res
 
     def _adj_times(self, x):
-        res = np.zeros(self.domain.shape, np.float64)
+        res = np.zeros(self.domain.shape, dtype_complex2float(x.dtype))
         for pp in range(self.domain.shape[0]):
             for tt in range(self.domain.shape[1]):
                 for ff in range(self.domain.shape[2]):
@@ -127,8 +135,6 @@ class SingleResponse(ift.LinearOperator):
         if mask is not None:
             self._args["mask"] = mask.astype(np.uint8)
         self._vol = self._domain[0].scalar_dvol
-        self._target_dtype = np_dtype(True)
-        self._domain_dtype = np_dtype(False)
         self._ofac = None
         self._facets = facets
 
@@ -137,23 +143,16 @@ class SingleResponse(ift.LinearOperator):
         one_facet = self._facets == (1, 1)
         x = x.val
         if mode == self.TIMES:
-            x = x.astype(self._domain_dtype, copy=False)
             if one_facet:
                 res = self._times(x)
             else:
                 res = self._facet_times(x)
         else:
-            x = x.astype(self._target_dtype, copy=False)
             if one_facet:
                 res = self._adjoint(x)
             else:
                 res = self._facet_adjoint(x)
-        res = ift.makeField(self._tgt(mode), res * self._vol)
-
-        expected_dtype = self._target_dtype if mode == self.TIMES else self._domain_dtype
-        my_asserteq(res.dtype, expected_dtype)
-
-        return res
+        return ift.makeField(self._tgt(mode), res * self._vol)
 
     def oversampling_factors(self):
         if self._ofac is not None:
@@ -203,7 +202,7 @@ class SingleResponse(ift.LinearOperator):
         npix_x, npix_y = self._domain.shape
         nx = npix_x // nfacets_x
         ny = npix_y // nfacets_y
-        res = np.zeros((npix_x, npix_y), self._domain_dtype)
+        res = np.zeros((npix_x, npix_y), dtype_complex2float(x.dtype))
         for xx, yy in product(range(nfacets_x), range(nfacets_y)):
             cx = ((0.5 + xx) / nfacets_x - 0.5) * self._args["pixsize_x"] * npix_x
             cy = ((0.5 + yy) / nfacets_y - 0.5) * self._args["pixsize_y"] * npix_y
@@ -211,3 +210,23 @@ class SingleResponse(ift.LinearOperator):
                            verbosity=verbosity(), **self._args)
             res[nx * xx: nx * (xx + 1), ny * yy: ny * (yy + 1)] = im
         return res
+
+
+class _DtypeConverter(ift.EndomorphicOperator):
+    def __init__(self, domain, domain_dtype, target_dtype):
+        self._domain = ift.DomainTuple.make(domain)
+        self._ddt = domain_dtype
+        self._tdt = target_dtype
+        self._capability = self.TIMES | self.ADJOINT_TIMES
+
+    def apply(self, x, mode):
+        self._check_input(x, mode)
+        # Sanity check
+        if mode == self.TIMES:
+            inp, out = self._ddt, self._tdt
+        else:
+            out, inp = self._ddt, self._tdt
+        my_asserteq(x.dtype, inp)
+        # /Sanity check
+        return ift.makeField(self._tgt(mode),
+                             x.val.astype(out, casting="same_kind", copy=False))

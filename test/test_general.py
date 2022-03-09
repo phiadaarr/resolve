@@ -317,17 +317,3 @@ def test_intop():
     dom = ift.RGSpace((12, 12))
     op = rve.WienerIntegrations(freqdomain, dom)
     ift.extra.check_linear_operator(op)
-
-
-def test_global_config():
-    rve.set_double_precision(True)
-    assert rve.np_dtype() == rve.np_dtype(False) == np.float64
-    assert rve.np_dtype(True) == np.complex128
-
-    rve.set_double_precision(False)
-    assert rve.np_dtype() == rve.np_dtype(False) == np.float32
-    assert rve.np_dtype(True) == np.complex64
-
-    rve.set_double_precision(True)
-    assert rve.np_dtype() == rve.np_dtype(False) == np.float64
-    assert rve.np_dtype(True) == np.complex128

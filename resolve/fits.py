@@ -48,7 +48,7 @@ def fits2field(file_name, ignore_units=False, from_wsclean=False):
     import astropy.io.fits as pyfits
 
     with pyfits.open(file_name) as hdu_list:
-        image_data = hdu_list[0].data.astype(np.float64)
+        image_data = hdu_list[0].data.astype(np.float64, casting="same_kind", copy=False)
         assert image_data.shape[0] == 1  # Only one Stokes component
         image_data = image_data[0]
         head = hdu_list[0].header

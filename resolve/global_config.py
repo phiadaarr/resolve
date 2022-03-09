@@ -51,21 +51,3 @@ def set_verbosity(val):
 
 def verbosity():
     return _verbosity
-
-
-def np_dtype(cplx=False):
-    if cplx:
-        if _double_precision:
-            return np.complex128
-        else:
-            return np.complex64
-    else:
-        if _double_precision:
-            return np.float64
-        else:
-            return np.float32
-
-
-def set_double_precision(val):
-    global _double_precision
-    _double_precision = bool(val)
