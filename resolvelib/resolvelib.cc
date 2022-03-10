@@ -200,6 +200,165 @@ public:
   }
 };
 
+template <typename T, bool complex_mean,
+          typename Tmean = conditional_t<complex_mean, complex<T>, T>,
+          typename Tacc = long double,
+          typename Tacc_cplx = conditional_t<complex_mean, complex<Tacc>, Tacc>>
+class VariableCovarianceDiagonalGaussianLikelihood {
+private:
+  const size_t nthreads;
+  const py::array pymean;
+  const py::str key_signal;
+  const py::str key_log_icov;
+
+public:
+  const ducc0::cfmav<Tmean> mean;
+
+  using Tenergy = double;
+
+  VariableCovarianceDiagonalGaussianLikelihood(const py::array &mean_,
+                                               const py::str &key_signal_,
+                                               const py::str &key_log_icov_,
+                                               size_t nthreads_ = 1)
+      : nthreads(nthreads_), pymean(mean_), key_signal(key_signal_),
+        key_log_icov(key_log_icov_), mean(ducc0::to_cfmav<Tmean>(mean_)) {}
+
+  py::array apply(const py::dict &inp_) const {
+    auto signal{ducc0::to_cfmav<Tmean>(inp_[key_signal])};
+    auto logicov{ducc0::to_cfmav<T>(inp_[key_log_icov])};
+    Tacc acc{0};
+    {
+      py::gil_scoped_release release;
+      ducc0::mav_apply(
+          [&acc](const Tmean &m, const T &lic, const Tmean &l) {
+            Tacc_cplx mm(m), ll(l);
+            Tacc iicc(exp(lic));
+            Tacc logiicc(lic);
+            if (complex_mean)
+              logiicc *= 2;
+            acc += iicc * norm(ll - mm) - logiicc;
+          },
+          1, mean, logicov, signal); // not parallelized because accumulating
+      acc *= 0.5;
+    }
+    return py::array(py::cast(Tenergy(acc)));
+  }
+
+  LinearizationWithMetric<py::dict> apply_with_jac(const py::dict &loc_) {
+    auto loc_s{ducc0::to_cfmav<Tmean>(loc_[key_signal])};
+    auto loc_lic{ducc0::to_cfmav<T>(loc_[key_log_icov])};
+    auto grad_s{ducc0::vfmav<Tmean>(loc_s.shape(), ducc0::UNINITIALIZED)};
+    auto grad_lic{ducc0::vfmav<T>(loc_lic.shape(), ducc0::UNINITIALIZED)};
+    Tacc acc{0};
+
+    // value
+    ducc0::mav_apply(
+        [&acc](const Tmean &m, const T &lic, const Tmean &l) {
+          Tacc_cplx mm(m), ll(l);
+          Tacc iicc(exp(lic));
+          Tacc logiicc(lic);
+          if (complex_mean)
+            logiicc *= 2;
+          acc += iicc * norm(ll - mm) - logiicc;
+        },
+        1, mean, loc_lic, loc_s); // not parallelized because accumulating
+    acc *= 0.5;
+    auto energy{Tenergy(acc)};
+    // /value
+
+    // gradient
+    // FIXME better variable names for everything...
+    ducc0::mav_apply(
+        [](const Tmean &m, const Tmean &s, const T &lic, Tmean &gs, T &glic) {
+          auto explic{exp(lic)};
+          auto tmp2{(s - m) * explic};
+          T fct;
+          if (complex_mean)
+            fct = 2;
+          else
+            fct = 1;
+          auto tmp3{0.5 * (explic * norm(m - s) - fct)};
+          gs = tmp2;
+          glic = tmp3;
+        },
+        nthreads, mean, loc_s, loc_lic, grad_s, grad_lic);
+    // /gradient
+
+    // Jacobian
+    function<py::array(const py::dict &)> ftimes =
+        [grad_s = grad_s, grad_lic = grad_lic, key_signal = key_signal,
+         key_log_icov = key_log_icov](const py::dict &inp_) {
+          auto inp_s{ducc0::to_cfmav<Tmean>(inp_[key_signal])};
+          auto inp_lic{ducc0::to_cfmav<T>(inp_[key_log_icov])};
+
+          Tacc acc{0};
+
+          ducc0::mav_apply(
+              [&acc](const Tmean &is, const T &ilic, const Tmean &gs,
+                     const T &glic) {
+                Tacc_cplx ii{is}, gg{gs};
+                Tacc jj{ilic}, hh{glic};
+                acc += real(ii) * real(gg) + imag(ii) * imag(gg);
+                acc += jj * hh;
+              },
+              1, inp_s, inp_lic, grad_s,
+              grad_lic); // not parallelized because accumulating
+          return py::array(py::cast(Tenergy(acc)));
+        };
+
+    function<py::dict(const py::array &)> fadjtimes =
+        [nthreads = nthreads, grad_s = grad_s, grad_lic = grad_lic,
+         key_signal = key_signal,
+         key_log_icov = key_log_icov](const py::array &inp_) {
+          auto inp{ducc0::to_cfmav<Tenergy>(inp_)};
+          auto inpT{T(inp())};
+          py::dict out_;
+          out_[key_signal] = ducc0::make_Pyarr<Tmean>(grad_s.shape());
+          out_[key_log_icov] = ducc0::make_Pyarr<T>(grad_s.shape());
+          auto outs{ducc0::to_vfmav<Tmean>(out_[key_signal])};
+          auto outlic{ducc0::to_vfmav<T>(out_[key_log_icov])};
+          ducc0::mav_apply(
+              [inpT = inpT](const Tmean &gs, const T &glic, Tmean &os,
+                            T &olic) {
+                os = inpT * gs;
+                olic = inpT * glic;
+              },
+              nthreads, grad_s, grad_lic, outs, outlic);
+          return out_;
+        };
+    // /Jacobian
+
+    // Metric
+    function<py::dict(const py::dict &)> apply_metric =
+        [nthreads = nthreads, key_signal = key_signal,
+         key_log_icov = key_log_icov, loc_lic = loc_lic](const py::dict &inp_) {
+          auto inp_s{ducc0::to_cfmav<Tmean>(inp_[key_signal])};
+          auto inp_lic{ducc0::to_cfmav<T>(inp_[key_log_icov])};
+
+          py::dict out_;
+          out_[key_signal] = ducc0::make_Pyarr<Tmean>(inp_s.shape());
+          out_[key_log_icov] = ducc0::make_Pyarr<T>(inp_s.shape());
+          auto outs{ducc0::to_vfmav<Tmean>(out_[key_signal])};
+          auto outlic{ducc0::to_vfmav<T>(out_[key_log_icov])};
+
+          ducc0::mav_apply(
+              [](const T &lic, const Tmean &ins, const T &inlic, Tmean &os,
+                 T &olic) {
+                os = exp(lic) * ins;
+                olic = inlic;
+                if (!complex_mean)
+                  olic *= 0.5;
+              },
+              nthreads, loc_lic, inp_s, inp_lic, outs, outlic);
+          return out_;
+        };
+    // /Metric
+
+    return LinearizationWithMetric<py::dict>(py::array(py::cast(energy)),
+                                             ftimes, fadjtimes, apply_metric);
+  }
+};
+
 template <typename T, size_t ndim> class PolarizationMatrixExponential {
 private:
   const size_t nthreads;
@@ -468,6 +627,37 @@ PYBIND11_MODULE(resolvelib, m) {
       .def("apply", &DiagonalGaussianLikelihood<float, true>::apply)
       .def("apply_with_jac",
            &DiagonalGaussianLikelihood<float, true>::apply_with_jac);
+
+  py::class_<VariableCovarianceDiagonalGaussianLikelihood<double, false>>(
+      m, "VariableCovarianceDiagonalGaussianLikelihood_f8")
+      .def(py::init<py::array, py::str, py::str, size_t>())
+      .def("apply",
+           &VariableCovarianceDiagonalGaussianLikelihood<double, false>::apply)
+      .def("apply_with_jac", &VariableCovarianceDiagonalGaussianLikelihood<
+                                 double, false>::apply_with_jac);
+  py::class_<VariableCovarianceDiagonalGaussianLikelihood<float, false>>(
+      m, "VariableCovarianceDiagonalGaussianLikelihood_f4")
+      .def(py::init<py::array, py::str, py::str, size_t>())
+      .def("apply",
+           &VariableCovarianceDiagonalGaussianLikelihood<float, false>::apply)
+      .def("apply_with_jac", &VariableCovarianceDiagonalGaussianLikelihood<
+                                 float, false>::apply_with_jac);
+  py::class_<VariableCovarianceDiagonalGaussianLikelihood<double, true>>(
+      m, "VariableCovarianceDiagonalGaussianLikelihood_c16")
+      .def(py::init<py::array, py::str, py::str, size_t>())
+      .def("apply",
+           &VariableCovarianceDiagonalGaussianLikelihood<double, true>::apply)
+      .def("apply_with_jac",
+           &VariableCovarianceDiagonalGaussianLikelihood<double,
+                                                         true>::apply_with_jac);
+  py::class_<VariableCovarianceDiagonalGaussianLikelihood<float, true>>(
+      m, "VariableCovarianceDiagonalGaussianLikelihood_c8")
+      .def(py::init<py::array, py::str, py::str, size_t>())
+      .def("apply",
+           &VariableCovarianceDiagonalGaussianLikelihood<float, true>::apply)
+      .def("apply_with_jac",
+           &VariableCovarianceDiagonalGaussianLikelihood<float,
+                                                         true>::apply_with_jac);
 
   add_linearization<py::array, py::array>(m, "Linearization_field2field");
   add_linearization<py::array, py::dict>(m, "Linearization_field2mfield");

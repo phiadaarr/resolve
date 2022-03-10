@@ -184,6 +184,8 @@ def _duplicate(lst, n):
 
 
 def is_single_precision(dtype):
+    if isinstance(dtype, dict):
+        return any(is_single_precision(vv) for vv in dtype.values())
     if dtype in [np.float32, np.complex64]:
         return True
     elif dtype in [np.float64, np.complex128]:
@@ -199,9 +201,12 @@ def dtype_float2complex(dt):
     raise ValueError
 
 
-def dtype_complex2float(dt):
+def dtype_complex2float(dt, force=False):
     if dt == np.complex128:
         return np.float64
     if dt == np.complex64:
         return np.float32
+    if force:
+        if dt in [np.float32, np.float64]:
+            return dt
     raise ValueError

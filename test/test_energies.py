@@ -23,16 +23,30 @@ import resolve as rve
 from .common import list2fixture, operator_equality
 
 dtype = list2fixture([np.complex64, np.complex128, np.float32, np.float64])
+dtype = list2fixture([np.complex128, np.float64])
 
 
 def test_gaussian_energy(dtype):
     dom = ift.UnstructuredDomain([4])
     mean = ift.from_random(dom, dtype=dtype)
-    icov = ift.from_random(dom,
-                           dtype=(np.float32 if rve.is_single_precision(dtype) else np.float64))
+    icov = ift.from_random(
+        dom, dtype=(np.float32 if rve.is_single_precision(dtype) else np.float64)
+    )
     icov = icov.exp()
-    op0 = ift.GaussianEnergy(data=mean, inverse_covariance=ift.makeOp(icov))
-    op1 = rve.DiagonalGaussianLikelihood(data=mean, inverse_covariance=icov)
-    operator_equality(op0, op1, ntries=5, domain_dtype=dtype)
+    op = rve.DiagonalGaussianLikelihood(data=mean, inverse_covariance=icov)
+    operator_equality(op.nifty_equivalent, op, ntries=5, domain_dtype=dtype)
     rve.set_nthreads(2)
-    operator_equality(op0, op1, ntries=5, domain_dtype=dtype)
+    operator_equality(op.nifty_equivalent, op, ntries=5, domain_dtype=dtype)
+
+
+def test_varcov_gaussian_energy(dtype):
+    dom = ift.UnstructuredDomain([4])
+    mean = ift.from_random(dom, dtype=dtype)
+    op = rve.VariableCovarianceDiagonalGaussianLikelihood(mean, "signal", "logicov")
+    dt = {
+        "signal": dtype,
+        "logicov": rve.dtype_complex2float(dtype, force=True),
+    }
+    operator_equality(op.nifty_equivalent, op, ntries=5, domain_dtype=dt)
+    rve.set_nthreads(2)
+    operator_equality(op.nifty_equivalent, op, ntries=5, domain_dtype=dt)

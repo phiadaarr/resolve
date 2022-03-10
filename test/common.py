@@ -33,7 +33,7 @@ def operator_equality(op0, op1, ntries=20, domain_dtype=np.float64):
     dom = op0.domain
     assert op0.domain == op1.domain
     assert op0.target == op1.target
-    rtol = 1e-6 if rve.is_single_precision(domain_dtype) else 1e-12
+    rtol = 1e-5 if rve.is_single_precision(domain_dtype) else 1e-11
     for ii in range(ntries):
         loc = ift.from_random(dom, dtype=domain_dtype)
         res0 = op0(loc)

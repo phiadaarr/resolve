@@ -44,11 +44,18 @@ def DiagonalGaussianLikelihood(data, inverse_covariance):
     if not ift.is_fieldlike(inverse_covariance):
         raise TypeError("Inverse_covariance needs to be a Field")
     if data.domain != inverse_covariance.domain:
-        raise ValueError("data and inverse_covariance need to have the same domain",
-                         data.domain, inverse_covariance.domain)
+        raise ValueError(
+            "data and inverse_covariance need to have the same domain",
+            data.domain,
+            inverse_covariance.domain,
+        )
     dt = data.dtype
-    if inverse_covariance.dtype != (np.float32 if is_single_precision(dt) else np.float64):
-        raise ValueError("Precision of inverse_covariance does not match precision of data.")
+    if inverse_covariance.dtype != (
+        np.float32 if is_single_precision(dt) else np.float64
+    ):
+        raise ValueError(
+            "Precision of inverse_covariance does not match precision of data."
+        )
 
     if dt == np.float64:
         f = resolvelib.DiagonalGaussianLikelihood_f8
@@ -61,15 +68,60 @@ def DiagonalGaussianLikelihood(data, inverse_covariance):
     else:
         raise TypeError("Dtype of data not supported. Supported dtypes: c8, c16.")
 
-    def draw_sample(from_inverse=False):
-        return ift.makeOp(inverse_covariance, sampling_dtype=dt).draw_sample(from_inverse)
-
-    trafo = ift.makeOp(inverse_covariance).get_sqrt()  # NOTE This is not implemented in C++ yet
     return Pybind11LikelihoodEnergyOperator(
-            data.domain,
-            f(data.val, inverse_covariance.val, nthreads()),
-            lambda x: draw_sample,
-            get_transformation=lambda: (dt, trafo),
-            data_residual=ift.Adder(data, neg=True),  # NOTE This is not implemented in C++ yet
-            sqrt_data_metric=lambda x: trafo,
-            )
+        data.domain,
+        f(data.val, inverse_covariance.val, nthreads()),
+        nifty_equivalent=ift.GaussianEnergy(
+            data=data, inverse_covariance=ift.makeOp(inverse_covariance)
+        ),
+    )
+
+
+def VariableCovarianceDiagonalGaussianLikelihood(
+    data, key_signal, key_log_inverse_covariance
+):
+    """Variable covariance Gaussian energy as NIFTy operator that is implemented in C++
+
+    Parameters
+    ----------
+    data : Field
+
+    key_signal : str
+
+    key_log_inverse_covariance : str
+
+    Note
+    ----
+    In contrast to the nifty interface of VariableCovarianceGaussianEnergy,
+    this function computes the residual as well and also takes the logarithm of
+    the inverse covariance as input.
+    """
+    if not ift.is_fieldlike(data):
+        raise TypeError("data needs to be a Field")
+    dt = data.dtype
+
+    if dt == np.float64:
+        f = resolvelib.VariableCovarianceDiagonalGaussianLikelihood_f8
+    elif dt == np.float32:
+        f = resolvelib.VariableCovarianceDiagonalGaussianLikelihood_f4
+    elif dt == np.complex64:
+        f = resolvelib.VariableCovarianceDiagonalGaussianLikelihood_c8
+    elif dt == np.complex128:
+        f = resolvelib.VariableCovarianceDiagonalGaussianLikelihood_c16
+    else:
+        raise TypeError("Dtype of data not supported. Supported dtypes: c8, c16.")
+
+    return Pybind11LikelihoodEnergyOperator(
+        {key_signal: data.domain, key_log_inverse_covariance: data.domain},
+        f(data.val, key_signal, key_log_inverse_covariance, nthreads()),
+        nifty_equivalent=ift.VariableCovarianceGaussianEnergy(
+            data.domain, "residual", "icov", data.dtype
+        )
+        @ (
+            ift.Adder(data, neg=True).ducktape_left("residual").ducktape(key_signal)
+            + ift.Operator.identity_operator(data.domain)
+            .exp()
+            .ducktape_left("icov")
+            .ducktape(key_log_inverse_covariance)
+        ),
+    )

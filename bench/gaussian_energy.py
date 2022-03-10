@@ -30,8 +30,9 @@ else:
 dom = ift.UnstructuredDomain(shp)
 mean = ift.full(dom, 1.2)
 invcov = ift.full(dom, 142.1)
-opold = ift.GaussianEnergy(mean, ift.makeOp(invcov))
 
+print("Gaussian energy")
+print("^^^^^^^^^^^^^^^")
 for nthreads in [1, 4, 8]:
     rve.set_nthreads(nthreads)
     op = rve.DiagonalGaussianLikelihood(mean, invcov)
@@ -39,4 +40,18 @@ for nthreads in [1, 4, 8]:
     ift.exec_time(op)
     print()
 print("Old implementation")
+opold = ift.GaussianEnergy(mean, ift.makeOp(invcov))
 ift.exec_time(opold)
+print()
+
+print("Variable covariance Gaussian energy")
+print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+for nthreads in [1, 4, 8]:
+    rve.set_nthreads(nthreads)
+    op = rve.VariableCovarianceDiagonalGaussianLikelihood(mean, "signal", "logicov")
+    print(f"New implementation (nthreads={nthreads})")
+    ift.exec_time(op)
+    print()
+
+print("Old implementation")
+ift.exec_time(op.nifty_equivalent)
