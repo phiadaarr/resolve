@@ -104,7 +104,7 @@ def test_varcov_imaging_likelihood(obs):
     invcovop = (
         ift.InverseGammaOperator(obs.vis.domain, 1, var).reciprocal().ducktape("invcov")
     )
-    try_lh(obs, rve.ImagingLikelihood, obs, sky, invcovop)
+    try_lh(obs, rve.ImagingLikelihood, obs, sky, invcovop.log())
 
 
 @pmp("obs", OBS)
@@ -125,7 +125,7 @@ def test_weighting_methods(obs, noisemodel):
     elif noisemodel == 1:  # Additive noise model
         var = rve.divide_where_possible(1, obs.weight)
         invcovop = (ift.Adder(var) @ correction ** 2).reciprocal()
-    try_lh(obs, rve.ImagingLikelihood, obs, sky, invcovop)
+    try_lh(obs, rve.ImagingLikelihood, obs, sky, invcovop.log())
 
 
 @pmp("time_mode", [True, False])

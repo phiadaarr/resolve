@@ -17,7 +17,7 @@ from ..likelihood import ImagingLikelihood
 from ..mpi import barrier, comm, master
 from ..plot.baseline_histogram import visualize_weighted_residuals
 from ..sky_model import sky_model_diffuse, sky_model_points
-from ..weighting_model import weighting_model
+from ..weighting_model import log_weighting_model
 
 
 def main():
@@ -43,7 +43,7 @@ def main():
     diffuse, additional_diffuse = sky_model_diffuse(cfg["sky"], obs_science)
     points, additional_points = sky_model_points(cfg["sky"], obs_science)
     sky = reduce(add, (op for op in [diffuse, points] if op is not None))
-    weights, additional_weights = weighting_model(cfg["weighting"], obs_science, sky.target)
+    logweights, additional_weights = log_weighting_model(cfg["weighting"], obs_science, sky.target)
     operators = {**additional_diffuse, **additional_points, **additional_weights}
     operators["sky"] = sky
     # /Model operators
@@ -54,14 +54,14 @@ def main():
         domains["diffuse"] = diffuse.domain
     if points is not None:
         domains["points"] = points.domain
-    if weights is not None:
-        domains["weights"] = ift.MultiDomain.union([ww.domain for ww in weights])
+    if logweights is not None:
+        domains["weights"] = ift.MultiDomain.union([ww.domain for ww in logweights])
     domains["sky"] = sky.domain
     # /Domains
 
     # Likelihoods
     lhs = {}
-    lhs["full"] = ImagingLikelihood(obs_science, sky, inverse_covariance_operator=weights)
+    lhs["full"] = ImagingLikelihood(obs_science, sky, log_inverse_covariance_operator=logweights)
     if points is not None:
         lhs["points"] = ImagingLikelihood(obs_science, points)
     lhs["data weights"] = ImagingLikelihood(obs_science, sky)
@@ -88,7 +88,7 @@ def main():
     # /Profiling
 
     def inspect_callback(sl, iglobal, position):
-        visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, outdir, io=master)
+        visualize_weighted_residuals(obs_science, sl, iglobal, sky, logweights.exp(), outdir, io=master)
 
     # Assumption: likelihood is not MPI distributed
     get_comm = comm

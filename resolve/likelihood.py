@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright(C) 2020-2021 Max-Planck-Society
+# Copyright(C) 2022 Max-Planck-Society, Philipp Arras
 # Author: Philipp Arras
 
 from functools import reduce
@@ -63,7 +64,7 @@ def _varcov(observation, Rs, inverse_covariance_operator):
 def ImagingLikelihood(
     observation,
     sky_operator,
-    inverse_covariance_operator=None,
+    log_inverse_covariance_operator=None,
     calibration_operator=None,
 ):
     """Versatile likelihood class.
@@ -96,7 +97,7 @@ def ImagingLikelihood(
         where `pdom` is a `PolarizationSpace`, `tdom` and `fdom` are an
         `IRGSpace`, and `sdom` is a two-dimensional `RGSpace`.
 
-    inverse_covariance_operator : Operator or list of Operator
+    log_inverse_covariance_operator : Operator or list of Operator
         Optional. Target needs to be the same space as observation.vis. If it
         is not specified, observation.wgt is taken as covariance.
 
@@ -107,45 +108,36 @@ def ImagingLikelihood(
     my_assert_isinstance(sky_operator, ift.Operator)
     obs = _obj2list(observation, Observation)
     cops = _duplicate(_obj2list(calibration_operator, ift.Operator), len(obs))
-    icovs = _duplicate(_obj2list(inverse_covariance_operator, ift.Operator),
-                       len(obs))
+    log_icovs = _duplicate(
+        _obj2list(log_inverse_covariance_operator, ift.Operator), len(obs)
+    )
     if len(obs) == 0:
         raise ValueError("List of observations is empty")
 
+    internal_sky_key = "_sky"
+
     energy = []
-    data, model_data, icov_at = [], [], []
-    used_keys = []
-    for ii, (oo, cop, icov) in enumerate(zip(obs, cops, icovs)):
-        virtual_key = f"_{ii} {oo.source_name}"
-        assert virtual_key not in used_keys
+    for ii, (oo, cop, log_icov) in enumerate(zip(obs, cops, log_icovs)):
         mask, vis, weight = _get_mask(oo)
+        if log_icov is not None:
+            log_icov = mask @ log_icov
         dtype = oo.vis.dtype
 
-        R = InterferometryResponse(oo, sky_operator.target).ducktape("_sky")
+        R = InterferometryResponse(oo, sky_operator.target).ducktape(internal_sky_key)
         if cop is not None:
-            R = cop*R  # Apply calibration solutions
+            R = cop * R  # Apply calibration solutions
         R = mask @ R  # Apply flags
 
-        if icov is None:
+        if log_icov is None:
             ee = DiagonalGaussianLikelihood(data=vis, inverse_covariance=weight) @ R
-            icov_at.append(lambda x: ift.BlockDiagonalOperator(ift.makeDomain({virtual_key: icov.domain}), {virtual_key: icov}))
+            ee.name = f"{oo.source_name} (data wgts)"
         else:
-            s0, s1 = "_resi", "_icov"
-            resi = ift.Adder(vis, neg=True) @ R
-            icov = mask @ icov
-            op = resi.ducktape_left(s0) + icov.ducktape_left(s1)
-            ee = ift.VariableCovarianceGaussianEnergy(resi.target, s0, s1, dtype) @ \
-                    (resi.ducktape_left(s0) + icov.ducktape_left(s1))
-            icov_at.append(lambda x: ift.makeOp(icov.ducktape_left(virtual_key).force(x)))
-
+            s0, s1 = "_model_data", "_log_icov"
+            ee = VariableCovarianceDiagonalGaussianLikelihood(
+                data=vis, key_signal=s0, key_log_inverse_covariance=s1
+            ) @ (log_icov.ducktape_left(s1) + R.ducktape_left(s0))
+            ee.name = f"{oo.source_name} (varcov)"
         energy.append(ee)
-        data.append(vis.ducktape_left(virtual_key))
-        model_data.append(R.ducktape_left(virtual_key))
-
-        used_keys.append(virtual_key)
-
-    sky_operator = sky_operator.ducktape_left("_sky")
-    return reduce(add, energy).partial_insert(sky_operator)
 
 
 def CalibrationLikelihood(
@@ -195,3 +187,6 @@ def CalibrationLikelihood(
         mask, vis, wgt = _get_mask(obs[0])
         return _build_gauss_lh_nres(mask @ model_d[0], vis, wgt)
     return _varcov(obs[0], model_d[0], icov[0])
+    energy = reduce(add, energy)
+    sky_operator = sky_operator.ducktape_left(internal_sky_key)
+    return energy.partial_insert(sky_operator)

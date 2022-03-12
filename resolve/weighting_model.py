@@ -15,7 +15,7 @@ from .sky_model import cfm_from_cfg
 from .util import _obj2list, assert_sky_domain
 
 
-def weighting_model(cfg, obs, sky_domain):
+def log_weighting_model(cfg, obs, sky_domain):
     """Assumes independent weighting for every imaging band and for every polarization"""
     assert_sky_domain(sky_domain)
 
@@ -60,7 +60,8 @@ def weighting_model(cfg, obs, sky_domain):
             linear_interpolation = reduce(add, tmpop)
             restructure = _CustomRestructure(linear_interpolation.target, oo.vis.domain)
             ift.extra.check_linear_operator(restructure)
-            tmpop = ift.makeOp(oo.weight) @ (restructure @ linear_interpolation @ log_weights).scale(-2).exp()
+            tmpop = (restructure @ linear_interpolation @ log_weights).scale(-2)
+            tmpop = ift.Adder(oo.weight.log()) @ tmpop
             op.append(tmpop)
         return op, additional
     if cfg["model"] == "independent gamma":
@@ -70,6 +71,7 @@ def weighting_model(cfg, obs, sky_domain):
         theta = cfg.getfloat("theta")
         op = [ift.makeOp(oo.weight) @ ift.GammaOperator(oo.vis.domain, mean=mean, var=var, alpha=alpha, theta=theta)
                 for iobs, oo in enumerate(obs)]
+        op = [oo.log() for oo in op]  # FIXME Simplify this for better performance
         op = [oo.ducktape(f"Observation {iobs}, invcov") for iobs, oo in enumerate(op)]
         return op, {}
     raise NotImplementedError
