@@ -19,6 +19,7 @@ from .irg_space import IRGSpace
 from .library.calibrators import *
 from .library.primary_beams import *
 from .likelihood import *
+from .likelihood_deprecated import *
 from .mosaicing import *
 from .mpi import barrier, onlymaster
 from .mpi_operators import *
