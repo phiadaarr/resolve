@@ -4,6 +4,7 @@
 
 from functools import reduce
 from operator import add
+from warnings import warn
 
 import nifty8 as ift
 import numpy as np

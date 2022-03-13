@@ -12,7 +12,7 @@ import numpy as np
 from .data.observation import Observation
 from .response_new import InterferometryResponse
 from .util import _duplicate, _obj2list, my_assert_isinstance
-from .energy_operators import DiagonalGaussianLikelihood
+from .energy_operators import DiagonalGaussianLikelihood, VariableCovarianceDiagonalGaussianLikelihood
 
 
 def _get_mask(observation):

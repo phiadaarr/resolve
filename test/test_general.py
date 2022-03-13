@@ -125,7 +125,7 @@ def test_weighting_methods(obs, noisemodel):
     elif noisemodel == 1:  # Additive noise model
         var = rve.divide_where_possible(1, obs.weight)
         invcovop = (ift.Adder(var) @ correction ** 2).reciprocal()
-    try_lh(obs, rve.ImagingLikelihood, obs, sky, invcovop.log())
+    try_lh(obs, rve.ImagingLikelihood, obs, sky, invcovop)
 
 
 @pmp("time_mode", [True, False])

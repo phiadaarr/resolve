@@ -435,6 +435,14 @@ class Observation(BaseObservation):
                            self._weight.astype(np.float32, casting="same_kind", copy=False),
                            self._polarization, self._freq, self._auxiliary_tables)
 
+    def is_single_precision(self):
+        assert not (is_single_precision(self._weight.dtype) ^ is_single_precision(self._vis.dtype))
+        return is_single_precision(self._weight.dtype)
+
+    def is_double_precision(self):
+        assert not (is_single_precision(self._weight.dtype) ^ is_single_precision(self._vis.dtype))
+        return not is_single_precision(self._weight.dtype)
+
     @property
     def double_precision(self):
         return self._vis.dtype == np.complex128

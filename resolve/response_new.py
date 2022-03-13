@@ -22,13 +22,11 @@ def InterferometryResponse(observation, domain):
     if observation.double_precision:
         dtype = _DtypeConverter(domain, np.float64, np.float64, "Response input")  # do nothing
         dtype_check0 = _DtypeConverter(pol.target, np.complex128, np.complex128, "Response output")  # do nothing
-        dtype_check0 = _DtypeConverter(pol.target, np.complex128, None, "Response output", casting="unsafe")  # FIXME THIS IS TEMPORARY
         dtype_check1 = _DtypeConverter(pol.domain, np.complex128, np.complex128, "Polarization converter output")  # do nothing
     else:
         dtype = _DtypeConverter(domain, np.float64, np.float32, "Response input")
         dtype = _DtypeConverter(domain, np.float64, np.float32, "Response input")
         dtype_check0 = _DtypeConverter(pol.target, np.complex64, np.complex64, "Response output")  # do nothing
-        dtype_check0 = _DtypeConverter(pol.target, np.complex64, None, "Response output", casting="unsafe")  # FIXME THIS IS TEMPORARY
         dtype_check1 = _DtypeConverter(pol.domain, np.complex64, np.complex64, "Polarization converter output")  # do nothing
     return dtype_check0 @ pol @ dtype_check1 @ R @ dtype
 
