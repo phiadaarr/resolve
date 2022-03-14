@@ -10,6 +10,8 @@ import pytest
 
 import resolve as rve
 
+from .common import setup_function, teardown_function
+
 pmp = pytest.mark.parametrize
 np.seterr(all="raise")
 

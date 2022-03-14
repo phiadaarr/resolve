@@ -53,3 +53,16 @@ def operator_equality(op0, op1, ntries=20, domain_dtype=np.float64):
         ift.extra.assert_allclose(res0, res1, rtol=rtol)
     ift.extra.check_operator(op0, loc, ntries=ntries, tol=rtol)
     ift.extra.check_operator(op1, loc, ntries=ntries, tol=rtol)
+
+
+def setup_function():
+    import nifty8 as ift
+    ift.random.push_sseq_from_seed(42)
+    comm, _, _, master = ift.utilities.get_MPI_params()
+    if comm is not None:
+        comm.Barrier()
+
+
+def teardown_function():
+    import nifty8 as ift
+    ift.random.pop_sseq()

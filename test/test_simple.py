@@ -19,7 +19,7 @@ import pytest
 
 import resolve as rve
 
-from .common import list2fixture
+from .common import list2fixture, setup_function, teardown_function
 
 pmp = pytest.mark.parametrize
 

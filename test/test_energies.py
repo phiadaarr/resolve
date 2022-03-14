@@ -20,7 +20,7 @@ import pytest
 
 import resolve as rve
 
-from .common import list2fixture, operator_equality
+from .common import list2fixture, operator_equality, setup_function, teardown_function
 
 dtype = list2fixture([np.complex64, np.complex128, np.float32, np.float64])
 dtype = list2fixture([np.complex128, np.float64])

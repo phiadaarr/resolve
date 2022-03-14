@@ -5,6 +5,7 @@
 import nifty8 as ift
 
 import resolve as rve
+from .common import setup_function, teardown_function
 
 
 def test_alma_beam():
