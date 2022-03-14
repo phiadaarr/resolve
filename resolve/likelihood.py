@@ -91,7 +91,7 @@ def ImagingLikelihood(
         R = InterferometryResponse(oo, sky_operator.target).ducktape(internal_sky_key)
         if cop is not None:
             R = cop * R  # Apply calibration solutions
-        R = mask @ R  # Apply flags
+        R = mask @ R  # Apply flags  FIXME Move this into cpp likelihoods
 
         if log_icov is None:
             ee = DiagonalGaussianLikelihood(data=vis, inverse_covariance=weight) @ R

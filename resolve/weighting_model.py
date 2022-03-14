@@ -13,7 +13,7 @@ from .data.observation import Observation
 from .simple_operators import MultiFieldStacker
 from .sky_model import cfm_from_cfg
 from .util import _obj2list, assert_sky_domain
-from .response_new import _DtypeConverter
+from .dtype_converter import DtypeConverter
 
 
 def weighting_model(cfg, obs, sky_domain):
@@ -68,7 +68,7 @@ def log_weighting_model(cfg, obs, sky_domain):
             ift.extra.check_linear_operator(restructure)
             tmpop = (restructure @ linear_interpolation @ log_weights).scale(-2)
             if oo.is_single_precision():
-                tmpop = _DtypeConverter(tmpop.target, np.float64, np.float32) @ tmpop
+                tmpop = DtypeConverter(tmpop.target, np.float64, np.float32) @ tmpop
             tmpop = ift.Adder(oo.weight.log()) @ tmpop
             op.append(tmpop)
         return op, additional
@@ -81,7 +81,7 @@ def log_weighting_model(cfg, obs, sky_domain):
         for iobs, oo in enumerate(obs):
             op = ift.GammaOperator(oo.vis.domain, mean=mean, var=var, alpha=alpha, theta=theta)
             if oo.is_single_precision():
-                op = _DtypeConverter(op.target, np.float64, np.float32) @ op
+                op = DtypeConverter(op.target, np.float64, np.float32) @ op
             op = ift.makeOp(oo.weight) @ op
             op = op.log()  # FIXME Simplify this for better performance
             op = op.ducktape(f"Observation {iobs}, invcov")

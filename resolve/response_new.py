@@ -14,20 +14,21 @@ from .global_config import epsilon, nthreads, verbosity, wgridding
 from .polarization_space import polarization_converter
 from .util import (assert_sky_domain, my_assert, my_assert_isinstance,
                    my_asserteq, dtype_complex2float, dtype_float2complex)
+from .dtype_converter import DtypeConverter
 
 
 def InterferometryResponse(observation, domain):
     R = _InterferometryResponse(observation, domain)
     pol = polarization_converter(R.target, observation.vis.domain)
     if observation.double_precision:
-        dtype = _DtypeConverter(domain, np.float64, np.float64, "Response input")  # do nothing
-        dtype_check0 = _DtypeConverter(pol.target, np.complex128, np.complex128, "Response output")  # do nothing
-        dtype_check1 = _DtypeConverter(pol.domain, np.complex128, np.complex128, "Polarization converter output")  # do nothing
+        dtype = DtypeConverter(domain, np.float64, np.float64, "Response input")  # do nothing
+        dtype_check0 = DtypeConverter(pol.target, np.complex128, np.complex128, "Response output")  # do nothing
+        dtype_check1 = DtypeConverter(pol.domain, np.complex128, np.complex128, "Polarization converter output")  # do nothing
     else:
-        dtype = _DtypeConverter(domain, np.float64, np.float32, "Response input")
-        dtype = _DtypeConverter(domain, np.float64, np.float32, "Response input")
-        dtype_check0 = _DtypeConverter(pol.target, np.complex64, np.complex64, "Response output")  # do nothing
-        dtype_check1 = _DtypeConverter(pol.domain, np.complex64, np.complex64, "Polarization converter output")  # do nothing
+        dtype = DtypeConverter(domain, np.float64, np.float32, "Response input")
+        dtype = DtypeConverter(domain, np.float64, np.float32, "Response input")
+        dtype_check0 = DtypeConverter(pol.target, np.complex64, np.complex64, "Response output")  # do nothing
+        dtype_check1 = DtypeConverter(pol.domain, np.complex64, np.complex64, "Polarization converter output")  # do nothing
     return dtype_check0 @ pol @ dtype_check1 @ R @ dtype
 
 
@@ -211,30 +212,3 @@ class SingleResponse(ift.LinearOperator):
                            verbosity=verbosity(), **self._args)
             res[nx * xx: nx * (xx + 1), ny * yy: ny * (yy + 1)] = im
         return res
-
-
-class _DtypeConverter(ift.EndomorphicOperator):
-    def __init__(self, domain, domain_dtype, target_dtype, hint="", casting="same_kind"):
-        self._domain = ift.DomainTuple.make(domain)
-        self._ddt = domain_dtype
-        self._tdt = target_dtype
-        self._capability = self.TIMES | self.ADJOINT_TIMES
-        self._hint = hint
-        self._casting = casting
-
-    def apply(self, x, mode):
-        self._check_input(x, mode)
-        # Sanity check
-        if mode == self.TIMES:
-            inp, out = self._ddt, self._tdt
-        else:
-            out, inp = self._ddt, self._tdt
-        if inp is not None and x.dtype != inp:
-            s = ["Dtypes not compatible", str(self.domain),
-                 f"Input: {x.dtype}, should be: {inp}", self._hint]
-            raise ValueError("\n".join(s))
-        # /Sanity check
-        if inp is None:
-            return x
-        return ift.makeField(self._tgt(mode),
-                             x.val.astype(out, casting=self._casting, copy=False))
