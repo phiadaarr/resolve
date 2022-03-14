@@ -15,6 +15,7 @@ from .util import (_duplicate, _obj2list, my_assert, my_assert_isinstance,
                    my_asserteq)
 from .energy_operators import DiagonalGaussianLikelihood
 from .likelihood import _get_mask
+from .dtype_converter import DtypeConverter
 
 
 def get_mask_multi_field(weight):
@@ -36,7 +37,8 @@ def _build_gauss_lh_nres(op, mean, invcov):
     my_assert_isinstance(op, ift.Operator)
     my_assert_isinstance(mean, invcov, (ift.Field, ift.MultiField))
     my_asserteq(op.target, mean.domain, invcov.domain)
-    return DiagonalGaussianLikelihood(data=mean, inverse_covariance=invcov) @ op
+    dt = DtypeConverter(op.target, np.complex128, mean.dtype)
+    return DiagonalGaussianLikelihood(data=mean, inverse_covariance=invcov) @ dt @ op
 
 
 def _varcov(observation, Rs, inverse_covariance_operator):

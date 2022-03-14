@@ -266,6 +266,7 @@ def test_response_distributor():
 @pmp("obs", OBS)
 @pmp("facets", FACETS)
 def test_single_response(obs, facets):
+    obs = obs.to_double_precision()
     sdom = dom[-1]
     mask = obs.mask.val
     op = rve.SingleResponse(sdom, obs.uvw, obs.freq, mask[0], facets=facets)
@@ -307,6 +308,7 @@ def test_mf_response():
     pdom, tdom, fdom, sdom = dom
     ms = join(direc, "CYG-D-6680-64CH-10S.ms")
     obs = rve.ms2observations(ms, "DATA", False, 0, "stokesiavg")[0]
+    obs = obs.to_double_precision()
     R = rve.MfResponse(obs, fdom, sdom)
     ift.extra.check_linear_operator(
         R, rtol=1e-5, atol=1e-5, target_dtype=np.complex128, only_r_linear=True

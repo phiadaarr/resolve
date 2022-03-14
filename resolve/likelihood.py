@@ -90,7 +90,9 @@ def ImagingLikelihood(
 
         R = InterferometryResponse(oo, sky_operator.target).ducktape(internal_sky_key)
         if cop is not None:
-            R = cop * R  # Apply calibration solutions
+            from .dtype_converter import DtypeConverter
+            dt = DtypeConverter(cop.target, np.complex128, dtype)
+            R = (dt @ cop) * R  # Apply calibration solutions
         R = mask @ R  # Apply flags  FIXME Move this into cpp likelihoods
 
         if log_icov is None:
