@@ -272,8 +272,8 @@ def test_single_response(obs, facets):
     sdom = dom[-1]
     mask = obs.mask.val
     op = rve.SingleResponse(sdom, obs.uvw, obs.freq, mask[0], facets=facets)
-    ift.extra.check_linear_operator(op, np.float64, np.complex64,
-                                    only_r_linear=True, rtol=1e-6, atol=1e-6)
+    ift.extra.check_linear_operator(op, np.float64, np.complex128,
+                                    only_r_linear=True, rtol=1e-6)
 
 
 def test_facet_consistency():
@@ -286,7 +286,7 @@ def test_facet_consistency():
         res = op(pos)
         if res0 is None:
             res0 = res
-        ift.extra.assert_allclose(res0, res, atol=1e-4, rtol=1e-4)
+        ift.extra.assert_allclose(res0, res, rtol=1e-4)
 
 
 @rve.onlymaster
@@ -313,7 +313,7 @@ def test_mf_response():
     obs = obs.to_double_precision()
     R = rve.MfResponse(obs, fdom, sdom)
     ift.extra.check_linear_operator(
-        R, rtol=1e-5, atol=1e-5, target_dtype=np.complex128, only_r_linear=True
+        R, rtol=1e-5, target_dtype=np.complex128, only_r_linear=True
     )
 
 
