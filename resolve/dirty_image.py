@@ -28,10 +28,8 @@ from .util import assert_sky_domain
 def dirty_image(observation, weighting, sky_domain, do_wgridding, epsilon,
                 vis=None, weight=None, nthreads=1):
     assert_sky_domain(sky_domain)
-    pol = observation.polarization.has_crosshanded()
-    if pol:
-        raise NotImplementedError
-    R = InterferometryResponse(observation, sky_domain, do_wgridding, epsilon, nthreads)
+    R = InterferometryResponse(observation, sky_domain, do_wgridding=do_wgridding,
+                               epsilon=epsilon, nthreads=nthreads)
     w = observation.weight if weight is None else weight
     d = observation.vis if vis is None else vis
     vol = sky_domain[-1].scalar_dvol

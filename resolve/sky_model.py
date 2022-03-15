@@ -180,7 +180,14 @@ def _single_freq_logsky(cfg, pol_label):
 
 def _multi_freq_logsky_cfm(cfg, sdom, pol_label):
     fnpix, df = cfg.getfloat("freq npix"), cfg.getfloat("freq pixel size")
-    fdom = IRGSpace(cfg.getfloat("freq start") + np.arange(fnpix)*df)
+    freq0 = cfg.getfloat("freq start")
+    if fnpix is None:
+        raise ValueError("Please set a value for `freq npix`")
+    if df is None:
+        raise ValueError("Please set a value for `freq pixel size`")
+    if freq0 is None:
+        raise ValueError("Please set a value for `freq start`")
+    fdom = IRGSpace(freq0 + np.arange(fnpix)*df)
     fdom_rg = ift.RGSpace(fnpix, df)
 
     cfm = cfm_from_cfg(cfg, {"freq": fdom_rg, "space": sdom}, f"stokes{pol_label} diffuse")

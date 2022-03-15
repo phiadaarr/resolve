@@ -133,13 +133,13 @@ def ImagingLikelihood(
 
         if log_icov is None:
             ee = DiagonalGaussianLikelihood(data=vis, inverse_covariance=weight) @ R
-            ee.name = f"{oo.source_name} (data wgts)"
+            ee.name = f"{oo.source_name} (data wgts) {ii}"
         else:
             s0, s1 = "_model_data", "_log_icov"
             ee = VariableCovarianceDiagonalGaussianLikelihood(
                 data=vis, key_signal=s0, key_log_inverse_covariance=s1
             ) @ (log_icov.ducktape_left(s1) + R.ducktape_left(s0))
-            ee.name = f"{oo.source_name} (varcov)"
+            ee.name = f"{oo.source_name} (varcov) {ii}"
         energy.append(ee)
     energy = reduce(add, energy)
     sky_operator = sky_operator.ducktape_left(internal_sky_key)

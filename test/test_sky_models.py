@@ -33,7 +33,7 @@ obs = rve.ms2observations("/data/CYG-D-6680-64CH-10S.ms", "DATA", True, 0, polar
 
 
 @pmp("fname", ["cfg/cygnusa.cfg", "cfg/cygnusa_polarization.cfg", "cfg/mf.cfg",
-               "cfg/cygnusa_mf.cfg"])
+               "cfg/cygnusa_mf.cfg", "cfg/cygnusa_mf_cfm.cfg"])
 def test_build_multi_frequency_skymodel(fname):
     tmp = TemporaryDirectory()
     direc = tmp.name

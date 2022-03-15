@@ -24,6 +24,7 @@ from matplotlib.colors import LogNorm
 from ..constants import ARCMIN2RAD
 from ..data.observation import unique_antennas
 from ..ubik_tools.plot_sky_hdf5 import _optimal_subplot_distribution
+from ..util import assert_sky_domain
 
 
 def baseline_histogram(file_name, vis, observation, bins, weight):
@@ -184,8 +185,11 @@ def scatter_vis(file_name, vis, observation, weight, lim):
     plt.close()
 
 
-def visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_directory, io):
-    from ..response_new import InterferometryResponse
+def visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_directory, io,
+                                 do_wgridding, epsilon, nthreads=1):
+    from ..response import InterferometryResponse
+    from ..dirty_image import dirty_image
+    from .sky import plot_dirty
 
     sky_mean = sl.average(sky)
 
@@ -207,21 +211,39 @@ def visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_
         # /data weights
 
         # learned weights
-        if weights is None:
-            continue
-        dd = os.path.join(output_directory, f"normlized data residuals obs{ii} (learned weights)")
-        weights_mean = sl.average(weights[ii])
-        if io:
-            os.makedirs(dd, exist_ok=True)
-            fname = os.path.join(dd, f"baseline_model_weights_iter{iglobal}_obs{ii}.png")
-            baseline_histogram(fname, model_vis-oo.vis, oo, 100, weights_mean)
+        if weights is not None:
+            dd = os.path.join(output_directory, f"normlized data residuals obs{ii} (learned weights)")
+            weights_mean = sl.average(weights[ii])
+            if io:
+                os.makedirs(dd, exist_ok=True)
+                fname = os.path.join(dd, f"baseline_model_weights_iter{iglobal}_obs{ii}.png")
+                baseline_histogram(fname, model_vis-oo.vis, oo, 100, weights_mean)
 
-            fname = os.path.join(dd, f"antenna_model_weights_iter{iglobal}_obs{ii}.png")
-            antenna_matrix(fname, model_vis-oo.vis, oo, weights_mean)
+                fname = os.path.join(dd, f"antenna_model_weights_iter{iglobal}_obs{ii}.png")
+                antenna_matrix(fname, model_vis-oo.vis, oo, weights_mean)
 
-            fname = os.path.join(dd, f"scatter_model_weights_iter{iglobal}_obs{ii}.png")
-            scatter_vis(fname, model_vis-oo.vis, oo, weights_mean, 10)
+                fname = os.path.join(dd, f"scatter_model_weights_iter{iglobal}_obs{ii}.png")
+                scatter_vis(fname, model_vis-oo.vis, oo, weights_mean, 10)
         # /learned weights
+
+        # Dirty images
+        if io:
+            dd = os.path.join(output_directory, f"dirty_images")
+            os.makedirs(dd, exist_ok=True)
+
+            for method in ["uniform", "natural"]:
+                fname = os.path.join(dd, f"dirty_image_{method}_data_weights_iter{iglobal}_obs{ii}.pdf")
+                di = dirty_image(oo, method, sky_mean.domain, do_wgridding, epsilon,
+                                 vis=model_vis-oo.vis, weight=oo.weight, nthreads=nthreads)
+                plot_dirty(di, fname)
+
+            if weights is not None:
+                for method in ["uniform", "natural"]:
+                    fname = os.path.join(dd, f"dirty_image_{method}_model_weights_iter{iglobal}_obs{ii}.pdf")
+                    di = dirty_image(oo, method, sky_mean.domain, do_wgridding, epsilon,
+                                     vis=model_vis-oo.vis, weight=weights_mean, nthreads=nthreads)
+                    plot_dirty(di, fname)
+        # /Dirty images
 
 
 def _zero_to_nan(arr):

@@ -59,7 +59,10 @@ def main():
     points, additional_points = sky_model_points(cfg["sky"], obs_science, nthreads=1)
     sky = reduce(add, (op for op in [diffuse, points] if op is not None))
     logweights, additional_weights = log_weighting_model(cfg["weighting"], obs_science, sky.target)
-    weights = [ww.exp() for ww in logweights]
+    if logweights is None:
+        weights = None
+    else:
+        weights = [ww.exp() for ww in logweights]
     operators = {**additional_diffuse, **additional_points, **additional_weights}
     operators["sky"] = sky
     # /Model operators
@@ -101,7 +104,8 @@ def main():
     # /Profiling
 
     def inspect_callback(sl, iglobal, position):
-        visualize_weighted_residuals(obs_science, sl, iglobal, sky, logweights.exp(), outdir, io=master)
+        visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, outdir, io=master,
+                                     do_wgridding=do_wgridding, epsilon=epsilon, nthreads=nthreads)
 
     # Assumption: likelihood is not MPI distributed
     get_comm = comm
