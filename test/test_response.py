@@ -48,7 +48,8 @@ def test_single_response(obs, facets):
     obs = obs.to_double_precision()
     sdom = dom[-1]
     mask = obs.mask.val
-    op = rve.SingleResponse(sdom, obs.uvw, obs.freq, mask[0], facets=facets)
+    op = rve.SingleResponse(sdom, obs.uvw, obs.freq, mask=mask[0], facets=facets, epsilon=1e-6,
+                            do_wgridding=False)
     ift.extra.check_linear_operator(op, np.float64, np.complex128,
                                     only_r_linear=True, rtol=1e-6, atol=1e-6)
 
@@ -59,7 +60,8 @@ def test_facet_consistency():
     res0 = None
     pos = ift.from_random(sdom)
     for facets in FACETS:
-        op = rve.SingleResponse(sdom, obs.uvw, obs.freq, obs.mask.val[0], facets=facets)
+        op = rve.SingleResponse(sdom, obs.uvw, obs.freq, 1e-6, False, mask=obs.mask.val[0],
+                                facets=facets)
         res = op(pos)
         if res0 is None:
             res0 = res
