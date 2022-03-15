@@ -31,12 +31,15 @@ def plot_dirty(fld, file_name):
     for kk in pdom.labels:
         for itime, time in enumerate(tdom.coordinates):
             for ifreq, freq in enumerate(fdom.coordinates):
+                axx = axs.pop(0)
                 myarr = fld.val[pdom.label2index(kk), itime, ifreq]
                 assert myarr.ndim == 2
-                norm = CenteredNorm(vcenter=0., halfrange=np.max(np.abs(myarr)))
-                axx = axs.pop(0)
+                halfrange = np.max(np.abs(myarr))
+                if halfrange == 0.:
+                    continue
+                norm = CenteredNorm(vcenter=0., halfrange=halfrange)
                 im = axx.imshow(myarr.T, origin="lower", norm=norm, cmap="seismic")
-                #plt.colorbar(im, ax=axx)
+                plt.colorbar(im, ax=axx)
     plt.tight_layout()
     plt.savefig(file_name)
     plt.close()

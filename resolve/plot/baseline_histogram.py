@@ -193,6 +193,9 @@ def visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_
 
     sky_mean = sl.average(sky)
 
+    di0 = {"uniform": ift.full(sky_mean.domain, 0.), "natural": ift.full(sky_mean.domain, 0.)}
+    di1 = {"uniform": ift.full(sky_mean.domain, 0.), "natural": ift.full(sky_mean.domain, 0.)}
+
     for ii, oo in enumerate(obs_science):
         # data weights
         R = InterferometryResponse(oo, sky.target, do_wgridding=do_wgridding, epsilon=epsilon, nthreads=nthreads)
@@ -226,24 +229,31 @@ def visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_
                 scatter_vis(fname, model_vis-oo.vis, oo, weights_mean, 10)
         # /learned weights
 
-        # Dirty images
-        if io:
-            dd = os.path.join(output_directory, f"dirty_images")
-            os.makedirs(dd, exist_ok=True)
 
+        for method in ["uniform", "natural"]:
+            di = dirty_image(oo, method, sky_mean.domain, do_wgridding, epsilon,
+                             vis=model_vis-oo.vis, weight=oo.weight, nthreads=nthreads)
+            di0[method] = di0[method] + di
+
+        if weights is not None:
             for method in ["uniform", "natural"]:
-                fname = os.path.join(dd, f"dirty_image_{method}_data_weights_iter{iglobal}_obs{ii}.pdf")
                 di = dirty_image(oo, method, sky_mean.domain, do_wgridding, epsilon,
-                                 vis=model_vis-oo.vis, weight=oo.weight, nthreads=nthreads)
-                plot_dirty(di, fname)
+                                 vis=model_vis-oo.vis, weight=weights_mean, nthreads=nthreads)
+                di1[method] = di1[method] + di
 
-            if weights is not None:
-                for method in ["uniform", "natural"]:
-                    fname = os.path.join(dd, f"dirty_image_{method}_model_weights_iter{iglobal}_obs{ii}.pdf")
-                    di = dirty_image(oo, method, sky_mean.domain, do_wgridding, epsilon,
-                                     vis=model_vis-oo.vis, weight=weights_mean, nthreads=nthreads)
-                    plot_dirty(di, fname)
-        # /Dirty images
+    # Dirty images
+    if io:
+        dd = os.path.join(output_directory, f"dirty_images")
+        os.makedirs(dd, exist_ok=True)
+
+        for method in ["uniform", "natural"]:
+            fname = os.path.join(dd, f"dirty_image_{method}_data_weights_iter{iglobal}.pdf")
+            plot_dirty(di0[method], fname)
+        if weights is not None:
+            for method in ["uniform", "natural"]:
+                fname = os.path.join(dd, f"dirty_image_{method}_model_weights_iter{iglobal}.pdf")
+                plot_dirty(di1[method], fname)
+    # /Dirty images
 
 
 def _zero_to_nan(arr):
