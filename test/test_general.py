@@ -257,38 +257,6 @@ def test_integrator_values():
     np.testing.assert_equal(out.val[0], a0.force(pos).val)
 
 
-def test_response_distributor():
-    dom = ift.UnstructuredDomain(2), ift.UnstructuredDomain(4)
-    op0 = ift.makeOp(ift.makeField(dom, np.arange(8).reshape(2, -1)))
-    op1 = ift.makeOp(ift.makeField(dom, 2 * np.arange(8).reshape(2, -1)))
-    op = rve.response.ResponseDistributor(ift.UnstructuredDomain(2), op0, op1)
-    ift.extra.check_linear_operator(op)
-
-
-@pmp("obs", OBS)
-@pmp("facets", FACETS)
-def test_single_response(obs, facets):
-    obs = obs.to_double_precision()
-    sdom = dom[-1]
-    mask = obs.mask.val
-    op = rve.SingleResponse(sdom, obs.uvw, obs.freq, mask[0], facets=facets)
-    ift.extra.check_linear_operator(op, np.float64, np.complex128,
-                                    only_r_linear=True, rtol=1e-6)
-
-
-def test_facet_consistency():
-    sdom = dom[-1]
-    obs = OBS[0]
-    res0 = None
-    pos = ift.from_random(sdom)
-    for facets in FACETS:
-        op = rve.SingleResponse(sdom, obs.uvw, obs.freq, obs.mask.val[0], facets=facets)
-        res = op(pos)
-        if res0 is None:
-            res0 = res
-        ift.extra.assert_allclose(res0, res, rtol=1e-4)
-
-
 @rve.onlymaster
 def fvalid():
     return 1.0
@@ -304,17 +272,6 @@ def test_randomonmaster():
     fvalid()
     with pytest.raises(RuntimeError):
         finvalid()
-
-
-def test_mf_response():
-    pdom, tdom, fdom, sdom = dom
-    ms = join(direc, "CYG-D-6680-64CH-10S.ms")
-    obs = rve.ms2observations(ms, "DATA", False, 0, "stokesiavg")[0]
-    obs = obs.to_double_precision()
-    R = rve.MfResponse(obs, fdom, sdom)
-    ift.extra.check_linear_operator(
-        R, rtol=1e-5, target_dtype=np.complex128, only_r_linear=True
-    )
 
 
 def test_intop():
