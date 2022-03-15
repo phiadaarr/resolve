@@ -30,6 +30,7 @@ from ..mpi import barrier, comm, master
 from ..plot.baseline_histogram import visualize_weighted_residuals
 from ..sky_model import sky_model_diffuse, sky_model_points
 from ..weighting_model import log_weighting_model
+from ..plot.sky import plot_sky
 
 
 def main():
@@ -106,6 +107,7 @@ def main():
     def inspect_callback(sl, iglobal, position):
         visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, outdir, io=master,
                                      do_wgridding=do_wgridding, epsilon=epsilon, nthreads=nthreads)
+        plot_sky(sl.average(sky), os.path.join(outdir, f"sky/sky_{iglobal}.pdf"))
 
     # Assumption: likelihood is not MPI distributed
     get_comm = comm

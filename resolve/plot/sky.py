@@ -49,12 +49,15 @@ def plot_sky(fld, file_name):
     fig, axs = plt.subplots(**_optimal_subplot_distribution(pdom.size*tdom.size*fdom.size))
     axs = list(np.array(axs).ravel())
     for kk in pdom.labels:
+        polarr = fld.val[pdom.label2index(kk)]
+        if kk == "I":
+            norm = LogNorm(vmin=np.min(polarr), vmax=np.max(polarr))
+        else:
+            norm = CenteredNorm(vcenter=0., halfrange=np.max(np.abs(polarr)))
         for itime, time in enumerate(tdom.coordinates):
-            for ifreq, freq in enumerate(tdom.coordinates):
-                myarr = fld.val[pdom.label2index(kk), itime, ifreq]
-                assert myarr.ndim == 2
+            for ifreq, freq in enumerate(fdom.coordinates):
                 axx = axs.pop(0)
-                im = axx.imshow(myarr.T, origin="lower")
+                im = axx.imshow(polarr[itime, ifreq].T, origin="lower", norm=norm)
                 plt.colorbar(im, ax=axx)
     plt.tight_layout()
     plt.savefig(file_name)
