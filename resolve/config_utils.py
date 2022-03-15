@@ -134,7 +134,6 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}, inspect_call
     cst_keys = _parse_cst(cfg["constants"], total_iterations, constants_dct)
     res["constants"] = lambda ii: cst_keys[ii]
 
-    res["resume"] = cfg.getboolean("resume")
     res["save_strategy"] = cfg.get("save strategy")
 
     return res
