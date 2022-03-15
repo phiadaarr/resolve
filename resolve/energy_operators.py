@@ -20,11 +20,10 @@ import numpy as np
 import resolvelib
 
 from .cpp2py import Pybind11LikelihoodEnergyOperator
-from .global_config import nthreads
 from .util import is_single_precision
 
 
-def DiagonalGaussianLikelihood(data, inverse_covariance):
+def DiagonalGaussianLikelihood(data, inverse_covariance, nthreads=1):
     """Gaussian energy as NIFTy operator that is implemented in C++
 
     Parameters
@@ -70,7 +69,7 @@ def DiagonalGaussianLikelihood(data, inverse_covariance):
 
     return Pybind11LikelihoodEnergyOperator(
         data.domain,
-        f(data.val, inverse_covariance.val, nthreads()),
+        f(data.val, inverse_covariance.val, nthreads),
         nifty_equivalent=ift.GaussianEnergy(
             data=data, inverse_covariance=ift.makeOp(inverse_covariance)
         ),
@@ -78,7 +77,7 @@ def DiagonalGaussianLikelihood(data, inverse_covariance):
 
 
 def VariableCovarianceDiagonalGaussianLikelihood(
-    data, key_signal, key_log_inverse_covariance
+    data, key_signal, key_log_inverse_covariance, nthreads=1
 ):
     """Variable covariance Gaussian energy as NIFTy operator that is implemented in C++
 
@@ -89,6 +88,8 @@ def VariableCovarianceDiagonalGaussianLikelihood(
     key_signal : str
 
     key_log_inverse_covariance : str
+
+    nthreads : int
 
     Note
     ----
@@ -113,7 +114,7 @@ def VariableCovarianceDiagonalGaussianLikelihood(
 
     return Pybind11LikelihoodEnergyOperator(
         {key_signal: data.domain, key_log_inverse_covariance: data.domain},
-        f(data.val, key_signal, key_log_inverse_covariance, nthreads()),
+        f(data.val, key_signal, key_log_inverse_covariance, nthreads),
         nifty_equivalent=ift.VariableCovarianceGaussianEnergy(
             data.domain, "residual", "icov", data.dtype
         )

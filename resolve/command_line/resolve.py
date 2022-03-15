@@ -12,7 +12,6 @@ from operator import add
 import nifty8 as ift
 
 from ..config_utils import parse_data_config, parse_optimize_kl_config
-from ..global_config import set_nthreads, set_verbosity
 from ..likelihood import ImagingLikelihood
 from ..mpi import barrier, comm, master
 from ..plot.baseline_histogram import visualize_weighted_residuals
@@ -29,9 +28,11 @@ def main():
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
+    nthreads = args.j
+    ift.set_nthreads(nthreads)
+
     cfg = ConfigParser()
     cfg.read(args.config_file)
-    set_nthreads(args.j)
 
     obs_calib_flux, obs_calib_phase, obs_science = parse_data_config(cfg)
 
@@ -40,8 +41,8 @@ def main():
     assert len(obs_calib_flux) == len(obs_calib_phase) == 0
 
     # Model operators
-    diffuse, additional_diffuse = sky_model_diffuse(cfg["sky"], obs_science)
-    points, additional_points = sky_model_points(cfg["sky"], obs_science)
+    diffuse, additional_diffuse = sky_model_diffuse(cfg["sky"], obs_science, nthreads=nthreads)
+    points, additional_points = sky_model_points(cfg["sky"], obs_science, nthreads=1)
     sky = reduce(add, (op for op in [diffuse, points] if op is not None))
     logweights, additional_weights = log_weighting_model(cfg["weighting"], obs_science, sky.target)
     operators = {**additional_diffuse, **additional_points, **additional_weights}
@@ -61,10 +62,10 @@ def main():
 
     # Likelihoods
     lhs = {}
-    lhs["full"] = ImagingLikelihood(obs_science, sky, log_inverse_covariance_operator=logweights)
+    lhs["full"] = ImagingLikelihood(obs_science, sky, log_inverse_covariance_operator=logweights, nthreads=nthreads)
     if points is not None:
-        lhs["points"] = ImagingLikelihood(obs_science, points)
-    lhs["data weights"] = ImagingLikelihood(obs_science, sky)
+        lhs["points"] = ImagingLikelihood(obs_science, points, nthreads=nthreads)
+    lhs["data weights"] = ImagingLikelihood(obs_science, sky, nthreads=nthreads)
     # /Likelihoods
 
     outdir = parse_optimize_kl_config(cfg["optimization"], lhs, domains)["output_directory"]
@@ -75,12 +76,7 @@ def main():
     if master:
         os.makedirs(outdir, exist_ok=True)
         with ift.random.Context(12):
-            if args.verbose:
-                set_verbosity(True)
-                ift.exec_time(lhs["full"], verbose=True)
-                set_verbosity(False)
-            else:
-                ift.exec_time(lhs["full"])
+            ift.exec_time(lhs["full"], verbose=args.verbose)
         if args.profile_only:
             exit()
     del position

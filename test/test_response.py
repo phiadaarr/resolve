@@ -17,10 +17,6 @@ pmp = pytest.mark.parametrize
 np.seterr(all="raise")
 
 direc = "/data/"
-nthreads = 1
-rve.set_nthreads(nthreads)
-rve.set_epsilon(1e-4)
-rve.set_wgridding(False)
 OBS = []
 for polmode in ["all", "stokesi", "stokesiavg"]:
     oo = rve.ms2observations(
@@ -56,24 +52,3 @@ def test_facet_consistency():
         if res0 is None:
             res0 = res
         ift.extra.assert_allclose(res0, res, rtol=1e-4, atol=1e-4)
-
-
-def test_mf_response():
-    pdom, tdom, fdom, sdom = dom
-    ms = join(direc, "CYG-D-6680-64CH-10S.ms")
-    obs = rve.ms2observations(ms, "DATA", False, 0, "stokesiavg")[0]
-    obs = obs.to_double_precision()
-    R = rve.MfResponse(obs, fdom, sdom)
-    ift.extra.check_linear_operator(
-        R, rtol=1e-5, target_dtype=np.complex128, only_r_linear=True
-    )
-
-
-def test_response_distributor():
-    dom = ift.UnstructuredDomain(2), ift.UnstructuredDomain(4)
-    op0 = ift.makeOp(ift.makeField(dom, np.arange(8).reshape(2, -1)))
-    op1 = ift.makeOp(ift.makeField(dom, 2 * np.arange(8).reshape(2, -1)))
-    op = rve.response.ResponseDistributor(ift.UnstructuredDomain(2), op0, op1)
-    ift.extra.check_linear_operator(op)
-
-

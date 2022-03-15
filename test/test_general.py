@@ -16,10 +16,6 @@ pmp = pytest.mark.parametrize
 np.seterr(all="raise")
 
 direc = "/data/"
-nthreads = 1
-rve.set_nthreads(nthreads)
-rve.set_epsilon(1e-4)
-rve.set_wgridding(False)
 OBS = []
 for polmode in ["all", "stokesi", "stokesiavg"]:
     oo = rve.ms2observations(
@@ -96,8 +92,7 @@ def try_lh(obs, lh_class, *args):
 @pmp("obs", OBS)
 def test_imaging_likelihood(obs):
     obs = obs.restrict_to_stokesi()
-    op = rve.ImagingLikelihood(obs, sky)
-    try_lh(obs, rve.ImagingLikelihood, obs, sky)
+    try_lh(obs, rve.ImagingLikelihood, obs, sky, 1e-6, False)
 
 
 @pmp("obs", OBS)
@@ -106,7 +101,7 @@ def test_varcov_imaging_likelihood(obs):
     invcovop = (
         ift.InverseGammaOperator(obs.vis.domain, 1, var).reciprocal().ducktape("invcov")
     )
-    try_lh(obs, rve.ImagingLikelihood, obs, sky, invcovop.log())
+    try_lh(obs, rve.ImagingLikelihood, obs, sky, 1e-6, False, invcovop.log(), None)
 
 
 @pmp("obs", OBS)
@@ -127,7 +122,7 @@ def test_weighting_methods(obs, noisemodel):
     elif noisemodel == 1:  # Additive noise model
         var = rve.divide_where_possible(1, obs.weight)
         invcovop = (ift.Adder(var) @ correction ** 2).reciprocal()
-    try_lh(obs, rve.ImagingLikelihood, obs, sky, invcovop)
+    try_lh(obs, rve.ImagingLikelihood, obs, sky, 1e-6, False, invcovop, None)
 
 
 @pmp("time_mode", [True, False])
@@ -204,7 +199,8 @@ def test_calibration_likelihood(time_mode):
             model_visibilities = ift.full(oo.vis.domain, 1)
             op = rve.CalibrationLikelihood(oo, abc, model_visibilities)
         else:
-            op = rve.ImagingLikelihood(oo, sky, calibration_operator=abc)
+            op = rve.ImagingLikelihood(oo, sky, calibration_operator=abc, epsilon=1e-6,
+                                       do_wgridding=False)
         lh = op if lh is None else lh + op
     try_operator(lh)
 

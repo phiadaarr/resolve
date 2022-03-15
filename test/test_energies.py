@@ -33,20 +33,20 @@ def test_gaussian_energy(dtype):
         dom, dtype=(np.float32 if rve.is_single_precision(dtype) else np.float64)
     )
     icov = icov.exp()
-    op = rve.DiagonalGaussianLikelihood(data=mean, inverse_covariance=icov)
-    operator_equality(op.nifty_equivalent, op, ntries=5, domain_dtype=dtype)
-    rve.set_nthreads(2)
-    operator_equality(op.nifty_equivalent, op, ntries=5, domain_dtype=dtype)
+    op1 = rve.DiagonalGaussianLikelihood(data=mean, inverse_covariance=icov, nthreads=1)
+    op2 = rve.DiagonalGaussianLikelihood(data=mean, inverse_covariance=icov, nthreads=2)
+    operator_equality(op1.nifty_equivalent, op1, ntries=5, domain_dtype=dtype)
+    operator_equality(op2.nifty_equivalent, op2, ntries=5, domain_dtype=dtype)
 
 
 def test_varcov_gaussian_energy(dtype):
     dom = ift.UnstructuredDomain([4])
     mean = ift.from_random(dom, dtype=dtype)
-    op = rve.VariableCovarianceDiagonalGaussianLikelihood(mean, "signal", "logicov")
+    op1 = rve.VariableCovarianceDiagonalGaussianLikelihood(mean, "signal", "logicov", nthreads=1)
+    op2 = rve.VariableCovarianceDiagonalGaussianLikelihood(mean, "signal", "logicov", nthreads=2)
     dt = {
         "signal": dtype,
         "logicov": rve.dtype_complex2float(dtype, force=True),
     }
-    operator_equality(op.nifty_equivalent, op, ntries=5, domain_dtype=dt)
-    rve.set_nthreads(2)
-    operator_equality(op.nifty_equivalent, op, ntries=5, domain_dtype=dt)
+    operator_equality(op1.nifty_equivalent, op1, ntries=5, domain_dtype=dt)
+    operator_equality(op2.nifty_equivalent, op2, ntries=5, domain_dtype=dt)

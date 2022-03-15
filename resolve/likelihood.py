@@ -10,9 +10,22 @@ import nifty8 as ift
 import numpy as np
 
 from .data.observation import Observation
-from .response_new import InterferometryResponse
+from .response import InterferometryResponse
 from .util import _duplicate, _obj2list, my_assert_isinstance
 from .energy_operators import DiagonalGaussianLikelihood, VariableCovarianceDiagonalGaussianLikelihood
+from functools import reduce
+from operator import add
+from warnings import warn
+
+import nifty8 as ift
+import numpy as np
+
+from .data.observation import Observation
+from .util import (_duplicate, _obj2list, my_assert, my_assert_isinstance,
+                   my_asserteq)
+from .energy_operators import DiagonalGaussianLikelihood
+from .dtype_converter import DtypeConverter
+from .energy_operators import VariableCovarianceDiagonalGaussianLikelihood
 
 
 def _get_mask(observation):
@@ -29,8 +42,12 @@ def _get_mask(observation):
 def ImagingLikelihood(
     observation,
     sky_operator,
+    epsilon,
+    do_wgridding,
     log_inverse_covariance_operator=None,
     calibration_operator=None,
+    verbosity=0,
+    nthreads=1
 ):
     """Versatile likelihood class.
 
@@ -62,6 +79,10 @@ def ImagingLikelihood(
         where `pdom` is a `PolarizationSpace`, `tdom` and `fdom` are an
         `IRGSpace`, and `sdom` is a two-dimensional `RGSpace`.
 
+    epsilon : float
+
+    do_wgridding : bool
+
     log_inverse_covariance_operator : Operator or list of Operator
         Optional. Target needs to be the same space as observation.vis. If it
         is not specified, observation.wgt is taken as covariance.
@@ -69,6 +90,9 @@ def ImagingLikelihood(
     calibration_operator : Operator or list of Operator
         Optional. Target needs to be the same as observation.vis.
 
+    verbosity : int
+
+    nthreads : int
     """
     my_assert_isinstance(sky_operator, ift.Operator)
     obs = _obj2list(observation, Observation)
@@ -88,7 +112,7 @@ def ImagingLikelihood(
             log_icov = mask @ log_icov
         dtype = oo.vis.dtype
 
-        R = InterferometryResponse(oo, sky_operator.target).ducktape(internal_sky_key)
+        R = InterferometryResponse(oo, sky_operator.target, do_wgridding=do_wgridding, epsilon=epsilon, verbosity=verbosity, nthreads=nthreads).ducktape(internal_sky_key)
         if cop is not None:
             from .dtype_converter import DtypeConverter
             dt = DtypeConverter(cop.target, np.complex128, dtype)
@@ -108,3 +132,68 @@ def ImagingLikelihood(
     energy = reduce(add, energy)
     sky_operator = sky_operator.ducktape_left(internal_sky_key)
     return energy.partial_insert(sky_operator)
+
+
+def CalibrationLikelihood(
+    observation,
+    calibration_operator,
+    model_visibilities,
+    inverse_covariance_operator=None,
+    nthreads=1
+):
+    """Versatile calibration likelihood class
+
+    It returns an operator that computes:
+
+    residual = calibration_operator * model_visibilities
+    likelihood = 0.5 * residual^dagger @ inverse_covariance @ residual
+
+    If an inverse_covariance_operator is passed, it is inserted into the above
+    formulae. If it is not passed, 1/observation.weights is used as inverse
+    covariance.
+
+    Parameters
+    ----------
+    observation : Observation or list of Observations
+        Observation object from which observation.vis and potentially
+        observation.weight is used for computing the likelihood.
+
+    calibration_operator : Operator or list of Operators
+        Target needs to be the same as observation.vis.
+
+    model_visibilities : Field or list of Fields
+        Known model visiblities that are used for calibration. Needs to be
+        defined on the same domain as `observation.vis`.
+
+    inverse_covariance_operator : Operator or list of Operators
+        Optional. Target needs to be the same space as observation.vis. If it is
+        not specified, observation.wgt is taken as covariance.
+
+    nthreads : int
+    """
+    obs = _obj2list(observation, Observation)
+    cops = _duplicate(_obj2list(calibration_operator, ift.Operator), len(obs))
+    icovs = _duplicate(_obj2list(inverse_covariance_operator, ift.Operator),
+                       len(obs))
+    model_d = _duplicate(_obj2list(model_visibilities, ift.Field), len(obs))
+    model_d = [ift.makeOp(mm) @ cop for mm, cop in zip(model_d, cops)]
+
+    if len(obs) > 1:
+        raise NotImplementedError
+    obs, model_d, icov = obs[0], model_d[0], icovs[0]
+
+    dt = DtypeConverter(model_d.target, np.complex128, obs.vis.dtype)
+    dt_icov = DtypeConverter(model_d.target, np.float64, obs.weight.dtype)
+
+    mask, vis, wgt = _get_mask(obs)
+    model_d = dt @ mask @ model_d
+    if icov is not None:
+        icov = dt_icov @ mask @ icov
+
+    if icov is None:
+        e = DiagonalGaussianLikelihood(data=vis, inverse_covariance=wgt, nthreads=nthreads)
+        return e @ model_d
+    else:
+        s0, s1 = "model data", "inverse covariance"
+        e = ift.VariableCovarianceDiagonalGaussianLikelihood(vis, s0, s1, nthreads=nthreads)
+        return e @ model_d.ducktape_left(s0) + icov.ducktape_left(s1)

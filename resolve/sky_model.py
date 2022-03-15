@@ -32,7 +32,7 @@ def _has_jax():
         return False
 
 
-def sky_model_diffuse(cfg, observations=[]):
+def sky_model_diffuse(cfg, observations=[], nthreads=1):
     sdom = _spatial_dom(cfg)
     pdom = PolarizationSpace(cfg["polarization"].split(","))
 
@@ -59,7 +59,7 @@ def sky_model_diffuse(cfg, observations=[]):
         tgt = default_sky_domain(pdom=pdom, fdom=fdom, sdom=sdom)
 
     logsky = reduce(add, (oo.ducktape_left(lbl) for lbl, oo in logsky.items()))
-    mexp = polarization_matrix_exponential_mf2f(logsky.target)
+    mexp = polarization_matrix_exponential_mf2f(logsky.target, nthreads=nthreads)
     sky = mexp @ logsky
 
     sky = sky.ducktape_left(tgt)
@@ -68,7 +68,7 @@ def sky_model_diffuse(cfg, observations=[]):
     return sky, additional
 
 
-def sky_model_points(cfg, observations=[]):
+def sky_model_points(cfg, observations=[], nthreads=1):
     sdom = _spatial_dom(cfg)
     pdom = PolarizationSpace(cfg["polarization"].split(","))
 
@@ -102,7 +102,7 @@ def sky_model_points(cfg, observations=[]):
                 v = ift.NormalTransform(cfg["point sources stokesv log mean"], cfg["point sources stokesv log stddev"], "points V", npoints)
                 v = v.ducktape_left("V")
                 polsum = polsum + v
-            points = polarization_matrix_exponential_mf2f(polsum.target) @ polsum
+            points = polarization_matrix_exponential_mf2f(polsum.target, nthreads=nthreads) @ polsum
             points = points.ducktape_left(inserter.domain)
         else:
             raise NotImplementedError(f"single_frequency_sky does not support point sources on {pdom.labels} (yet?)")
