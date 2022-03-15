@@ -132,6 +132,8 @@ class SingleResponse(ift.LinearOperator):
     def __init__(self, domain, uvw, freq, do_wgridding, epsilon, mask=None, facets=(1, 1),
                  verbosity=0, nthreads=1):
         my_assert_isinstance(facets, tuple)
+        my_assert_isinstance(do_wgridding, bool)
+        my_assert_isinstance(epsilon, float)
         for ii in range(2):
             if domain.shape[ii] % facets[ii] != 0:
                 raise ValueError("nfacets needs to be divisor of npix.")

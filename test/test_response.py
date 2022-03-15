@@ -60,7 +60,7 @@ def test_facet_consistency():
     res0 = None
     pos = ift.from_random(sdom)
     for facets in FACETS:
-        op = rve.SingleResponse(sdom, obs.uvw, obs.freq, 1e-6, False, mask=obs.mask.val[0],
+        op = rve.SingleResponse(sdom, obs.uvw, obs.freq, False, 1e-6, mask=obs.mask.val[0],
                                 facets=facets)
         res = op(pos)
         if res0 is None:
