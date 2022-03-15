@@ -17,8 +17,8 @@
 
 import nifty8 as ift
 import numpy as np
-from warnings import warn
 from functools import partial
+from .logger import logger
 
 
 class Pybind11Operator(ift.Operator):
@@ -76,18 +76,18 @@ class Pybind11LikelihoodEnergyOperator(ift.LikelihoodEnergyOperator):
         self._domain = ift.makeDomain(dom)
         self._op = op
         if data_residual is None and nifty_equivalent is not None:
-            warn("Use nifty equivalent for data_residual")
+            logger.info("Use nifty equivalent for data_residual")
             data_residual = nifty_equivalent._res
         if sqrt_data_metric is None and nifty_equivalent is not None:
-            warn("Use nifty equivalent for sqrt_data_metric")
+            logger.info("Use nifty equivalent for sqrt_data_metric")
             sqrt_data_metric = nifty_equivalent._sqrt_data_metric_at
         if draw_sample is None:
-            warn("Use nifty equivalent for draw_sample")
+            logger.info("Use nifty equivalent for draw_sample")
             draw_sample = lambda loc, from_inverse: nifty_equivalent(
                 ift.Linearization.make_var(ift.makeField(self._domain, loc), True)
             ).metric.draw_sample(from_inverse)
         if get_transformation is None:
-            warn("Use nifty equivalent for get_transformation")
+            logger.info("Use nifty equivalent for get_transformation")
             get_transformation = nifty_equivalent.get_transformation
         self._draw_sample = draw_sample
         self.get_transformation = get_transformation

@@ -268,7 +268,7 @@ def read_ms_i(name, data_column, field, spectral_window, pol_indices, pol_summat
                 wgt[realstart:realstop] = twgt
 
             start, realstart = stop, realstop
-    logger.info("Selected:", 10 * " ")
+    logger.info("Selected:" + 10 * " ")
     logger.info(f"  shape: {vis.shape}")
     logger.info(f"  flagged: {(1.0-np.sum(wgt!=0)/wgt.size)*100:.1f} %")
 

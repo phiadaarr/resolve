@@ -17,10 +17,10 @@
 def _logger_init():
     import logging
     res = logging.getLogger('resolve')
-    res.setLevel(logging.DEBUG)
+    res.setLevel(logging.WARNING)
     res.propagate = False
     ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
+    ch.setLevel(logging.WARNING)
     res.addHandler(ch)
     return res
 

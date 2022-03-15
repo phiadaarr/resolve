@@ -191,7 +191,8 @@ def visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_
 
     for ii, oo in enumerate(obs_science):
         # data weights
-        model_vis = InterferometryResponse(oo, sky.target)(sky_mean)
+        R = InterferometryResponse(oo, sky.target, do_wgridding=do_wgridding, epsilon=epsilon, nthreads=nthreads)
+        model_vis = R(sky_mean)
         if io:
             dd = os.path.join(output_directory, f"normlized data residuals obs{ii} (data weights)")
             os.makedirs(dd, exist_ok=True)

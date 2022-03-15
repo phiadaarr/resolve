@@ -21,7 +21,7 @@ from .logger import logger
 from .constants import SPEEDOFLIGHT, str2rad
 from .irg_space import IRGSpace
 from .polarization_space import PolarizationSpace
-from .response_new import InterferometryResponse
+from .response import InterferometryResponse
 from .util import assert_sky_domain
 
 

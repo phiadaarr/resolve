@@ -58,6 +58,7 @@ def main():
     points, additional_points = sky_model_points(cfg["sky"], obs_science, nthreads=1)
     sky = reduce(add, (op for op in [diffuse, points] if op is not None))
     logweights, additional_weights = log_weighting_model(cfg["weighting"], obs_science, sky.target)
+    weights = [ww.exp() for ww in logweights]
     operators = {**additional_diffuse, **additional_points, **additional_weights}
     operators["sky"] = sky
     # /Model operators
@@ -74,11 +75,13 @@ def main():
     # /Domains
 
     # Likelihoods
+    do_wgridding = cfg["response"].getboolean("wgridding")
+    epsilon = cfg["response"].getfloat("epsilon")
     lhs = {}
-    lhs["full"] = ImagingLikelihood(obs_science, sky, log_inverse_covariance_operator=logweights, nthreads=nthreads)
+    lhs["full"] = ImagingLikelihood(obs_science, sky, log_inverse_covariance_operator=logweights, epsilon=epsilon, do_wgridding=do_wgridding, nthreads=nthreads)
     if points is not None:
-        lhs["points"] = ImagingLikelihood(obs_science, points, nthreads=nthreads)
-    lhs["data weights"] = ImagingLikelihood(obs_science, sky, nthreads=nthreads)
+        lhs["points"] = ImagingLikelihood(obs_science, points, epsilon=epsilon, do_wgridding=do_wgridding, nthreads=nthreads)
+    lhs["data weights"] = ImagingLikelihood(obs_science, sky, epsilon=epsilon, do_wgridding=do_wgridding, nthreads=nthreads)
     # /Likelihoods
 
     outdir = parse_optimize_kl_config(cfg["optimization"], lhs, domains)["output_directory"]
