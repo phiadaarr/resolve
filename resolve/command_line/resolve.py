@@ -41,6 +41,7 @@ def main():
     parser.add_argument("--profile-only", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--terminate", type=int)
     args = parser.parse_args()
 
     nthreads = args.j
@@ -109,11 +110,16 @@ def main():
                                      do_wgridding=do_wgridding, epsilon=epsilon, nthreads=nthreads)
         plot_sky(sl.average(sky), os.path.join(outdir, f"sky/sky_{iglobal}.pdf"))
 
+    if args.terminate is None:
+        terminate_callback = lambda iglobal: False
+    else:
+        terminate_callback = lambda iglobal: iglobal == args.terminate
+
     # Assumption: likelihood is not MPI distributed
     get_comm = comm
     ift.optimize_kl(**parse_optimize_kl_config(cfg["optimization"], lhs, domains, inspect_callback),
                     plottable_operators=operators, comm=get_comm, overwrite=True,
-                    plot_latent=True, resume=args.resume)
+                    plot_latent=True, resume=args.resume, terminate_callback=terminate_callback)
 
 
 if __name__ == "__main__":

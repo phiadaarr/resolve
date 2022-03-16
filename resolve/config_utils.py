@@ -123,10 +123,6 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}, inspect_call
         # /Reset parts of the latent space
 
     res["inspect_callback"] = callback
-    terminate = cfg.getfloat("terminate")
-    if terminate is not None:
-        res["terminate_callback"] = lambda iglobal: iglobal == terminate
-
     constants_dct[None] = ift.MultiDomain.make({})
 
     pe_keys = _parse_cst(cfg["point estimates"], total_iterations, constants_dct)
