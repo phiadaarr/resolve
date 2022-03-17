@@ -15,7 +15,7 @@ pip3 install git+https://gitlab.mpcdf.mpg.de/ift/nifty@$4
 
 rm -rf resolve
 git clone --recursive -b $3 gitlab:parras/resolve
-cd resolve && pip3 install -e . && cd ..
+cd resolve && pip3 install . && cd ..
 rm -rf resolve
 
 #pip3 install --no-binary ducc0 ducc0
