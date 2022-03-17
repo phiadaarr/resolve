@@ -277,7 +277,7 @@ public:
             fct = 2;
           else
             fct = 1;
-          auto tmp3{0.5 * (explic * norm(m - s) - fct)};
+          T tmp3{T(0.5) * (explic * norm(m - s) - fct)};
           gs = tmp2;
           glic = tmp3;
         },
@@ -347,7 +347,7 @@ public:
                 os = exp(lic) * ins;
                 olic = inlic;
                 if (!complex_mean)
-                  olic *= 0.5;
+                  olic *= T(0.5);
               },
               nthreads, loc_lic, inp_s, inp_lic, outs, outlic);
           return out_;
