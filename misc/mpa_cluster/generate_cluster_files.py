@@ -14,6 +14,7 @@ def main():
     parser.add_argument("config_file")
 
     parser.add_argument("--qname")
+    parser.add_argument("--venv-dir")
     parser.add_argument("--h_cpu", help="e.g. '48:00:00' for 48 hours.")
 
     parser.add_argument("--pe", help="Parallel environment, e.g. 'mpi-20'"
@@ -28,38 +29,46 @@ def main():
 
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--profile-only", action="store_true")
+    parser.add_argument("--max-iteration", type=int)
     args = parser.parse_args()
 
     cfg = ConfigParser()
     cfg.read(args.config_file)
     total_iterations = cfg["optimization"].getint("total iterations")
+    output_direc = os.path.expanduser(cfg["optimization"]["output folder"])
+    os.makedirs(os.path.join(output_direc, "sge"), exist_ok=True)
 
     cfg_dir, cfg_file = os.path.split(args.config_file)
+    cfg_dir = os.path.expanduser(cfg_dir)
 
-    timestamp = '{:%Y%m%d_%H%M%S}_'.format(datetime.datetime.now())
+    timestamp = '{:%Y%m%d_%H%M%S}'.format(datetime.datetime.now())
 
     total_iterations = cfg["optimization"].getint("total iterations")
+    if args.max_iteration is not None:
+        if args.max_iteration > total_iterations:
+            raise ValueError("Max iteration needs to be smaller than total_iteration")
+        total_iterations = max_iterations
     cluster_files = []
 
     previous_jobname = None
     for iteration in range(total_iterations):
         cluster_file = os.path.join(cfg_dir, f"{iteration}.clusterfile")
         cluster_files.append(cluster_file)
-        jobname = f'{args.job_prefix}{iteration}{timestamp}'
+        jobname = f'x{args.job_prefix}{iteration}_{timestamp}'
 
         # Assemble main resolve call
         main_call = ""
         if "mpi" in args.pe:
-            assert args.np % args.total_threads == 0
-            j = args.np // args.total_threads
-            main_call += "mpirun -np {args.np} "
+            assert args.total_threads % args.mpi_np == 0
+            j = args.total_threads // args.mpi_np 
+            main_call += f"mpirun -np {args.mpi_np} "
             pe_parts = args.pe.split("-")
             if len(pe_parts) == 2:
                 assert pe_parts[0] == "mpi"
                 threads_per_node = int(pe_parts[1])
                 assert threads_per_node % j == 0
                 processes_per_node = threads_per_node // j
-                main_call += "-ppn {processes_per_node} " 
+                main_call += f"-ppn {processes_per_node} " 
             else:
                 assert "mpi" in args.pe
         elif "sm" == args.pe:
@@ -83,10 +92,10 @@ def main():
         else:
             previous = ""
 
+        sge_file = os.path.join(output_direc, f"sge/{jobname}")
 
-
-        s = f'''#$ -e sge/{jobname}.e
-#$ -o sge/{jobname}.o
+        s = f'''#$ -e {sge_file}.e
+#$ -o {sge_file}.o
 #$ -l h_vmem={mem}
 #$ -l h_cpu={args.h_cpu}
 #$ -l qname={args.qname}
@@ -96,7 +105,7 @@ def main():
 {previous}
 
 setenv MPLBACKEND agg
-source venv{args.qname}/bin/activate
+source {args.venv_dir}/venv{args.qname}/bin/activate.csh
 
 setenv OMP_NUM_THREADS {j}
 
@@ -108,7 +117,7 @@ setenv OMP_NUM_THREADS {j}
 
     if not args.dry_run:
         for cluster_file in cluster_files:
-            direc, fname = os.path.split(cluster_files)
+            direc, fname = os.path.split(cluster_file)
             os.system(f'cd {direc}; qsub {fname}')
 
 if __name__ == '__main__':
