@@ -11,9 +11,9 @@ NIFTY_BRANCH=NIFTy_8
 
 H_CPU=40:00:00 # wall time for one KL iteration
 PE=mpi-20 # Number determines threads per node
-TOTAL_THREADS=200 # Total number of threads across all MPI tasks
+TOTAL_THREADS=100 # Total number of threads across all MPI tasks
 MEM=40G # Memory per Task
-MPI_NP=10 # Number of MPI processes
+MPI_NP=5 # Number of MPI processes
 
 #./prepare_environment.sh $INSTALL_DIR $QUEUE $RESOLVE_BRANCH $NIFTY_BRANCH
 python3 generate_cluster_files.py  \
@@ -24,5 +24,4 @@ python3 generate_cluster_files.py  \
 	--mpi-np $MPI_NP \
 	--total-threads $TOTAL_THREADS \
 	--mem $MEM \
-	cfgs/cygnusa_polarization_13360.cfg
-	#--max-iteration 2 
+	cfgs/cygnusa_polarization_13360.cfg --max-iteration 2
