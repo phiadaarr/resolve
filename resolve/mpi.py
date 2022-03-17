@@ -19,6 +19,7 @@ import functools
 import nifty8 as ift
 
 from .util import my_asserteq
+from .logger import logger
 
 try:
     from mpi4py import MPI
@@ -38,6 +39,7 @@ try:
         comm_self = None
         rank = 0
 except ImportError:
+    logger.warn("Could not import MPI")
     master = True
     mpi = False
     comm = None
