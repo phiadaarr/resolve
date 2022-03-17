@@ -54,15 +54,9 @@ def uvw_density(eff_u, eff_v, sky_domain, weights):
     nx, ny = sdom.shape
     ku = np.sort(np.fft.fftfreq(nx, dstx))
     kv = np.sort(np.fft.fftfreq(ny, dsty))
-    assert np.min(u) >= ku[0]
-    assert np.max(u)  < ku[-1]
-    assert np.min(v) >= kv[0]
-    assert np.max(v)  < kv[-1]
+    if np.min(u) < ku[0] or np.max(u)  >= ku[-1] or np.min(v) < kv[0] or np.max(v) >= kv[-1]:
+        raise ValueError
     H, xedges, yedges = np.histogram2d(u, v, bins=[ku, kv], weights=weights)
-    # import matplotlib.pyplot as plt
-    # plt.imshow(H)
-    # plt.show()
-    # plt.close()
     return H, xedges, yedges
 
 

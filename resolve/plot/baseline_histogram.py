@@ -231,14 +231,20 @@ def visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_
 
 
         for method in ["uniform", "natural"]:
-            di = dirty_image(oo, method, sky_mean.domain, do_wgridding, epsilon,
-                             vis=model_vis-oo.vis, weight=oo.weight, nthreads=nthreads)
+            try:
+                di = dirty_image(oo, method, sky_mean.domain, do_wgridding, epsilon,
+                                 vis=model_vis-oo.vis, weight=oo.weight, nthreads=nthreads)
+            except ValueError:  # If the resolution is too small, the dirty image cannot be computed
+                continue
             di0[method] = di0[method] + di
 
         if weights is not None:
             for method in ["uniform", "natural"]:
-                di = dirty_image(oo, method, sky_mean.domain, do_wgridding, epsilon,
-                                 vis=model_vis-oo.vis, weight=weights_mean, nthreads=nthreads)
+                try:
+                    di = dirty_image(oo, method, sky_mean.domain, do_wgridding, epsilon,
+                                     vis=model_vis-oo.vis, weight=weights_mean, nthreads=nthreads)
+                except ValueError:  # If the resolution is too small, the dirty image cannot be computed
+                    continue
                 di1[method] = di1[method] + di
 
     # Dirty images
@@ -246,11 +252,11 @@ def visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_
         dd = os.path.join(output_directory, f"dirty_images")
         os.makedirs(dd, exist_ok=True)
 
-        for method in ["uniform", "natural"]:
+        for method in di0.keys():
             fname = os.path.join(dd, f"dirty_image_{method}_data_weights_iter{iglobal}.pdf")
             plot_dirty(di0[method], fname)
         if weights is not None:
-            for method in ["uniform", "natural"]:
+            for method in di1.keys():
                 fname = os.path.join(dd, f"dirty_image_{method}_model_weights_iter{iglobal}.pdf")
                 plot_dirty(di1[method], fname)
     # /Dirty images
