@@ -47,14 +47,23 @@ def main():
     nthreads = args.j
     ift.set_nthreads(nthreads)
 
+    # Read config file
+    if not os.path.isfile(args.config_file):
+        raise RuntimeError(f"Config file {args.config_file} not found")
+    output_directory = os.path.split(args.config_file)[0]
+    if output_directory == "":
+        output_directory = "."
     cfg = ConfigParser()
     cfg.read(args.config_file)
+    # /Read config file
 
+    # Read data
     obs_calib_flux, obs_calib_phase, obs_science = parse_data_config(cfg)
 
     if cfg["sky"]["polarization"] == "I":
         obs_science = [oo.restrict_to_stokesi().average_stokesi() for oo in obs_science]
     assert len(obs_calib_flux) == len(obs_calib_phase) == 0
+    # /Read data
 
     # Model operators
     diffuse, additional_diffuse = sky_model_diffuse(cfg["sky"], obs_science, nthreads=nthreads)
@@ -90,13 +99,11 @@ def main():
     lhs["data weights"] = ImagingLikelihood(obs_science, sky, epsilon=epsilon, do_wgridding=do_wgridding, nthreads=nthreads)
     # /Likelihoods
 
-    outdir = parse_optimize_kl_config(cfg["optimization"], lhs, domains)["output_directory"]
-
     # Profiling
     position = 0.1 * ift.from_random(lhs["full"].domain)
     barrier(comm)
     if master:
-        os.makedirs(outdir, exist_ok=True)
+        os.makedirs(output_directory, exist_ok=True)
         with ift.random.Context(12):
             ift.exec_time(lhs["full"], verbose=args.verbose)
         if args.profile_only:
@@ -105,10 +112,11 @@ def main():
     barrier(comm)
     # /Profiling
 
+    # Inference
     def inspect_callback(sl, iglobal, position):
-        visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, outdir, io=master,
+        visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_directory, io=master,
                                      do_wgridding=do_wgridding, epsilon=epsilon, nthreads=nthreads)
-        plot_sky(sl.average(sky), os.path.join(outdir, f"sky/sky_{iglobal}.pdf"))
+        plot_sky(sl.average(sky), os.path.join(output_directory, f"sky/sky_{iglobal}.pdf"))
 
     if args.terminate is None:
         terminate_callback = lambda iglobal: False
@@ -119,7 +127,9 @@ def main():
     get_comm = comm
     ift.optimize_kl(**parse_optimize_kl_config(cfg["optimization"], lhs, domains, inspect_callback),
                     plottable_operators=operators, comm=get_comm, overwrite=True,
-                    plot_latent=True, resume=args.resume, terminate_callback=terminate_callback)
+                    plot_latent=True, resume=args.resume, terminate_callback=terminate_callback,
+                    output_directory=output_directory)
+    # /Inference
 
 
 if __name__ == "__main__":

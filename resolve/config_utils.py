@@ -79,7 +79,6 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}, inspect_call
     sampling_iterations = f_int(cfg["sampling iteration limit"])
     res["n_samples"] = lambda ii: f_int(cfg["n samples"])[ii]
     res["sampling_iteration_controller"] = lambda ii: ift.AbsDeltaEnergyController(0.05, iteration_limit=sampling_iterations[ii], convergence_level=3, name="Sampling")
-    res["output_directory"] = os.path.expanduser(cfg["output folder"])
 
 
     def optimizer(ii):
