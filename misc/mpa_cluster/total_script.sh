@@ -1,6 +1,8 @@
 set -ex
 
-CONFIG_FILE=`realpath cfgs/cygnusa_polarization_13360.cfg`
+# total_script.sh <path-to-config>
+
+CONFIG_FILE=`realpath $1`
 INSTALL_DIR=`dirname $CONFIG_FILE`
 QUEUE=pascal
 RESOLVE_BRANCH=devel
@@ -11,10 +13,10 @@ NIFTY_BRANCH=NIFTy_8
 # Pascal: sm mpi mpi-5 mpi-10 mpi-20 mpi-40
 
 H_CPU=40:00:00 # wall time for one KL iteration
-PE=mpi-20 # Number determines threads per node
-TOTAL_THREADS=100 # Total number of threads across all MPI tasks
+PE=mpi-10 # Number determines threads per node
+TOTAL_THREADS=30 # Total number of threads across all MPI tasks
 MEM=40G # Memory per Task
-MPI_NP=5 # Number of MPI processes
+MPI_NP=3 # Number of MPI processes
 
 ./prepare_environment.sh $INSTALL_DIR $QUEUE $RESOLVE_BRANCH $NIFTY_BRANCH
 python3 generate_cluster_files.py  \

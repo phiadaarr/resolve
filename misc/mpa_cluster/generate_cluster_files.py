@@ -32,14 +32,18 @@ def main():
     parser.add_argument("--max-iteration", type=int)
     args = parser.parse_args()
 
+    # Read config file
+    if not os.path.isfile(args.config_file):
+        raise RuntimeError(f"Config file {args.config_file} not found")
+    output_directory = os.path.split(args.config_file)[0]
+    if output_directory == "":
+        output_directory = "."
     cfg = ConfigParser()
     cfg.read(args.config_file)
-    total_iterations = cfg["optimization"].getint("total iterations")
-    output_direc = os.path.expanduser(cfg["optimization"]["output folder"])
-    os.makedirs(os.path.join(output_direc, "sge"), exist_ok=True)
+    os.makedirs(os.path.join(output_directory, "sge"), exist_ok=True)
+    # /Read config file
 
-    cfg_dir, cfg_file = os.path.split(args.config_file)
-    cfg_dir = os.path.expanduser(cfg_dir)
+    _, cfg_file = os.path.split(args.config_file)
 
     timestamp = '{:%Y%m%d_%H%M%S}'.format(datetime.datetime.now())
 
@@ -52,7 +56,7 @@ def main():
 
     previous_jobname = None
     for iteration in range(total_iterations):
-        cluster_file = os.path.join(cfg_dir, f"{iteration}.clusterfile")
+        cluster_file = os.path.join(output_directory, f"{iteration}.clusterfile")
         cluster_files.append(cluster_file)
         jobname = f'x{args.job_prefix}{iteration}_{timestamp}'
 
@@ -92,7 +96,7 @@ def main():
         else:
             previous = ""
 
-        sge_file = os.path.join(output_direc, f"sge/{jobname}")
+        sge_file = os.path.join(output_directory, f"sge/{jobname}")
 
         s = f'''#$ -e {sge_file}.e
 #$ -o {sge_file}.o
