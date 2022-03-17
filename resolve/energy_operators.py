@@ -71,7 +71,7 @@ def DiagonalGaussianLikelihood(data, inverse_covariance, nthreads=1):
         data.domain,
         f(data.val, inverse_covariance.val, nthreads),
         nifty_equivalent=ift.GaussianEnergy(
-            data=data, inverse_covariance=ift.makeOp(inverse_covariance)
+            data=data, inverse_covariance=ift.makeOp(inverse_covariance, sampling_dtype=dt),
         ),
     )
 

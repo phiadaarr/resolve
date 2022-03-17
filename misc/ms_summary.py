@@ -34,7 +34,10 @@ if __name__ == "__main__":
             chans = t.getcol("CHAN_FREQ", startrow=ii, nrow=1)
 
             print(f"Shape: {chans.shape}")
-            print(f"f1-f0: {(chans[0][1]-chans[0][0])/1e6} MHz")
+            try:
+                print(f"f1-f0: {(chans[0][1]-chans[0][0])/1e6} MHz")
+            except:
+                pass
             print("Frequencies (GHz)")
             print(chans/1e9)
             print()
