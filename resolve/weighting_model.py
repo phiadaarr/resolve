@@ -1,4 +1,16 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 # Copyright(C) 2021 Max-Planck-Society
 # Author: Philipp Arras
 
@@ -13,9 +25,15 @@ from .data.observation import Observation
 from .simple_operators import MultiFieldStacker
 from .sky_model import cfm_from_cfg
 from .util import _obj2list, assert_sky_domain
+from .dtype_converter import DtypeConverter
 
 
 def weighting_model(cfg, obs, sky_domain):
+    op, additional = log_weighting_model
+    return op.exp(), additional
+
+
+def log_weighting_model(cfg, obs, sky_domain):
     """Assumes independent weighting for every imaging band and for every polarization"""
     assert_sky_domain(sky_domain)
 
@@ -60,7 +78,10 @@ def weighting_model(cfg, obs, sky_domain):
             linear_interpolation = reduce(add, tmpop)
             restructure = _CustomRestructure(linear_interpolation.target, oo.vis.domain)
             ift.extra.check_linear_operator(restructure)
-            tmpop = ift.makeOp(oo.weight) @ (restructure @ linear_interpolation @ log_weights).scale(-2).exp()
+            tmpop = (restructure @ linear_interpolation @ log_weights).scale(-2)
+            if oo.is_single_precision():
+                tmpop = DtypeConverter(tmpop.target, np.float64, np.float32) @ tmpop
+            tmpop = ift.Adder(oo.weight.log()) @ tmpop
             op.append(tmpop)
         return op, additional
     if cfg["model"] == "independent gamma":
@@ -68,10 +89,16 @@ def weighting_model(cfg, obs, sky_domain):
         var = cfg.getfloat("var")
         alpha = cfg.getfloat("alpha")
         theta = cfg.getfloat("theta")
-        op = [ift.makeOp(oo.weight) @ ift.GammaOperator(oo.vis.domain, mean=mean, var=var, alpha=alpha, theta=theta)
-                for iobs, oo in enumerate(obs)]
-        op = [oo.ducktape(f"Observation {iobs}, invcov") for iobs, oo in enumerate(op)]
-        return op, {}
+        ops = []
+        for iobs, oo in enumerate(obs):
+            op = ift.GammaOperator(oo.vis.domain, mean=mean, var=var, alpha=alpha, theta=theta)
+            if oo.is_single_precision():
+                op = DtypeConverter(op.target, np.float64, np.float32) @ op
+            op = ift.makeOp(oo.weight) @ op
+            op = op.log()  # FIXME Simplify this for better performance
+            op = op.ducktape(f"Observation {iobs}, invcov")
+            ops.append(op)
+        return ops, {}
     raise NotImplementedError
 
 

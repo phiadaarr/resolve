@@ -1,4 +1,16 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 # Copyright(C) 2019-2021 Max-Planck-Society
 
 import os
@@ -6,8 +18,8 @@ from os.path import expanduser, isdir, join
 
 import numpy as np
 
-from ..global_config import verbosity
 from ..util import my_assert, my_assert_isinstance, my_asserteq
+from ..logger import logger
 from .antenna_positions import AntennaPositions
 from .auxiliary_table import AuxiliaryTable
 from .observation import Observation
@@ -132,8 +144,7 @@ def ms2observations(ms, data_column, with_calib_info, spectral_window,
         source_name = auxtables['SOURCE']['NAME'][0]
         if field is not None and source_name != field:
             continue
-        if verbosity():
-            print(f"Work on Field {ifield}: {source_name}")
+        print(f"Work on Field {ifield}: {source_name}")
         mm = read_ms_i(ms, data_column, ifield, spectral_window, pol_ind, pol_summation,
                        with_calib_info, channels, ignore_flags)
         if mm is None:
@@ -183,9 +194,8 @@ def read_ms_i(name, data_column, field, spectral_window, pol_indices, pol_summat
     with ms_table(name) as t:
         nmspol = t.getcol(data_column, startrow=0, nrow=3).shape[2]
         nrow = t.nrows()
-    if verbosity():
-        print("Measurement set visibilities:")
-        print(f"  shape: ({nrow}, {_ms_nchannels(name, spectral_window)}, {nmspol})")
+    logger.info("Measurement set visibilities:")
+    logger.info(f"  shape: ({nrow}, {_ms_nchannels(name, spectral_window)}, {nmspol})")
 
     active_rows, active_channels = _first_pass(name, field, spectral_window, channels, pol_indices,
                                                pol_summation, ignore_flags)
@@ -214,8 +224,7 @@ def read_ms_i(name, data_column, field, spectral_window, pol_indices, pol_summat
         # Read in data
         start, realstart = 0, 0
         while start < nrow:
-            if verbosity():
-                print("Second pass:", f"{(start/nrow*100):.1f}%", end="\r")
+            logger.debug(f"Second pass: {(start/nrow*100):.1f}%")
             stop = _ms_stop(start, nrow)
             realstop = realstart + np.sum(active_rows[start:stop])
             if realstop > realstart:
@@ -259,10 +268,9 @@ def read_ms_i(name, data_column, field, spectral_window, pol_indices, pol_summat
                 wgt[realstart:realstop] = twgt
 
             start, realstart = stop, realstop
-    if verbosity():
-        print("Selected:", 10 * " ")
-        print(f"  shape: {vis.shape}")
-        print(f"  flagged: {(1.0-np.sum(wgt!=0)/wgt.size)*100:.1f} %")
+    logger.info("Selected:" + 10 * " ")
+    logger.info(f"  shape: {vis.shape}")
+    logger.info(f"  flagged: {(1.0-np.sum(wgt!=0)/wgt.size)*100:.1f} %")
 
     # UVW
     with ms_table(name) as t:
@@ -286,8 +294,7 @@ def read_ms_i(name, data_column, field, spectral_window, pol_indices, pol_summat
                 ptg = np.empty((nrealrows, 1, 2), dtype=np.float64)
                 start, realstart = 0, 0
                 while start < nrow:
-                    if verbosity():
-                        print("Second pass:", f"{(start/nrow*100):.1f}%", end="\r")
+                    logger.debug(f"Second pass: {(start/nrow*100):.1f}%")
                     stop = _ms_stop(start, nrow)
                     realstop = realstart + np.sum(active_rows[start:stop])
                     if realstop > realstart:
@@ -323,8 +330,7 @@ def _first_pass(ms, field, spectral_window, channels, pol_indices, pol_summation
         # Determine which subset of rows/channels we need to input
         start = 0
         while start < nrow:
-            if verbosity():
-                print("First pass:", f"{(start/nrow*100):.1f}%", end="\r")
+            logger.debug(f"First pass: {(start/nrow*100):.1f}%")
             stop = _ms_stop(start, nrow)
             tflags = _conditional_flags(t, start, stop, pol_indices, ignore_flags)
             twgt = t.getcol(weightcol, startrow=start, nrow=stop - start)[..., pol_indices]

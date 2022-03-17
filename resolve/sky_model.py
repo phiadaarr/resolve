@@ -1,4 +1,16 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 # Copyright(C) 2021 Max-Planck-Society
 # Copyright(C) 2022 Philipp Arras
 # Author: Philipp Arras
@@ -14,7 +26,8 @@ from .integrated_wiener_process import (IntWProcessInitialConditions,
                                         WienerIntegrations)
 from .irg_space import IRGSpace
 from .points import PointInserter
-from .polarization_matrix_exponential import polarization_matrix_exponential_mf2f
+from .polarization_matrix_exponential import \
+    polarization_matrix_exponential_mf2f
 from .polarization_space import PolarizationSpace
 from .simple_operators import MultiFieldStacker
 from .util import assert_sky_domain
@@ -31,7 +44,7 @@ def _has_jax():
         return False
 
 
-def sky_model_diffuse(cfg, observations=[]):
+def sky_model_diffuse(cfg, observations=[], nthreads=1):
     sdom = _spatial_dom(cfg)
     pdom = PolarizationSpace(cfg["polarization"].split(","))
 
@@ -58,7 +71,7 @@ def sky_model_diffuse(cfg, observations=[]):
         tgt = default_sky_domain(pdom=pdom, fdom=fdom, sdom=sdom)
 
     logsky = reduce(add, (oo.ducktape_left(lbl) for lbl, oo in logsky.items()))
-    mexp = polarization_matrix_exponential_mf2f(logsky.target)
+    mexp = polarization_matrix_exponential_mf2f(logsky.target, nthreads=nthreads)
     sky = mexp @ logsky
 
     sky = sky.ducktape_left(tgt)
@@ -67,7 +80,7 @@ def sky_model_diffuse(cfg, observations=[]):
     return sky, additional
 
 
-def sky_model_points(cfg, observations=[]):
+def sky_model_points(cfg, observations=[], nthreads=1):
     sdom = _spatial_dom(cfg)
     pdom = PolarizationSpace(cfg["polarization"].split(","))
 
@@ -101,7 +114,7 @@ def sky_model_points(cfg, observations=[]):
                 v = ift.NormalTransform(cfg["point sources stokesv log mean"], cfg["point sources stokesv log stddev"], "points V", npoints)
                 v = v.ducktape_left("V")
                 polsum = polsum + v
-            points = polarization_matrix_exponential_mf2f(polsum.target) @ polsum
+            points = polarization_matrix_exponential_mf2f(polsum.target, nthreads=nthreads) @ polsum
             points = points.ducktape_left(inserter.domain)
         else:
             raise NotImplementedError(f"single_frequency_sky does not support point sources on {pdom.labels} (yet?)")
@@ -167,7 +180,14 @@ def _single_freq_logsky(cfg, pol_label):
 
 def _multi_freq_logsky_cfm(cfg, sdom, pol_label):
     fnpix, df = cfg.getfloat("freq npix"), cfg.getfloat("freq pixel size")
-    fdom = IRGSpace(cfg.getfloat("freq start") + np.arange(fnpix)*df)
+    freq0 = cfg.getfloat("freq start")
+    if fnpix is None:
+        raise ValueError("Please set a value for `freq npix`")
+    if df is None:
+        raise ValueError("Please set a value for `freq pixel size`")
+    if freq0 is None:
+        raise ValueError("Please set a value for `freq start`")
+    fdom = IRGSpace(freq0 + np.arange(fnpix)*df)
     fdom_rg = ift.RGSpace(fnpix, df)
 
     cfm = cfm_from_cfg(cfg, {"freq": fdom_rg, "space": sdom}, f"stokes{pol_label} diffuse")

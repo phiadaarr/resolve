@@ -1,4 +1,3 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -19,15 +18,15 @@
 from warnings import warn
 
 import nifty8 as ift
+
 import resolvelib
 
+from .cpp2py import Pybind11Operator
 from .polarization_space import PolarizationSpace
 from .simple_operators import MultiFieldStacker
-from .cpp2py import Pybind11Operator
-from .global_config import nthreads as global_nthreads
 
 
-def polarization_matrix_exponential_mf2f(domain, nthreads=None):
+def polarization_matrix_exponential_mf2f(domain, nthreads=1):
     """
 
     Note
@@ -53,8 +52,6 @@ def polarization_matrix_exponential_mf2f(domain, nthreads=None):
         f = resolvelib.PolarizationMatrixExponential4
     else:
         raise NotImplementedError("Not compiled for this shape")
-    if nthreads is None:
-        nthreads = global_nthreads()
     return Pybind11Operator(domain, target, f(nthreads))
 
 
@@ -122,7 +119,7 @@ class PolarizationMatrixExponential(ift.Operator):
 
 
 def _jax_pol(domain):
-    from jax.numpy import cosh, exp, sinh, sqrt, empty, float64, zeros
+    from jax.numpy import cosh, empty, exp, float64, sinh, sqrt, zeros
 
     domain = ift.makeDomain(domain)
     pdom = domain[0]

@@ -1,0 +1,112 @@
+[data]
+flux calibrator =
+phase calibrator =
+science target = ~/temp2/rickandresolve_data/CYG-ALL-13360-8MHZ.ms:(Cygnus-N$0$DATA)
+#number of randomly sampled rows = 10000
+
+[optimization]
+output folder = ~/temp4/polarization_imaging_mpa_cluster/13360
+total iterations = 45
+likelihood = points,data weights,full,*
+constants       = None,None,10*sky,3*weights,None,*
+point estimates = None,None,10*sky,3*weights$points,None,*
+reset = 11*None,diffuse,None,*
+save strategy = last
+n samples = 0,0,5,*
+sampling iteration limit = 0,0,10*200,3*1000,30*2000
+optimizer = 2*NewtonCG,10*VL_BFGS,3*NewtonCG,30*NewtonCG
+optimizer iteration limit = 4,50,10*20,3*15,30*15
+nonlinear sampling optimizer = None
+nonlinear sampling optimizer iteration limit = None
+
+[response]
+wgridding = False
+epsilon = 1e-9
+double precision = True
+
+[sky]
+space npix x = 4096
+space npix y = 2048
+space fov x = 0.05deg
+space fov y = 0.025deg
+
+polarization = I,Q,U,V
+freq mode = single
+
+stokesi diffuse space i0 zero mode offset = 21
+stokesi diffuse space i0 zero mode mean = 1
+stokesi diffuse space i0 zero mode stddev = 0.1
+stokesi diffuse space i0 fluctuations mean = 5
+stokesi diffuse space i0 fluctuations stddev = 1
+stokesi diffuse space i0 loglogavgslope mean = -2
+stokesi diffuse space i0 loglogavgslope stddev = 0.5
+stokesi diffuse space i0 flexibility mean = 1.2
+stokesi diffuse space i0 flexibility stddev = 0.4
+stokesi diffuse space i0 asperity mean = 0.2
+stokesi diffuse space i0 asperity stddev = 0.2
+
+stokesu diffuse space i0 zero mode offset = 0
+stokesu diffuse space i0 zero mode mean = 0.01
+stokesu diffuse space i0 zero mode stddev = 0.01
+stokesu diffuse space i0 fluctuations mean = 0.05
+stokesu diffuse space i0 fluctuations stddev = 0.05
+stokesu diffuse space i0 loglogavgslope mean = -2
+stokesu diffuse space i0 loglogavgslope stddev = 0.5
+stokesu diffuse space i0 flexibility mean = 0.1
+stokesu diffuse space i0 flexibility stddev = 0.1
+stokesu diffuse space i0 asperity mean = 0.2
+stokesu diffuse space i0 asperity stddev = 0.2
+
+stokesq diffuse space i0 zero mode offset = 0
+stokesq diffuse space i0 zero mode mean = 0.01
+stokesq diffuse space i0 zero mode stddev = 0.01
+stokesq diffuse space i0 fluctuations mean = 0.05
+stokesq diffuse space i0 fluctuations stddev = 0.05
+stokesq diffuse space i0 loglogavgslope mean = -2
+stokesq diffuse space i0 loglogavgslope stddev = 0.5
+stokesq diffuse space i0 flexibility mean = 0.1
+stokesq diffuse space i0 flexibility stddev = 0.1
+stokesq diffuse space i0 asperity mean = 0.2
+stokesq diffuse space i0 asperity stddev = 0.2
+
+stokesv diffuse space i0 zero mode offset = 0
+stokesv diffuse space i0 zero mode mean = 0.01
+stokesv diffuse space i0 zero mode stddev = 0.01
+stokesv diffuse space i0 fluctuations mean = 0.01
+stokesv diffuse space i0 fluctuations stddev = 0.01
+stokesv diffuse space i0 loglogavgslope mean = -2
+stokesv diffuse space i0 loglogavgslope stddev = 0.5
+stokesv diffuse space i0 flexibility mean = 0.1
+stokesv diffuse space i0 flexibility stddev = 0.1
+stokesv diffuse space i0 asperity mean = 0.2
+stokesv diffuse space i0 asperity stddev = 0.2
+
+point sources mode = single
+point sources locations = 0deg$0deg,0.35as$-0.22as
+point sources alpha = 0.5
+point sources q = 0.2
+point sources stokesq log mean = 0.
+point sources stokesq log stddev = 1.
+point sources stokesu log mean = 0.
+point sources stokesu log stddev = 1.
+point sources stokesv log mean = 0.
+point sources stokesv log stddev = 1.
+
+[weighting]
+enable = True
+model = cfm
+
+npix = 1000
+zeropadding factor = 2
+
+invcov zero mode offset = 0
+invcov zero mode mean = 2
+invcov zero mode stddev = 2
+invcov fluctuations mean = 2
+invcov fluctuations stddev = 2
+invcov loglogavgslope mean = -2
+invcov loglogavgslope stddev = 0.5
+invcov flexibility mean =   1.2
+invcov flexibility stddev = 0.4
+invcov asperity mean =  0.5
+invcov asperity stddev = 0.2

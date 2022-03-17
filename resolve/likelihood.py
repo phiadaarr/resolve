@@ -1,5 +1,18 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 # Copyright(C) 2020-2021 Max-Planck-Society
+# Copyright(C) 2022 Max-Planck-Society, Philipp Arras
 # Author: Philipp Arras
 
 from functools import reduce
@@ -9,9 +22,22 @@ import nifty8 as ift
 import numpy as np
 
 from .data.observation import Observation
-from .response_new import InterferometryResponse
+from .response import InterferometryResponse
+from .util import _duplicate, _obj2list, my_assert_isinstance
+from .energy_operators import DiagonalGaussianLikelihood, VariableCovarianceDiagonalGaussianLikelihood
+from functools import reduce
+from operator import add
+from warnings import warn
+
+import nifty8 as ift
+import numpy as np
+
+from .data.observation import Observation
 from .util import (_duplicate, _obj2list, my_assert, my_assert_isinstance,
                    my_asserteq)
+from .energy_operators import DiagonalGaussianLikelihood
+from .dtype_converter import DtypeConverter
+from .energy_operators import VariableCovarianceDiagonalGaussianLikelihood
 
 
 def _get_mask(observation):
@@ -25,60 +51,15 @@ def _get_mask(observation):
     return mask, mask(vis), mask(observation.weight)
 
 
-def get_mask_multi_field(weight):
-    assert isinstance(weight, ift.MultiField)
-    op = []
-    for kk, ww in weight.items():
-        flags = ww.val == 0.0
-        if np.any(flags):
-            myop = ift.MaskOperator(ift.makeField(ww.domain, flags))
-        else:
-            myop = ift.ScalingOperator(ww.domain, 1.0)
-        op.append(myop.ducktape(kk).ducktape_left(kk))
-    op = reduce(add, op)
-    assert op.domain == weight.domain
-    return op
-
-
-def _Likelihood(operator, data, metric_at_pos, model_data):
-    my_assert_isinstance(operator, model_data, ift.Operator)
-    my_asserteq(operator.target, ift.DomainTuple.scalar_domain())
-    my_asserteq(model_data.target, data.domain)
-    operator.data = data
-    operator.metric_at_pos = metric_at_pos
-    operator.model_data = model_data
-    return operator
-
-
-def _build_gauss_lh_nres(op, mean, invcov):
-    my_assert_isinstance(op, ift.Operator)
-    my_assert_isinstance(mean, invcov, (ift.Field, ift.MultiField))
-    my_asserteq(op.target, mean.domain, invcov.domain)
-
-    lh = ift.GaussianEnergy(data=mean, inverse_covariance=ift.makeOp(invcov, sampling_dtype=mean.dtype)) @ op
-    return _Likelihood(lh, mean, lambda x: ift.makeOp(invcov), op)
-
-
-def _varcov(observation, Rs, inverse_covariance_operator):
-    s0, s1 = "residual", "inverse covariance"
-    my_assert_isinstance(inverse_covariance_operator, ift.Operator)
-    my_asserteq(Rs.target, observation.vis.domain, inverse_covariance_operator.target)
-    mask, vis, _ = _get_mask(observation)
-    residual = ift.Adder(vis, neg=True) @ mask @ Rs
-    inverse_covariance_operator = mask @ inverse_covariance_operator
-    dtype = observation.vis.dtype
-    op = residual.ducktape_left(s0) + inverse_covariance_operator.ducktape_left(s1)
-    lh = ift.VariableCovarianceGaussianEnergy(residual.target, s0, s1, dtype) @ op
-    model_data = mask @ Rs
-    icov_at = lambda x: ift.makeOp(inverse_covariance_operator.force(x))
-    return _Likelihood(lh, vis, icov_at, model_data)
-
-
 def ImagingLikelihood(
     observation,
     sky_operator,
-    inverse_covariance_operator=None,
+    epsilon,
+    do_wgridding,
+    log_inverse_covariance_operator=None,
     calibration_operator=None,
+    verbosity=0,
+    nthreads=1
 ):
     """Versatile likelihood class.
 
@@ -110,61 +91,59 @@ def ImagingLikelihood(
         where `pdom` is a `PolarizationSpace`, `tdom` and `fdom` are an
         `IRGSpace`, and `sdom` is a two-dimensional `RGSpace`.
 
-    inverse_covariance_operator : Operator or list of Operator
+    epsilon : float
+
+    do_wgridding : bool
+
+    log_inverse_covariance_operator : Operator or list of Operator
         Optional. Target needs to be the same space as observation.vis. If it
         is not specified, observation.wgt is taken as covariance.
 
     calibration_operator : Operator or list of Operator
         Optional. Target needs to be the same as observation.vis.
 
+    verbosity : int
+
+    nthreads : int
     """
     my_assert_isinstance(sky_operator, ift.Operator)
     obs = _obj2list(observation, Observation)
     cops = _duplicate(_obj2list(calibration_operator, ift.Operator), len(obs))
-    icovs = _duplicate(_obj2list(inverse_covariance_operator, ift.Operator),
-                       len(obs))
+    log_icovs = _duplicate(
+        _obj2list(log_inverse_covariance_operator, ift.Operator), len(obs)
+    )
     if len(obs) == 0:
         raise ValueError("List of observations is empty")
 
+    internal_sky_key = "_sky"
+
     energy = []
-    data, model_data, icov_at = [], [], []
-    used_keys = []
-    for ii, (oo, cop, icov) in enumerate(zip(obs, cops, icovs)):
-        virtual_key = f"_{ii} {oo.source_name}"
-        assert virtual_key not in used_keys
+    for ii, (oo, cop, log_icov) in enumerate(zip(obs, cops, log_icovs)):
         mask, vis, weight = _get_mask(oo)
+        if log_icov is not None:
+            log_icov = mask @ log_icov
         dtype = oo.vis.dtype
 
-        R = InterferometryResponse(oo, sky_operator.target).ducktape("_sky")
+        R = InterferometryResponse(oo, sky_operator.target, do_wgridding=do_wgridding, epsilon=epsilon, verbosity=verbosity, nthreads=nthreads).ducktape(internal_sky_key)
         if cop is not None:
-            R = cop*R  # Apply calibration solutions
-        R = mask @ R  # Apply flags
+            from .dtype_converter import DtypeConverter
+            dt = DtypeConverter(cop.target, np.complex128, dtype)
+            R = (dt @ cop) * R  # Apply calibration solutions
+        R = mask @ R  # Apply flags  FIXME Move this into cpp likelihoods
 
-        if icov is None:
-            icov = ift.makeOp(weight, sampling_dtype=dtype)
-            ee = ift.GaussianEnergy(data=vis, inverse_covariance=icov) @ R
-            icov_at.append(lambda x: ift.BlockDiagonalOperator(ift.makeDomain({virtual_key: icov.domain}), {virtual_key: icov}))
+        if log_icov is None:
+            ee = DiagonalGaussianLikelihood(data=vis, inverse_covariance=weight) @ R
+            ee.name = f"{oo.source_name} (data wgts) {ii}"
         else:
-            s0, s1 = "_resi", "_icov"
-            resi = ift.Adder(vis, neg=True) @ R
-            icov = mask @ icov
-            op = resi.ducktape_left(s0) + icov.ducktape_left(s1)
-            ee = ift.VariableCovarianceGaussianEnergy(resi.target, s0, s1, dtype) @ \
-                    (resi.ducktape_left(s0) + icov.ducktape_left(s1))
-            icov_at.append(lambda x: ift.makeOp(icov.ducktape_left(virtual_key).force(x)))
-
+            s0, s1 = "_model_data", "_log_icov"
+            ee = VariableCovarianceDiagonalGaussianLikelihood(
+                data=vis, key_signal=s0, key_log_inverse_covariance=s1
+            ) @ (log_icov.ducktape_left(s1) + R.ducktape_left(s0))
+            ee.name = f"{oo.source_name} (varcov) {ii}"
         energy.append(ee)
-        data.append(vis.ducktape_left(virtual_key))
-        model_data.append(R.ducktape_left(virtual_key))
-
-        used_keys.append(virtual_key)
-
-    sky_operator = sky_operator.ducktape_left("_sky")
-    energy = reduce(add, energy).partial_insert(sky_operator)
-    data = ift.MultiField.union(data)
-    model_data = reduce(add, model_data).partial_insert(sky_operator)
-    total_icov_at = lambda x: reduce(add, (iicc(x) for iicc in icov_at))
-    return _Likelihood(energy, data, total_icov_at, model_data)
+    energy = reduce(add, energy)
+    sky_operator = sky_operator.ducktape_left(internal_sky_key)
+    return energy.partial_insert(sky_operator)
 
 
 def CalibrationLikelihood(
@@ -172,6 +151,7 @@ def CalibrationLikelihood(
     calibration_operator,
     model_visibilities,
     inverse_covariance_operator=None,
+    nthreads=1
 ):
     """Versatile calibration likelihood class
 
@@ -200,6 +180,8 @@ def CalibrationLikelihood(
     inverse_covariance_operator : Operator or list of Operators
         Optional. Target needs to be the same space as observation.vis. If it is
         not specified, observation.wgt is taken as covariance.
+
+    nthreads : int
     """
     obs = _obj2list(observation, Observation)
     cops = _duplicate(_obj2list(calibration_operator, ift.Operator), len(obs))
@@ -210,7 +192,20 @@ def CalibrationLikelihood(
 
     if len(obs) > 1:
         raise NotImplementedError
-    if icovs[0] is None:
-        mask, vis, wgt = _get_mask(obs[0])
-        return _build_gauss_lh_nres(mask @ model_d[0], vis, wgt)
-    return _varcov(obs[0], model_d[0], icov[0])
+    obs, model_d, icov = obs[0], model_d[0], icovs[0]
+
+    dt = DtypeConverter(model_d.target, np.complex128, obs.vis.dtype)
+    dt_icov = DtypeConverter(model_d.target, np.float64, obs.weight.dtype)
+
+    mask, vis, wgt = _get_mask(obs)
+    model_d = dt @ mask @ model_d
+    if icov is not None:
+        icov = dt_icov @ mask @ icov
+
+    if icov is None:
+        e = DiagonalGaussianLikelihood(data=vis, inverse_covariance=wgt, nthreads=nthreads)
+        return e @ model_d
+    else:
+        s0, s1 = "model data", "inverse covariance"
+        e = ift.VariableCovarianceDiagonalGaussianLikelihood(vis, s0, s1, nthreads=nthreads)
+        return e @ model_d.ducktape_left(s0) + icov.ducktape_left(s1)

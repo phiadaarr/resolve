@@ -1,4 +1,16 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 # Copyright(C) 2022 Max-Planck-Society
 # Author: Philipp Arras
 
@@ -12,15 +24,15 @@ import matplotlib.pyplot as plt
 import nifty8 as ift
 import numpy as np
 from matplotlib.colors import CenteredNorm, LogNorm, Normalize
-
-from ..sky_model import assert_sky_domain, default_sky_domain
-from .fits import field2fits
-
 # For eval() spaces
 from nifty8 import DomainTuple, MultiDomain
 from nifty8.domains import *
+
 from ..irg_space import IRGSpace
 from ..polarization_space import PolarizationSpace
+from ..sky_model import assert_sky_domain, default_sky_domain
+from .fits import field2fits
+
 # /For eval() spaces
 
 

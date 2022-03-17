@@ -12,7 +12,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with nifty_gridder; if not, write to the Free Software
+ *  along with resolve; if not, write to the Free Software
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
@@ -32,273 +32,637 @@ auto None = py::none();
 #include "shape_helper.h"
 using namespace std;
 
+template <typename Tin, typename Tout> class Linearization {
+public:
+  Linearization(const Tout &position_, function<Tout(const Tin &)> jac_times_,
+                function<Tin(const Tout &)> jac_adjoint_times_)
+      : p(position_), jt(jac_times_), jat(jac_adjoint_times_) {}
 
-template<typename Tin, typename Tout>
-class Linearization {
-  public:
-    Linearization(const Tout &position_,
-                  function<Tout(const Tin  &)> jac_times_,
-                  function<Tin (const Tout &)> jac_adjoint_times_)
-        : p(position_), jt(jac_times_), jat(jac_adjoint_times_) {}
+  Tout jac_times(const Tin &inp) const { return jt(inp); }
+  Tin jac_adjoint_times(const Tout &inp) const { return jat(inp); }
+  Tin apply_metric(const Tin &inp) const { return met(inp); }
+  Tout position() { return p; };
 
-    Tout jac_times        (const Tin  &inp) const { return jt(inp); }
-    Tin  jac_adjoint_times(const Tout &inp) const { return jat(inp); }
-    Tout position() { return p; };
-
-  private:
-    const Tout p;
-    const function<Tout(const Tin  &)> jt;
-    const function<Tin (const Tout &)> jat;
+protected:
+  const Tout p;
+  const function<Tout(const Tin &)> jt;
+  const function<Tin(const Tout &)> jat;
 };
 
-template<typename Tin, typename Tout>
+template <typename Tin>
+class LinearizationWithMetric : public Linearization<Tin, py::array> {
+  using Tout = py::array;
+
+public:
+  LinearizationWithMetric(const Tout &position_,
+                          function<Tout(const Tin &)> jac_times_,
+                          function<Tin(const Tout &)> jac_adjoint_times_,
+                          function<Tin(const Tin &)> apply_metric_)
+      : Linearization<Tin, Tout>(position_, jac_times_, jac_adjoint_times_),
+        met(apply_metric_) {}
+  Tin apply_metric(const Tin &inp) const { return met(inp); }
+
+private:
+  const function<Tin(const Tin &)> met;
+};
+
+template <typename Tin, typename Tout>
 void add_linearization(py::module_ &msup, const char *name) {
-    py::class_<Linearization<Tin, Tout>>(msup, name)
-       .def(py::init<const Tout &,
-                     function<Tout(const Tin &)>,
-                     function<Tin (const Tout &)>
-                     >())
-       .def("position",          &Linearization<Tin, Tout>::position)
-       .def("jac_times",         &Linearization<Tin, Tout>::jac_times)
-       .def("jac_adjoint_times", &Linearization<Tin, Tout>::jac_adjoint_times);
+  py::class_<Linearization<Tin, Tout>>(msup, name)
+      .def(py::init<const Tout &, function<Tout(const Tin &)>,
+                    function<Tin(const Tout &)>>())
+      .def("position", &Linearization<Tin, Tout>::position)
+      .def("jac_times", &Linearization<Tin, Tout>::jac_times)
+      .def("jac_adjoint_times", &Linearization<Tin, Tout>::jac_adjoint_times);
+}
+template <typename Tin>
+void add_linearization_with_metric(py::module_ &msup, const char *name) {
+  using Tout = py::array;
+  py::class_<LinearizationWithMetric<Tin>>(msup, name)
+      .def(py::init<const Tout &, function<Tout(const Tin &)>,
+                    function<Tin(const Tout &)>, function<Tin(const Tin &)>>())
+      .def("position", &LinearizationWithMetric<Tin>::position)
+      .def("jac_times", &LinearizationWithMetric<Tin>::jac_times)
+      .def("jac_adjoint_times",
+           &LinearizationWithMetric<Tin>::jac_adjoint_times)
+      .def("apply_metric", &LinearizationWithMetric<Tin>::apply_metric);
 }
 
+template <typename T, bool complex_mean,
+          typename Tmean = conditional_t<complex_mean, complex<T>, T>,
+          typename Tacc = long double,
+          typename Tacc_cplx = conditional_t<complex_mean, complex<Tacc>, Tacc>>
+class DiagonalGaussianLikelihood {
+private:
+  const size_t nthreads;
+  const py::array pymean;
+  const py::array pyicov;
 
-template<typename T, size_t ndim>
-class PolarizationMatrixExponential {
-  private:
-    const size_t nthreads;
-  public:
-    PolarizationMatrixExponential(size_t nthreads_=1) : nthreads(nthreads_) {}
+public:
+  const ducc0::cfmav<Tmean> mean;
+  const ducc0::cfmav<T> icov;
 
-    py::array apply(const py::dict &inp_) const {
-      // Parse input
-      auto I {ducc0::to_cmav<T, ndim>(inp_["I"])},
-           Q {ducc0::to_cmav<T, ndim>(inp_["Q"])},
-           U {ducc0::to_cmav<T, ndim>(inp_["U"])},
-           V {ducc0::to_cmav<T, ndim>(inp_["V"])};
-      // /Parse input
+  using Tenergy = double;
 
-      // Instantiate output array
-      auto out_ = ducc0::make_Pyarr<T>(combine_shapes(4, I.shape()));
-      auto out  = ducc0::to_vmav<T, ndim+1>(out_);
-      vector<ducc0::slice> slcs(ndim+1);
-      slcs[0] = ducc0::slice(0);
-      auto outI = ducc0::subarray<ndim>(out, slcs);
-      slcs[0] = ducc0::slice(1);
-      auto outQ = ducc0::subarray<ndim>(out, slcs);
-      slcs[0] = ducc0::slice(2);
-      auto outU = ducc0::subarray<ndim>(out, slcs);
-      slcs[0] = ducc0::slice(3);
-      auto outV = ducc0::subarray<ndim>(out, slcs);
-      // /Instantiate output array
+  DiagonalGaussianLikelihood(const py::array &mean_,
+                             const py::array &inverse_covariance_,
+                             size_t nthreads_ = 1)
+      : nthreads(nthreads_), pymean(mean_), pyicov(inverse_covariance_),
+        mean(ducc0::to_cfmav<Tmean>(mean_)),
+        icov(ducc0::to_cfmav<T>(inverse_covariance_)) {}
 
-
-      ducc0::mav_apply([](const auto &ii, const auto &qq,
-                          const auto &uu, const auto &vv,
-                          auto &oii, auto &oqq,
-                          auto &ouu, auto &ovv
-                          ){
-              auto pol{sqrt(qq*qq + uu*uu + vv*vv)};
-              auto expii{exp(ii)};
-              auto exppol{exp(pol)};
-              oii = 0.5 * (expii*exppol + expii/exppol);
-              auto tmp{0.5 * ((expii/pol)*exppol - (expii/pol)/exppol)};
-              oqq = tmp * qq;
-              ouu = tmp * uu;
-              ovv = tmp * vv;
-          }, nthreads, I, Q, U, V, outI, outQ, outU, outV);
-      return out_;
+  py::array apply(const py::array &inp_) const {
+    auto inp{ducc0::to_cfmav<Tmean>(inp_)};
+    Tacc acc{0};
+    {
+      py::gil_scoped_release release;
+      ducc0::mav_apply(
+          [&acc](const Tmean &m, const T &ic, const Tmean &l) {
+            Tacc_cplx mm(m), ll(l);
+            Tacc iicc(ic);
+            acc += iicc * norm(ll - mm);
+          },
+          1, mean, icov, inp); // not parallelized because accumulating
+      acc *= 0.5;
     }
+    return py::array(py::cast(Tenergy(acc)));
+  }
 
-    Linearization<py::dict,py::array> apply_with_jac(const py::dict &loc_) {
-        // Parse input
-        auto I {ducc0::to_cmav<T, ndim>(loc_["I"])},
-             Q {ducc0::to_cmav<T, ndim>(loc_["Q"])},
-             U {ducc0::to_cmav<T, ndim>(loc_["U"])},
-             V {ducc0::to_cmav<T, ndim>(loc_["V"])};
-        // /Parse input
+  LinearizationWithMetric<py::array> apply_with_jac(const py::array &loc_) {
+    auto loc{ducc0::to_cfmav<Tmean>(loc_)};
+    auto gradient{ducc0::vfmav<Tmean>(loc.shape(), ducc0::UNINITIALIZED)};
+    Tacc acc{0};
 
-        // Instantiate output array
-        auto applied_ = ducc0::make_Pyarr<T>(combine_shapes(4, I.shape()));
-        auto applied  = ducc0::to_vmav<T, ndim+1>(applied_);
+    // value
+    ducc0::mav_apply(
+        [&acc](const Tmean &m, const T &ic, const Tmean &l) {
+          Tacc_cplx mm(m), ll(l);
+          Tacc iicc(ic);
+          auto tmp1{iicc * norm(ll - mm)};
+          acc += tmp1;
+        },
+        1, mean, icov, loc); // not parallelized because accumulating
+    acc *= 0.5;
+    auto energy{Tenergy(acc)};
+    // /value
 
-        vector<ducc0::slice> slcs(ndim+1);
-        slcs[0] = ducc0::slice(0);
-        auto appliedI = ducc0::subarray<ndim>(applied, slcs);
-        slcs[0] = ducc0::slice(1);
-        auto appliedQ = ducc0::subarray<ndim>(applied, slcs);
-        slcs[0] = ducc0::slice(2);
-        auto appliedU = ducc0::subarray<ndim>(applied, slcs);
-        slcs[0] = ducc0::slice(3);
-        auto appliedV = ducc0::subarray<ndim>(applied, slcs);
-        // /Instantiate output array
+    // gradient
+    ducc0::mav_apply(
+        [](const Tmean &m, const T &ic, const Tmean &l, Tmean &g) {
+          auto tmp2{(l - m) * ic};
+          g = tmp2;
+        },
+        nthreads, mean, icov, loc, gradient);
+    // /gradient
 
-        struct mtx {
-          T iq, iu, iv, qq, qu, qv, uq, uu, uv, vq, vu, vv; };
+    // Jacobian
+    function<py::array(const py::array &)> ftimes =
+        [gradient = gradient](const py::array &inp_) {
+          auto inp{ducc0::to_cfmav<Tmean>(inp_)};
+          Tacc acc{0};
 
-        // Allocate Jacobian
-        auto mat = ducc0::vmav<mtx, ndim>(I.shape());
-        // /Allocate Jacobian
+          ducc0::mav_apply(
+              [&acc](const Tmean &i, const Tmean &g) {
+                Tacc_cplx ii{i}, gg{g};
+                acc += real(ii) * real(gg) + imag(ii) * imag(gg);
+              },
+              1, inp, gradient); // not parallelized because accumulating
+          return py::array(py::cast(Tenergy(acc)));
+        };
+    function<py::array(const py::array &)> fadjtimes =
+        [nthreads = nthreads, gradient = gradient](const py::array &inp_) {
+          auto inp{ducc0::to_cfmav<Tenergy>(inp_)};
+          auto inpT{T(inp())};
+          auto out_{ducc0::make_Pyarr<Tmean>(gradient.shape())};
+          auto out{ducc0::to_vfmav<Tmean>(out_)};
+          ducc0::mav_apply(
+              [inpT = inpT](const Tmean &g, Tmean &o) { o = inpT * g; },
+              nthreads, gradient, out);
+          return out_;
+        };
+    // /Jacobian
 
-        // Derive + apply
-        ducc0::mav_apply([](const auto &ii , const auto &qq , const auto &uu , const auto &vv ,
-                            auto &dii, auto &dqi, auto &dui, auto &dvi,
-                            auto &d
-                            ){
-              auto pol0{qq*qq + uu*uu + vv*vv};
-              auto pol{sqrt(pol0)};
-              auto expii{exp(ii)};
-              auto exppol{exp(pol)};
-              auto eplus0{expii*exppol}, eminus0{expii/exppol};
-              auto tmp2{0.5 / pol * (eplus0 - eminus0)};
-              dii = 0.5 * (eplus0 + eminus0);
-              d.iq = tmp2 * qq;
-              d.iu = tmp2 * uu;
-              d.iv = tmp2 * vv;
+    // Metric
+    function<py::array(const py::array &)> apply_metric =
+        [nthreads = nthreads, icov = icov](const py::array &inp_) {
+          auto inp{ducc0::to_cfmav<Tmean>(inp_)};
+          auto out_{ducc0::make_Pyarr<Tmean>(inp.shape())};
+          auto out{ducc0::to_vfmav<Tmean>(out_)};
+          ducc0::mav_apply(
+              [](const Tmean &i, const T &ic, Tmean &o) { o = i * ic; },
+              nthreads, inp, icov, out);
+          return out_;
+        };
+    // /Metric
 
-              // Tip: never define several variables "auto" together!
-              auto eplus{(expii/pol)*exppol};
-              auto eminus{(expii/pol)/exppol};
-              auto tmp{0.5 * (eplus - eminus)};
-              auto tmp3{0.5/pol0 * (eplus*(pol-1.) + eminus*(pol+1.))};
+    return LinearizationWithMetric<py::array>(py::array(py::cast(energy)),
+                                              ftimes, fadjtimes, apply_metric);
+  }
+};
 
-              auto tmpq{tmp3*qq};
-              dqi = tmp * qq;
-              d.qq = qq * tmpq + tmp;
-              d.qu = uu * tmpq;
-              d.qv = vv * tmpq;
+template <typename T, bool complex_mean,
+          typename Tmean = conditional_t<complex_mean, complex<T>, T>,
+          typename Tacc = long double,
+          typename Tacc_cplx = conditional_t<complex_mean, complex<Tacc>, Tacc>>
+class VariableCovarianceDiagonalGaussianLikelihood {
+private:
+  const size_t nthreads;
+  const py::array pymean;
+  const py::str key_signal;
+  const py::str key_log_icov;
 
-              auto tmpu{tmp3*uu};
-              dui = tmp * uu;
-              d.uq = qq * tmpu;
-              d.uu = uu * tmpu + tmp;
-              d.uv = vv * tmpu;
+public:
+  const ducc0::cfmav<Tmean> mean;
 
-              auto tmpv{tmp3*vv};
-              dvi = tmp * vv;
-              d.vq = qq * tmpv;
-              d.vu = uu * tmpv;
-              d.vv = vv * tmpv + tmp;
+  using Tenergy = double;
 
-            }, nthreads,
-               I, Q, U, V,
-               appliedI, appliedQ, appliedU, appliedV,
-               mat);
-        // /Derive + apply
+  VariableCovarianceDiagonalGaussianLikelihood(const py::array &mean_,
+                                               const py::str &key_signal_,
+                                               const py::str &key_log_icov_,
+                                               size_t nthreads_ = 1)
+      : nthreads(nthreads_), pymean(mean_), key_signal(key_signal_),
+        key_log_icov(key_log_icov_), mean(ducc0::to_cfmav<Tmean>(mean_)) {}
 
-        function<py::array(const py::dict &)> ftimes =
-            [nthreads=nthreads,appliedI,appliedQ,appliedU,appliedV,mat](const py::dict &inp_) {
-              // Parse input
-              auto I {ducc0::to_cmav<T, ndim>(inp_["I"])},
-                   Q {ducc0::to_cmav<T, ndim>(inp_["Q"])},
-                   U {ducc0::to_cmav<T, ndim>(inp_["U"])},
-                   V {ducc0::to_cmav<T, ndim>(inp_["V"])};
-              // /Parse input
-
-              // Instantiate output array
-              auto out_ = ducc0::make_Pyarr<T>(combine_shapes(4, I.shape()));
-              auto out  = ducc0::to_vmav<T, ndim+1>(out_);
-              vector<ducc0::slice> slcs(ndim+1);
-              slcs[0] = ducc0::slice(0);
-              auto outI = ducc0::subarray<ndim>(out, slcs);
-              slcs[0] = ducc0::slice(1);
-              auto outQ = ducc0::subarray<ndim>(out, slcs);
-              slcs[0] = ducc0::slice(2);
-              auto outU = ducc0::subarray<ndim>(out, slcs);
-              slcs[0] = ducc0::slice(3);
-              auto outV = ducc0::subarray<ndim>(out, slcs);
-              // /Instantiate output array
-
-              // Matrix multiplication
-              ducc0::mav_apply([](const auto &dii, const auto &dqi,
-                                  const auto &dui, const auto &dvi,
-                                  const auto &d,
-                                  const auto &ii, const auto &qq,
-                                  const auto &uu, const auto &vv,
-                                  auto &iiout, auto &qqout,
-                                  auto &uuout, auto &vvout){
-                    auto ti = dii*ii + d.iq*qq + d.iu*uu + d.iv*vv;
-                    auto tq = dqi*ii + d.qq*qq + d.qu*uu + d.qv*vv;
-                    auto tu = dui*ii + d.uq*qq + d.uu*uu + d.uv*vv;
-                    auto tv = dvi*ii + d.vq*qq + d.vu*uu + d.vv*vv;
-                    iiout = ti; qqout = tq; uuout = tu; vvout = tv;
-                  }, nthreads, appliedI, appliedQ, appliedU, appliedV,mat,I,Q,U,V,outI,outQ,outU,outV);
-              // /Matrix multiplication
-
-              return out_;
-            };
-
-        function<py::dict(const py::array &)> fadjtimes =
-            [nthreads=nthreads,appliedI,appliedQ,appliedU,appliedV,mat](const py::array &inp_) {
-              // Parse input
-              auto inp {ducc0::to_cmav<T, ndim+1>(inp_)};
-              vector<ducc0::slice> slcs(ndim+1);
-              slcs[0] = ducc0::slice(0);
-              auto I {ducc0::subarray<ndim>(inp, slcs)};
-              slcs[0] = ducc0::slice(1);
-              auto Q {ducc0::subarray<ndim>(inp, slcs)};
-              slcs[0] = ducc0::slice(2);
-              auto U {ducc0::subarray<ndim>(inp, slcs)};
-              slcs[0] = ducc0::slice(3);
-              auto V {ducc0::subarray<ndim>(inp, slcs)};
-              // /Parse input
-
-              // Instantiate output
-              py::dict out_;
-              out_["I"] = ducc0::make_Pyarr<T>(I.shape());
-              out_["Q"] = ducc0::make_Pyarr<T>(I.shape());
-              out_["U"] = ducc0::make_Pyarr<T>(I.shape());
-              out_["V"] = ducc0::make_Pyarr<T>(I.shape());
-              auto outI {ducc0::to_vmav<T, ndim>(out_["I"])},
-                   outQ {ducc0::to_vmav<T, ndim>(out_["Q"])},
-                   outU {ducc0::to_vmav<T, ndim>(out_["U"])},
-                   outV {ducc0::to_vmav<T, ndim>(out_["V"])};
-              // /Instantiate output
-
-              // Adjoint matrix multiplication
-              ducc0::mav_apply([](const auto &dii, const auto &dqi,
-                                  const auto &dui, const auto &dvi,
-                                  const auto &d,
-                                  const auto &ii, const auto &qq,
-                                  const auto &uu, const auto &vv,
-                                  auto &iiout, auto &qqout,
-                                  auto &uuout, auto &vvout){
-                    auto ti = dii *ii + dqi *qq + dui *uu + dvi *vv;
-                    auto tq = d.iq*ii + d.qq*qq + d.uq*uu + d.vq*vv;
-                    auto tu = d.iu*ii + d.qu*qq + d.uu*uu + d.vu*vv;
-                    auto tv = d.iv*ii + d.qv*qq + d.uv*uu + d.vv*vv;
-                    iiout = ti; qqout = tq; uuout = tu; vvout = tv;
-                  }, nthreads, appliedI, appliedQ, appliedU, appliedV,mat,I,Q,U,V,outI,outQ,outU,outV);
-              // /Adjoint matrix multiplication
-              return out_;
-            };
-
-        return Linearization<py::dict,py::array>(applied_, ftimes, fadjtimes);
+  py::array apply(const py::dict &inp_) const {
+    auto signal{ducc0::to_cfmav<Tmean>(inp_[key_signal])};
+    auto logicov{ducc0::to_cfmav<T>(inp_[key_log_icov])};
+    Tacc acc{0};
+    {
+      py::gil_scoped_release release;
+      ducc0::mav_apply(
+          [&acc](const Tmean &m, const T &lic, const Tmean &l) {
+            Tacc_cplx mm(m), ll(l);
+            Tacc iicc(exp(lic));
+            Tacc logiicc(lic);
+            if (complex_mean)
+              logiicc *= 2;
+            acc += iicc * norm(ll - mm) - logiicc;
+          },
+          1, mean, logicov, signal); // not parallelized because accumulating
+      acc *= 0.5;
     }
+    return py::array(py::cast(Tenergy(acc)));
+  }
+
+  LinearizationWithMetric<py::dict> apply_with_jac(const py::dict &loc_) {
+    auto loc_s{ducc0::to_cfmav<Tmean>(loc_[key_signal])};
+    auto loc_lic{ducc0::to_cfmav<T>(loc_[key_log_icov])};
+    auto grad_s{ducc0::vfmav<Tmean>(loc_s.shape(), ducc0::UNINITIALIZED)};
+    auto grad_lic{ducc0::vfmav<T>(loc_lic.shape(), ducc0::UNINITIALIZED)};
+    Tacc acc{0};
+
+    // value
+    ducc0::mav_apply(
+        [&acc](const Tmean &m, const T &lic, const Tmean &l) {
+          Tacc_cplx mm(m), ll(l);
+          Tacc iicc(exp(lic));
+          Tacc logiicc(lic);
+          if (complex_mean)
+            logiicc *= 2;
+          acc += iicc * norm(ll - mm) - logiicc;
+        },
+        1, mean, loc_lic, loc_s); // not parallelized because accumulating
+    acc *= 0.5;
+    auto energy{Tenergy(acc)};
+    // /value
+
+    // gradient
+    // FIXME better variable names for everything...
+    ducc0::mav_apply(
+        [](const Tmean &m, const Tmean &s, const T &lic, Tmean &gs, T &glic) {
+          auto explic{exp(lic)};
+          auto tmp2{(s - m) * explic};
+          T fct;
+          if (complex_mean)
+            fct = 2;
+          else
+            fct = 1;
+          T tmp3{T(0.5) * (explic * norm(m - s) - fct)};
+          gs = tmp2;
+          glic = tmp3;
+        },
+        nthreads, mean, loc_s, loc_lic, grad_s, grad_lic);
+    // /gradient
+
+    // Jacobian
+    function<py::array(const py::dict &)> ftimes =
+        [grad_s = grad_s, grad_lic = grad_lic, key_signal = key_signal,
+         key_log_icov = key_log_icov](const py::dict &inp_) {
+          auto inp_s{ducc0::to_cfmav<Tmean>(inp_[key_signal])};
+          auto inp_lic{ducc0::to_cfmav<T>(inp_[key_log_icov])};
+
+          Tacc acc{0};
+
+          ducc0::mav_apply(
+              [&acc](const Tmean &is, const T &ilic, const Tmean &gs,
+                     const T &glic) {
+                Tacc_cplx ii{is}, gg{gs};
+                Tacc jj{ilic}, hh{glic};
+                acc += real(ii) * real(gg) + imag(ii) * imag(gg);
+                acc += jj * hh;
+              },
+              1, inp_s, inp_lic, grad_s,
+              grad_lic); // not parallelized because accumulating
+          return py::array(py::cast(Tenergy(acc)));
+        };
+
+    function<py::dict(const py::array &)> fadjtimes =
+        [nthreads = nthreads, grad_s = grad_s, grad_lic = grad_lic,
+         key_signal = key_signal,
+         key_log_icov = key_log_icov](const py::array &inp_) {
+          auto inp{ducc0::to_cfmav<Tenergy>(inp_)};
+          auto inpT{T(inp())};
+          py::dict out_;
+          out_[key_signal] = ducc0::make_Pyarr<Tmean>(grad_s.shape());
+          out_[key_log_icov] = ducc0::make_Pyarr<T>(grad_s.shape());
+          auto outs{ducc0::to_vfmav<Tmean>(out_[key_signal])};
+          auto outlic{ducc0::to_vfmav<T>(out_[key_log_icov])};
+          ducc0::mav_apply(
+              [inpT = inpT](const Tmean &gs, const T &glic, Tmean &os,
+                            T &olic) {
+                os = inpT * gs;
+                olic = inpT * glic;
+              },
+              nthreads, grad_s, grad_lic, outs, outlic);
+          return out_;
+        };
+    // /Jacobian
+
+    // Metric
+    function<py::dict(const py::dict &)> apply_metric =
+        [nthreads = nthreads, key_signal = key_signal,
+         key_log_icov = key_log_icov, loc_lic = loc_lic](const py::dict &inp_) {
+          auto inp_s{ducc0::to_cfmav<Tmean>(inp_[key_signal])};
+          auto inp_lic{ducc0::to_cfmav<T>(inp_[key_log_icov])};
+
+          py::dict out_;
+          out_[key_signal] = ducc0::make_Pyarr<Tmean>(inp_s.shape());
+          out_[key_log_icov] = ducc0::make_Pyarr<T>(inp_s.shape());
+          auto outs{ducc0::to_vfmav<Tmean>(out_[key_signal])};
+          auto outlic{ducc0::to_vfmav<T>(out_[key_log_icov])};
+
+          ducc0::mav_apply(
+              [](const T &lic, const Tmean &ins, const T &inlic, Tmean &os,
+                 T &olic) {
+                os = exp(lic) * ins;
+                olic = inlic;
+                if (!complex_mean)
+                  olic *= T(0.5);
+              },
+              nthreads, loc_lic, inp_s, inp_lic, outs, outlic);
+          return out_;
+        };
+    // /Metric
+
+    return LinearizationWithMetric<py::dict>(py::array(py::cast(energy)),
+                                             ftimes, fadjtimes, apply_metric);
+  }
+};
+
+template <typename T, size_t ndim> class PolarizationMatrixExponential {
+private:
+  const size_t nthreads;
+
+public:
+  PolarizationMatrixExponential(size_t nthreads_ = 1) : nthreads(nthreads_) {}
+
+  py::array apply(const py::dict &inp_) const {
+    // Parse input
+    auto I{ducc0::to_cmav<T, ndim>(inp_["I"])},
+        Q{ducc0::to_cmav<T, ndim>(inp_["Q"])},
+        U{ducc0::to_cmav<T, ndim>(inp_["U"])},
+        V{ducc0::to_cmav<T, ndim>(inp_["V"])};
+    // /Parse input
+
+    // Instantiate output array
+    auto out_ = ducc0::make_Pyarr<T>(combine_shapes(4, I.shape()));
+    auto out = ducc0::to_vmav<T, ndim + 1>(out_);
+    vector<ducc0::slice> slcs(ndim + 1);
+    slcs[0] = ducc0::slice(0);
+    auto outI = ducc0::subarray<ndim>(out, slcs);
+    slcs[0] = ducc0::slice(1);
+    auto outQ = ducc0::subarray<ndim>(out, slcs);
+    slcs[0] = ducc0::slice(2);
+    auto outU = ducc0::subarray<ndim>(out, slcs);
+    slcs[0] = ducc0::slice(3);
+    auto outV = ducc0::subarray<ndim>(out, slcs);
+    // /Instantiate output array
+
+    ducc0::mav_apply(
+        [](const auto &ii, const auto &qq, const auto &uu, const auto &vv,
+           auto &oii, auto &oqq, auto &ouu, auto &ovv) {
+          auto pol{sqrt(qq * qq + uu * uu + vv * vv)};
+          auto expii{exp(ii)};
+          auto exppol{exp(pol)};
+          oii = 0.5 * (expii * exppol + expii / exppol);
+          auto tmp{0.5 * ((expii / pol) * exppol - (expii / pol) / exppol)};
+          oqq = tmp * qq;
+          ouu = tmp * uu;
+          ovv = tmp * vv;
+        },
+        nthreads, I, Q, U, V, outI, outQ, outU, outV);
+    return out_;
+  }
+
+  Linearization<py::dict, py::array> apply_with_jac(const py::dict &loc_) {
+    // Parse input
+    auto I{ducc0::to_cmav<T, ndim>(loc_["I"])},
+        Q{ducc0::to_cmav<T, ndim>(loc_["Q"])},
+        U{ducc0::to_cmav<T, ndim>(loc_["U"])},
+        V{ducc0::to_cmav<T, ndim>(loc_["V"])};
+    // /Parse input
+
+    // Instantiate output array
+    auto applied_ = ducc0::make_Pyarr<T>(combine_shapes(4, I.shape()));
+    auto applied = ducc0::to_vmav<T, ndim + 1>(applied_);
+
+    vector<ducc0::slice> slcs(ndim + 1);
+    slcs[0] = ducc0::slice(0);
+    auto appliedI = ducc0::subarray<ndim>(applied, slcs);
+    slcs[0] = ducc0::slice(1);
+    auto appliedQ = ducc0::subarray<ndim>(applied, slcs);
+    slcs[0] = ducc0::slice(2);
+    auto appliedU = ducc0::subarray<ndim>(applied, slcs);
+    slcs[0] = ducc0::slice(3);
+    auto appliedV = ducc0::subarray<ndim>(applied, slcs);
+    // /Instantiate output array
+
+    struct mtx {
+      T iq, iu, iv, qq, qu, qv, uq, uu, uv, vq, vu, vv;
+    };
+
+    // Allocate Jacobian
+    auto mat = ducc0::vmav<mtx, ndim>(I.shape());
+    // /Allocate Jacobian
+
+    // Derive + apply
+    ducc0::mav_apply(
+        [](const auto &ii, const auto &qq, const auto &uu, const auto &vv,
+           auto &dii, auto &dqi, auto &dui, auto &dvi, auto &d) {
+          auto pol0{qq * qq + uu * uu + vv * vv};
+          auto pol{sqrt(pol0)};
+          auto expii{exp(ii)};
+          auto exppol{exp(pol)};
+          auto eplus0{expii * exppol}, eminus0{expii / exppol};
+          auto tmp2{0.5 / pol * (eplus0 - eminus0)};
+          dii = 0.5 * (eplus0 + eminus0);
+          d.iq = tmp2 * qq;
+          d.iu = tmp2 * uu;
+          d.iv = tmp2 * vv;
+
+          // Tip: never define several variables "auto" together!
+          auto eplus{(expii / pol) * exppol};
+          auto eminus{(expii / pol) / exppol};
+          auto tmp{0.5 * (eplus - eminus)};
+          auto tmp3{0.5 / pol0 * (eplus * (pol - 1.) + eminus * (pol + 1.))};
+
+          auto tmpq{tmp3 * qq};
+          dqi = tmp * qq;
+          d.qq = qq * tmpq + tmp;
+          d.qu = uu * tmpq;
+          d.qv = vv * tmpq;
+
+          auto tmpu{tmp3 * uu};
+          dui = tmp * uu;
+          d.uq = qq * tmpu;
+          d.uu = uu * tmpu + tmp;
+          d.uv = vv * tmpu;
+
+          auto tmpv{tmp3 * vv};
+          dvi = tmp * vv;
+          d.vq = qq * tmpv;
+          d.vu = uu * tmpv;
+          d.vv = vv * tmpv + tmp;
+        },
+        nthreads, I, Q, U, V, appliedI, appliedQ, appliedU, appliedV, mat);
+    // /Derive + apply
+
+    function<py::array(const py::dict &)> ftimes =
+        [nthreads = nthreads, appliedI, appliedQ, appliedU, appliedV,
+         mat](const py::dict &inp_) {
+          // Parse input
+          auto I{ducc0::to_cmav<T, ndim>(inp_["I"])},
+              Q{ducc0::to_cmav<T, ndim>(inp_["Q"])},
+              U{ducc0::to_cmav<T, ndim>(inp_["U"])},
+              V{ducc0::to_cmav<T, ndim>(inp_["V"])};
+          // /Parse input
+
+          // Instantiate output array
+          auto out_ = ducc0::make_Pyarr<T>(combine_shapes(4, I.shape()));
+          auto out = ducc0::to_vmav<T, ndim + 1>(out_);
+          vector<ducc0::slice> slcs(ndim + 1);
+          slcs[0] = ducc0::slice(0);
+          auto outI = ducc0::subarray<ndim>(out, slcs);
+          slcs[0] = ducc0::slice(1);
+          auto outQ = ducc0::subarray<ndim>(out, slcs);
+          slcs[0] = ducc0::slice(2);
+          auto outU = ducc0::subarray<ndim>(out, slcs);
+          slcs[0] = ducc0::slice(3);
+          auto outV = ducc0::subarray<ndim>(out, slcs);
+          // /Instantiate output array
+
+          // Matrix multiplication
+          ducc0::mav_apply(
+              [](const auto &dii, const auto &dqi, const auto &dui,
+                 const auto &dvi, const auto &d, const auto &ii, const auto &qq,
+                 const auto &uu, const auto &vv, auto &iiout, auto &qqout,
+                 auto &uuout, auto &vvout) {
+                auto ti = dii * ii + d.iq * qq + d.iu * uu + d.iv * vv;
+                auto tq = dqi * ii + d.qq * qq + d.qu * uu + d.qv * vv;
+                auto tu = dui * ii + d.uq * qq + d.uu * uu + d.uv * vv;
+                auto tv = dvi * ii + d.vq * qq + d.vu * uu + d.vv * vv;
+                iiout = ti;
+                qqout = tq;
+                uuout = tu;
+                vvout = tv;
+              },
+              nthreads, appliedI, appliedQ, appliedU, appliedV, mat, I, Q, U, V,
+              outI, outQ, outU, outV);
+          // /Matrix multiplication
+
+          return out_;
+        };
+
+    function<py::dict(const py::array &)> fadjtimes =
+        [nthreads = nthreads, appliedI, appliedQ, appliedU, appliedV,
+         mat](const py::array &inp_) {
+          // Parse input
+          auto inp{ducc0::to_cmav<T, ndim + 1>(inp_)};
+          vector<ducc0::slice> slcs(ndim + 1);
+          slcs[0] = ducc0::slice(0);
+          auto I{ducc0::subarray<ndim>(inp, slcs)};
+          slcs[0] = ducc0::slice(1);
+          auto Q{ducc0::subarray<ndim>(inp, slcs)};
+          slcs[0] = ducc0::slice(2);
+          auto U{ducc0::subarray<ndim>(inp, slcs)};
+          slcs[0] = ducc0::slice(3);
+          auto V{ducc0::subarray<ndim>(inp, slcs)};
+          // /Parse input
+
+          // Instantiate output
+          py::dict out_;
+          out_["I"] = ducc0::make_Pyarr<T>(I.shape());
+          out_["Q"] = ducc0::make_Pyarr<T>(I.shape());
+          out_["U"] = ducc0::make_Pyarr<T>(I.shape());
+          out_["V"] = ducc0::make_Pyarr<T>(I.shape());
+          auto outI{ducc0::to_vmav<T, ndim>(out_["I"])},
+              outQ{ducc0::to_vmav<T, ndim>(out_["Q"])},
+              outU{ducc0::to_vmav<T, ndim>(out_["U"])},
+              outV{ducc0::to_vmav<T, ndim>(out_["V"])};
+          // /Instantiate output
+
+          // Adjoint matrix multiplication
+          ducc0::mav_apply(
+              [](const auto &dii, const auto &dqi, const auto &dui,
+                 const auto &dvi, const auto &d, const auto &ii, const auto &qq,
+                 const auto &uu, const auto &vv, auto &iiout, auto &qqout,
+                 auto &uuout, auto &vvout) {
+                auto ti = dii * ii + dqi * qq + dui * uu + dvi * vv;
+                auto tq = d.iq * ii + d.qq * qq + d.uq * uu + d.vq * vv;
+                auto tu = d.iu * ii + d.qu * qq + d.uu * uu + d.vu * vv;
+                auto tv = d.iv * ii + d.qv * qq + d.uv * uu + d.vv * vv;
+                iiout = ti;
+                qqout = tq;
+                uuout = tu;
+                vvout = tv;
+              },
+              nthreads, appliedI, appliedQ, appliedU, appliedV, mat, I, Q, U, V,
+              outI, outQ, outU, outV);
+          // /Adjoint matrix multiplication
+          return out_;
+        };
+
+    return Linearization<py::dict, py::array>(applied_, ftimes, fadjtimes);
+  }
 };
 
 PYBIND11_MODULE(resolvelib, m) {
-    m.attr("__name__") = "resolvelib";
-    py::class_<PolarizationMatrixExponential<double, 1>>(m, "PolarizationMatrixExponential1")
-        .def(py::init<size_t>())
-        .def("apply",          &PolarizationMatrixExponential<double, 1>::apply)
-        .def("apply_with_jac", &PolarizationMatrixExponential<double, 1>::apply_with_jac);
-    py::class_<PolarizationMatrixExponential<double, 2>>(m, "PolarizationMatrixExponential2")
-        .def(py::init<size_t>())
-        .def("apply",          &PolarizationMatrixExponential<double, 2>::apply)
-        .def("apply_with_jac", &PolarizationMatrixExponential<double, 2>::apply_with_jac);
-    py::class_<PolarizationMatrixExponential<double, 3>>(m, "PolarizationMatrixExponential3")
-        .def(py::init<size_t>())
-        .def("apply",          &PolarizationMatrixExponential<double, 3>::apply)
-        .def("apply_with_jac", &PolarizationMatrixExponential<double, 3>::apply_with_jac);
-    py::class_<PolarizationMatrixExponential<double, 4>>(m, "PolarizationMatrixExponential4")
-        .def(py::init<size_t>())
-        .def("apply",          &PolarizationMatrixExponential<double, 4>::apply)
-        .def("apply_with_jac", &PolarizationMatrixExponential<double, 4>::apply_with_jac);
+  m.attr("__name__") = "resolvelib";
+  py::class_<PolarizationMatrixExponential<double, 1>>(
+      m, "PolarizationMatrixExponential1")
+      .def(py::init<size_t>())
+      .def("apply", &PolarizationMatrixExponential<double, 1>::apply)
+      .def("apply_with_jac",
+           &PolarizationMatrixExponential<double, 1>::apply_with_jac);
+  py::class_<PolarizationMatrixExponential<double, 2>>(
+      m, "PolarizationMatrixExponential2")
+      .def(py::init<size_t>())
+      .def("apply", &PolarizationMatrixExponential<double, 2>::apply)
+      .def("apply_with_jac",
+           &PolarizationMatrixExponential<double, 2>::apply_with_jac);
+  py::class_<PolarizationMatrixExponential<double, 3>>(
+      m, "PolarizationMatrixExponential3")
+      .def(py::init<size_t>())
+      .def("apply", &PolarizationMatrixExponential<double, 3>::apply)
+      .def("apply_with_jac",
+           &PolarizationMatrixExponential<double, 3>::apply_with_jac);
+  py::class_<PolarizationMatrixExponential<double, 4>>(
+      m, "PolarizationMatrixExponential4")
+      .def(py::init<size_t>())
+      .def("apply", &PolarizationMatrixExponential<double, 4>::apply)
+      .def("apply_with_jac",
+           &PolarizationMatrixExponential<double, 4>::apply_with_jac);
 
-    add_linearization<py::array, py::array>(m, "Linearization_field2field");
-    add_linearization<py::array, py::dict >(m, "Linearization_field2mfield");
-    add_linearization<py::dict , py::array>(m, "Linearization_mfield2field");
-    add_linearization<py::dict , py::dict >(m, "Linearization_mfield2mfield");
+  py::class_<DiagonalGaussianLikelihood<double, false>>(
+      m, "DiagonalGaussianLikelihood_f8")
+      .def(py::init<py::array, py::array, size_t>())
+      .def("apply", &DiagonalGaussianLikelihood<double, false>::apply)
+      .def("apply_with_jac",
+           &DiagonalGaussianLikelihood<double, false>::apply_with_jac);
+  py::class_<DiagonalGaussianLikelihood<float, false>>(
+      m, "DiagonalGaussianLikelihood_f4")
+      .def(py::init<py::array, py::array, size_t>())
+      .def("apply", &DiagonalGaussianLikelihood<float, false>::apply)
+      .def("apply_with_jac",
+           &DiagonalGaussianLikelihood<float, false>::apply_with_jac);
+  py::class_<DiagonalGaussianLikelihood<double, true>>(
+      m, "DiagonalGaussianLikelihood_c16")
+      .def(py::init<py::array, py::array, size_t>())
+      .def("apply", &DiagonalGaussianLikelihood<double, true>::apply)
+      .def("apply_with_jac",
+           &DiagonalGaussianLikelihood<double, true>::apply_with_jac);
+  py::class_<DiagonalGaussianLikelihood<float, true>>(
+      m, "DiagonalGaussianLikelihood_c8")
+      .def(py::init<py::array, py::array, size_t>())
+      .def("apply", &DiagonalGaussianLikelihood<float, true>::apply)
+      .def("apply_with_jac",
+           &DiagonalGaussianLikelihood<float, true>::apply_with_jac);
+
+  py::class_<VariableCovarianceDiagonalGaussianLikelihood<double, false>>(
+      m, "VariableCovarianceDiagonalGaussianLikelihood_f8")
+      .def(py::init<py::array, py::str, py::str, size_t>())
+      .def("apply",
+           &VariableCovarianceDiagonalGaussianLikelihood<double, false>::apply)
+      .def("apply_with_jac", &VariableCovarianceDiagonalGaussianLikelihood<
+                                 double, false>::apply_with_jac);
+  py::class_<VariableCovarianceDiagonalGaussianLikelihood<float, false>>(
+      m, "VariableCovarianceDiagonalGaussianLikelihood_f4")
+      .def(py::init<py::array, py::str, py::str, size_t>())
+      .def("apply",
+           &VariableCovarianceDiagonalGaussianLikelihood<float, false>::apply)
+      .def("apply_with_jac", &VariableCovarianceDiagonalGaussianLikelihood<
+                                 float, false>::apply_with_jac);
+  py::class_<VariableCovarianceDiagonalGaussianLikelihood<double, true>>(
+      m, "VariableCovarianceDiagonalGaussianLikelihood_c16")
+      .def(py::init<py::array, py::str, py::str, size_t>())
+      .def("apply",
+           &VariableCovarianceDiagonalGaussianLikelihood<double, true>::apply)
+      .def("apply_with_jac",
+           &VariableCovarianceDiagonalGaussianLikelihood<double,
+                                                         true>::apply_with_jac);
+  py::class_<VariableCovarianceDiagonalGaussianLikelihood<float, true>>(
+      m, "VariableCovarianceDiagonalGaussianLikelihood_c8")
+      .def(py::init<py::array, py::str, py::str, size_t>())
+      .def("apply",
+           &VariableCovarianceDiagonalGaussianLikelihood<float, true>::apply)
+      .def("apply_with_jac",
+           &VariableCovarianceDiagonalGaussianLikelihood<float,
+                                                         true>::apply_with_jac);
+
+  add_linearization<py::array, py::array>(m, "Linearization_field2field");
+  add_linearization<py::array, py::dict>(m, "Linearization_field2mfield");
+  add_linearization<py::dict, py::array>(m, "Linearization_mfield2field");
+  add_linearization<py::dict, py::dict>(m, "Linearization_mfield2mfield");
+  add_linearization_with_metric<py::dict>(m, "LinearizationWithMetric_mfield");
+  add_linearization_with_metric<py::array>(m, "LinearizationWithMetric_field");
 }

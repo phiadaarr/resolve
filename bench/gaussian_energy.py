@@ -11,7 +11,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright(C) 2021 Max-Planck-Society
 # Copyright(C) 2022 Max-Planck-Society, Philipp Arras
 # Author: Philipp Arras
 
@@ -24,25 +23,34 @@ import numpy as np
 import resolve as rve
 
 if len(sys.argv) == 2 and sys.argv[1] == "quick":
-    npix = 10
+    shp = (10,)
 else:
-    npix = 4000
+    shp = (1000000, 100)  # 100 Mio entries
 
-pdom = rve.PolarizationSpace(["I", "Q", "U", "V"])
-sdom = ift.RGSpace([npix, npix])
-dom = rve.default_sky_domain(pdom=pdom, sdom=sdom)
-dom = {kk: dom[1:] for kk in pdom.labels}
-tgt = rve.default_sky_domain(pdom=pdom, sdom=sdom)
-opold = rve.polarization_matrix_exponential(tgt)
-opold_jax = rve.polarization_matrix_exponential(tgt, jax=True)
+dom = ift.UnstructuredDomain(shp)
+mean = ift.full(dom, 1.2)
+invcov = ift.full(dom, 142.1)
 
+print("Gaussian energy")
+print("^^^^^^^^^^^^^^^")
 for nthreads in [1, 4, 8]:
-    op = rve.polarization_matrix_exponential_mf2f(dom, nthreads)
+    op = rve.DiagonalGaussianLikelihood(mean, invcov, nthreads=nthreads)
     print(f"New implementation (nthreads={nthreads})")
     ift.exec_time(op)
     print()
 print("Old implementation")
+opold = ift.GaussianEnergy(mean, ift.makeOp(invcov))
 ift.exec_time(opold)
 print()
-print("Old implementation (jax)")
-ift.exec_time(opold_jax)
+
+print("Variable covariance Gaussian energy")
+print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+for nthreads in [1, 4, 8]:
+    op = rve.VariableCovarianceDiagonalGaussianLikelihood(mean, "signal", "logicov",
+                                                          nthreads=nthreads)
+    print(f"New implementation (nthreads={nthreads})")
+    ift.exec_time(op)
+    print()
+
+print("Old implementation")
+ift.exec_time(op.nifty_equivalent)

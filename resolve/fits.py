@@ -1,4 +1,16 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 # Copyright(C) 2019-2021 Max-Planck-Society
 # Author: Philipp Arras
 
@@ -48,7 +60,7 @@ def fits2field(file_name, ignore_units=False, from_wsclean=False):
     import astropy.io.fits as pyfits
 
     with pyfits.open(file_name) as hdu_list:
-        image_data = hdu_list[0].data.astype(np.float64)
+        image_data = hdu_list[0].data.astype(np.float64, casting="same_kind", copy=False)
         assert image_data.shape[0] == 1  # Only one Stokes component
         image_data = image_data[0]
         head = hdu_list[0].header

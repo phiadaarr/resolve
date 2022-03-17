@@ -14,15 +14,15 @@
 # Copyright(C) 2021-2022 Max-Planck-Society, Philipp Arras
 # Author: Philipp Arras
 
+from time import time
+
 import nifty8 as ift
+import numpy as np
 import pytest
 
 import resolve as rve
 
-from .common import list2fixture
-import numpy as np
-
-from time import time
+from .common import list2fixture, operator_equality, setup_function, teardown_function
 
 pmp = pytest.mark.parametrize
 
@@ -70,24 +70,6 @@ def test_polarization(pol):
         ift.extra.check_operator(op_jax, pos, ntries=5)
     except ImportError:
         pass
-
-
-def operator_equality(op0, op1, ntries=20):
-    dom = op0.domain
-    assert op0.domain == op1.domain
-    assert op0.target == op1.target
-    for ii in range(ntries):
-        loc = ift.from_random(dom)
-        res0 = op0(loc)
-        res1 = op1(loc)
-        ift.extra.assert_allclose(res0, res1)
-
-        linloc = ift.Linearization.make_var(loc)
-        res0 = op0(linloc).jac(0.23*loc)
-        res1 = op1(linloc).jac(0.23*loc)
-        ift.extra.assert_allclose(res0, res1)
-    ift.extra.check_operator(op0, loc, ntries=ntries)
-    ift.extra.check_operator(op1, loc, ntries=ntries)
 
 
 def test_polarization_matrix_exponential():

@@ -1,5 +1,18 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 # Copyright(C) 2021 Max-Planck-Society
+# Copyright(C) 2022 Max-Planck-Society, Philipp Arras
 # Author: Philipp Arras
 
 import os
@@ -12,18 +25,14 @@ import numpy as np
 
 from .data.ms_import import ms2observations
 from .data.observation import Observation
-from .global_config import set_double_precision, set_epsilon, set_wgridding
 from .mpi import master
 
 
 def parse_data_config(cfg):
-    set_epsilon(cfg["response"].getfloat("epsilon"))
-    set_wgridding(strtobool(cfg["response"]["wgridding"]))
-    set_double_precision(cfg["response"].getboolean("double precision"))
-
-    obs_calib_phase = _cfg_to_observations(cfg["data"]["phase calibrator"])
-    obs_calib_flux = _cfg_to_observations(cfg["data"]["flux calibrator"])
-    obs_science = _cfg_to_observations(cfg["data"]["science target"])
+    dprec = cfg["response"].getboolean("double precision")
+    obs_calib_phase = _cfg_to_observations(cfg["data"]["phase calibrator"], dprec)
+    obs_calib_flux = _cfg_to_observations(cfg["data"]["flux calibrator"], dprec)
+    obs_science = _cfg_to_observations(cfg["data"]["science target"], dprec)
 
     s = "number of randomly sampled rows"
     comm = ift.utilities.get_MPI_params()[0]
@@ -70,7 +79,6 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}, inspect_call
     sampling_iterations = f_int(cfg["sampling iteration limit"])
     res["n_samples"] = lambda ii: f_int(cfg["n samples"])[ii]
     res["sampling_iteration_controller"] = lambda ii: ift.AbsDeltaEnergyController(0.05, iteration_limit=sampling_iterations[ii], convergence_level=3, name="Sampling")
-    res["output_directory"] = os.path.expanduser(cfg["output folder"])
 
 
     def optimizer(ii):
@@ -114,10 +122,6 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}, inspect_call
         # /Reset parts of the latent space
 
     res["inspect_callback"] = callback
-    terminate = cfg.getfloat("terminate")
-    if terminate is not None:
-        res["terminate_callback"] = lambda iglobal: iglobal == terminate
-
     constants_dct[None] = ift.MultiDomain.make({})
 
     pe_keys = _parse_cst(cfg["point estimates"], total_iterations, constants_dct)
@@ -125,7 +129,6 @@ def parse_optimize_kl_config(cfg, likelihood_dct, constants_dct={}, inspect_call
     cst_keys = _parse_cst(cfg["constants"], total_iterations, constants_dct)
     res["constants"] = lambda ii: cst_keys[ii]
 
-    res["resume"] = cfg.getboolean("resume")
     res["save_strategy"] = cfg.get("save strategy")
 
     return res
@@ -138,7 +141,7 @@ def _parse_cst(cfg, total_iterations, constants_dct):
     return tuple(cst_keys)
 
 
-def _cfg_to_observations(cfg):
+def _cfg_to_observations(cfg, double_precision):
     newcfg = []
     for cc in cfg.split(","):
         if len(cc) == 0:
@@ -173,6 +176,10 @@ def _cfg_to_observations(cfg):
             obs = obs[0]
         else:
             raise RuntimeError("Paths with ':' and ',' are not allowed")
+        if double_precision:
+            obs = obs.to_double_precision()
+        else:
+            obs = obs.to_single_precision()
         res.append(obs)
     return res
 

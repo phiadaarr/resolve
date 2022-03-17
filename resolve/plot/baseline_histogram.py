@@ -1,17 +1,30 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 # Copyright(C) 2021-2022 Max-Planck-Society
 # Author: Philipp Arras
 
 import os
+
+import matplotlib.pyplot as plt
+import nifty8 as ift
+import numpy as np
+from matplotlib.colors import LogNorm
+
 from ..constants import ARCMIN2RAD
 from ..data.observation import unique_antennas
 from ..ubik_tools.plot_sky_hdf5 import _optimal_subplot_distribution
-
-import nifty8 as ift
-import numpy as np
-
-import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
+from ..util import assert_sky_domain
 
 
 def baseline_histogram(file_name, vis, observation, bins, weight):
@@ -172,14 +185,21 @@ def scatter_vis(file_name, vis, observation, weight, lim):
     plt.close()
 
 
-def visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_directory, io):
-    from ..response_new import InterferometryResponse
+def visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_directory, io,
+                                 do_wgridding, epsilon, nthreads=1):
+    from ..response import InterferometryResponse
+    from ..dirty_image import dirty_image
+    from .sky import plot_dirty
 
     sky_mean = sl.average(sky)
 
+    di0 = {"uniform": ift.full(sky_mean.domain, 0.), "natural": ift.full(sky_mean.domain, 0.)}
+    di1 = {"uniform": ift.full(sky_mean.domain, 0.), "natural": ift.full(sky_mean.domain, 0.)}
+
     for ii, oo in enumerate(obs_science):
         # data weights
-        model_vis = InterferometryResponse(oo, sky.target)(sky_mean)
+        R = InterferometryResponse(oo, sky.target, do_wgridding=do_wgridding, epsilon=epsilon, nthreads=nthreads)
+        model_vis = R(sky_mean)
         if io:
             dd = os.path.join(output_directory, f"normlized data residuals obs{ii} (data weights)")
             os.makedirs(dd, exist_ok=True)
@@ -194,21 +214,52 @@ def visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_
         # /data weights
 
         # learned weights
-        if weights is None:
-            continue
-        dd = os.path.join(output_directory, f"normlized data residuals obs{ii} (learned weights)")
-        weights_mean = sl.average(weights[ii])
-        if io:
-            os.makedirs(dd, exist_ok=True)
-            fname = os.path.join(dd, f"baseline_model_weights_iter{iglobal}_obs{ii}.png")
-            baseline_histogram(fname, model_vis-oo.vis, oo, 100, weights_mean)
+        if weights is not None:
+            dd = os.path.join(output_directory, f"normlized data residuals obs{ii} (learned weights)")
+            weights_mean = sl.average(weights[ii])
+            if io:
+                os.makedirs(dd, exist_ok=True)
+                fname = os.path.join(dd, f"baseline_model_weights_iter{iglobal}_obs{ii}.png")
+                baseline_histogram(fname, model_vis-oo.vis, oo, 100, weights_mean)
 
-            fname = os.path.join(dd, f"antenna_model_weights_iter{iglobal}_obs{ii}.png")
-            antenna_matrix(fname, model_vis-oo.vis, oo, weights_mean)
+                fname = os.path.join(dd, f"antenna_model_weights_iter{iglobal}_obs{ii}.png")
+                antenna_matrix(fname, model_vis-oo.vis, oo, weights_mean)
 
-            fname = os.path.join(dd, f"scatter_model_weights_iter{iglobal}_obs{ii}.png")
-            scatter_vis(fname, model_vis-oo.vis, oo, weights_mean, 10)
+                fname = os.path.join(dd, f"scatter_model_weights_iter{iglobal}_obs{ii}.png")
+                scatter_vis(fname, model_vis-oo.vis, oo, weights_mean, 10)
         # /learned weights
+
+
+        for method in ["uniform", "natural"]:
+            try:
+                di = dirty_image(oo, method, sky_mean.domain, do_wgridding, epsilon,
+                                 vis=model_vis-oo.vis, weight=oo.weight, nthreads=nthreads)
+            except ValueError:  # If the resolution is too small, the dirty image cannot be computed
+                continue
+            di0[method] = di0[method] + di
+
+        if weights is not None:
+            for method in ["uniform", "natural"]:
+                try:
+                    di = dirty_image(oo, method, sky_mean.domain, do_wgridding, epsilon,
+                                     vis=model_vis-oo.vis, weight=weights_mean, nthreads=nthreads)
+                except ValueError:  # If the resolution is too small, the dirty image cannot be computed
+                    continue
+                di1[method] = di1[method] + di
+
+    # Dirty images
+    if io:
+        dd = os.path.join(output_directory, f"dirty_images")
+        os.makedirs(dd, exist_ok=True)
+
+        for method in di0.keys():
+            fname = os.path.join(dd, f"dirty_image_{method}_data_weights_iter{iglobal}.pdf")
+            plot_dirty(di0[method], fname)
+        if weights is not None:
+            for method in di1.keys():
+                fname = os.path.join(dd, f"dirty_image_{method}_model_weights_iter{iglobal}.pdf")
+                plot_dirty(di1[method], fname)
+    # /Dirty images
 
 
 def _zero_to_nan(arr):

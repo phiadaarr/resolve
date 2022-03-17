@@ -1,4 +1,16 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 # Copyright(C) 2020-2021 Max-Planck-Society
 # Author: Philipp Arras
 
@@ -10,21 +22,19 @@ import pytest
 
 import resolve as rve
 
+from .common import setup_function, teardown_function
+
 pmp = pytest.mark.parametrize
 np.seterr(all="raise")
 
 direc = "/data/"
-nthreads = 1
-rve.set_nthreads(nthreads)
-rve.set_epsilon(1e-4)
-rve.set_wgridding(False)
 OBS = []
 for polmode in ["all", "stokesi", "stokesiavg"]:
-    OBS.append(
-        rve.ms2observations(
+    oo = rve.ms2observations(
             f"{direc}CYG-ALL-2052-2MHZ.ms", "DATA", True, 0, polarizations=polmode
         )[0]
-    )
+    # OBS.append(oo.to_single_precision())
+    OBS.append(oo.to_double_precision())
 npix, fov = 256, 1 * rve.DEG2RAD
 sdom = ift.RGSpace((npix, npix), (fov / npix, fov / npix))
 sky = ift.SimpleCorrelatedField(sdom, 21, (1, 0.1), (5, 1), (1.2, 0.4), (0.2, 0.2), (-2, 0.5)).exp()
@@ -94,8 +104,7 @@ def try_lh(obs, lh_class, *args):
 @pmp("obs", OBS)
 def test_imaging_likelihood(obs):
     obs = obs.restrict_to_stokesi()
-    op = rve.ImagingLikelihood(obs, sky)
-    try_lh(obs, rve.ImagingLikelihood, obs, sky)
+    try_lh(obs, rve.ImagingLikelihood, obs, sky, 1e-6, False)
 
 
 @pmp("obs", OBS)
@@ -104,7 +113,7 @@ def test_varcov_imaging_likelihood(obs):
     invcovop = (
         ift.InverseGammaOperator(obs.vis.domain, 1, var).reciprocal().ducktape("invcov")
     )
-    try_lh(obs, rve.ImagingLikelihood, obs, sky, invcovop)
+    try_lh(obs, rve.ImagingLikelihood, obs, sky, 1e-6, False, invcovop.log(), None)
 
 
 @pmp("obs", OBS)
@@ -125,7 +134,7 @@ def test_weighting_methods(obs, noisemodel):
     elif noisemodel == 1:  # Additive noise model
         var = rve.divide_where_possible(1, obs.weight)
         invcovop = (ift.Adder(var) @ correction ** 2).reciprocal()
-    try_lh(obs, rve.ImagingLikelihood, obs, sky, invcovop)
+    try_lh(obs, rve.ImagingLikelihood, obs, sky, 1e-6, False, invcovop, None)
 
 
 @pmp("time_mode", [True, False])
@@ -202,7 +211,8 @@ def test_calibration_likelihood(time_mode):
             model_visibilities = ift.full(oo.vis.domain, 1)
             op = rve.CalibrationLikelihood(oo, abc, model_visibilities)
         else:
-            op = rve.ImagingLikelihood(oo, sky, calibration_operator=abc)
+            op = rve.ImagingLikelihood(oo, sky, calibration_operator=abc, epsilon=1e-6,
+                                       do_wgridding=False)
         lh = op if lh is None else lh + op
     try_operator(lh)
 
@@ -255,37 +265,6 @@ def test_integrator_values():
     np.testing.assert_equal(out.val[0], a0.force(pos).val)
 
 
-def test_response_distributor():
-    dom = ift.UnstructuredDomain(2), ift.UnstructuredDomain(4)
-    op0 = ift.makeOp(ift.makeField(dom, np.arange(8).reshape(2, -1)))
-    op1 = ift.makeOp(ift.makeField(dom, 2 * np.arange(8).reshape(2, -1)))
-    op = rve.response.ResponseDistributor(ift.UnstructuredDomain(2), op0, op1)
-    ift.extra.check_linear_operator(op)
-
-
-@pmp("obs", OBS)
-@pmp("facets", FACETS)
-def test_single_response(obs, facets):
-    sdom = dom[-1]
-    mask = obs.mask.val
-    op = rve.SingleResponse(sdom, obs.uvw, obs.freq, mask[0], facets=facets)
-    ift.extra.check_linear_operator(op, np.float64, np.complex64,
-                                    only_r_linear=True, rtol=1e-6, atol=1e-6)
-
-
-def test_facet_consistency():
-    sdom = dom[-1]
-    obs = OBS[0]
-    res0 = None
-    pos = ift.from_random(sdom)
-    for facets in FACETS:
-        op = rve.SingleResponse(sdom, obs.uvw, obs.freq, obs.mask.val[0], facets=facets)
-        res = op(pos)
-        if res0 is None:
-            res0 = res
-        ift.extra.assert_allclose(res0, res, atol=1e-4, rtol=1e-4)
-
-
 @rve.onlymaster
 def fvalid():
     return 1.0
@@ -303,31 +282,7 @@ def test_randomonmaster():
         finvalid()
 
 
-def test_mf_response():
-    pdom, tdom, fdom, sdom = dom
-    ms = join(direc, "CYG-D-6680-64CH-10S.ms")
-    obs = rve.ms2observations(ms, "DATA", False, 0, "stokesiavg")[0]
-    R = rve.MfResponse(obs, fdom, sdom)
-    ift.extra.check_linear_operator(
-        R, rtol=1e-5, atol=1e-5, target_dtype=np.complex128, only_r_linear=True
-    )
-
-
 def test_intop():
     dom = ift.RGSpace((12, 12))
     op = rve.WienerIntegrations(freqdomain, dom)
     ift.extra.check_linear_operator(op)
-
-
-def test_global_config():
-    rve.set_double_precision(True)
-    assert rve.np_dtype() == rve.np_dtype(False) == np.float64
-    assert rve.np_dtype(True) == np.complex128
-
-    rve.set_double_precision(False)
-    assert rve.np_dtype() == rve.np_dtype(False) == np.float32
-    assert rve.np_dtype(True) == np.complex64
-
-    rve.set_double_precision(True)
-    assert rve.np_dtype() == rve.np_dtype(False) == np.float64
-    assert rve.np_dtype(True) == np.complex128

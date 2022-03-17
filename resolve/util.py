@@ -1,12 +1,24 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 # Copyright(C) 2020-2022 Max-Planck-Society, Philipp Arras
 # Author: Philipp Arras
 
-from time import time
 import cProfile
 import io
 import pstats
 from pstats import SortKey
+from time import time
 
 import matplotlib.pyplot as plt
 import nifty8 as ift
@@ -181,3 +193,32 @@ def _duplicate(lst, n):
     if len(lst) == 1:
         return n*lst
     raise RuntimeError
+
+
+def is_single_precision(dtype):
+    if isinstance(dtype, dict):
+        return any(is_single_precision(vv) for vv in dtype.values())
+    if dtype in [np.float32, np.complex64]:
+        return True
+    elif dtype in [np.float64, np.complex128]:
+        return False
+    raise TypeError(f"DType {dtype} is not a floating point dtype.")
+
+
+def dtype_float2complex(dt):
+    if dt == np.float64:
+        return np.complex128
+    if dt == np.float32:
+        return np.complex64
+    raise ValueError
+
+
+def dtype_complex2float(dt, force=False):
+    if dt == np.complex128:
+        return np.float64
+    if dt == np.complex64:
+        return np.float32
+    if force:
+        if dt in [np.float32, np.float64]:
+            return dt
+    raise ValueError
