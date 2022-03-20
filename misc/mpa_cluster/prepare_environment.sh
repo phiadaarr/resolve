@@ -8,6 +8,8 @@ module load python3
 mkdir -p $1
 cd $1
 
+echo "Install venv to $1"
+
 python3 -m venv venv$2
 source venv$2/bin/activate
 pip3 install matplotlib scipy python-casacore astropy h5py mpi4py pybind11
