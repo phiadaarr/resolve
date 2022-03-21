@@ -536,6 +536,14 @@ class Observation(BaseObservation):
         pol = self._polarization.restrict_to_stokes_i()
         return Observation(self._antpos, vis, wgt, pol, self._freq, self._auxiliary_tables)
 
+    def restrict_to_polarization(self, pol_label):
+        # FIXME Do I need to change something in self._auxiliary_tables?
+        ind = self.vis.domain[0].label2index(pol_label)
+        vis = self._vis[ind:ind+1]
+        wgt = self._weight[ind:ind+1]
+        pol = Polarization([9])  # FIXME!!!!
+        return Observation(self._antpos, vis, wgt, pol, self._freq, self._auxiliary_tables)
+
     def restrict_to_autocorrelations(self):
         slc = self._antpos.ant1 == self._antpos.ant2
         return self[slc]
