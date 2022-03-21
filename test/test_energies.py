@@ -20,7 +20,7 @@ import pytest
 
 import resolve as rve
 
-from .common import list2fixture, operator_equality, setup_function, teardown_function
+from .common import list2fixture, setup_function, teardown_function
 
 dtype = list2fixture([np.complex64, np.complex128, np.float32, np.float64])
 dtype = list2fixture([np.complex128, np.float64])
@@ -35,8 +35,8 @@ def test_gaussian_energy(dtype):
     icov = icov.exp()
     op1 = rve.DiagonalGaussianLikelihood(data=mean, inverse_covariance=icov, nthreads=1)
     op2 = rve.DiagonalGaussianLikelihood(data=mean, inverse_covariance=icov, nthreads=2)
-    operator_equality(op1.nifty_equivalent, op1, ntries=5, domain_dtype=dtype)
-    operator_equality(op2.nifty_equivalent, op2, ntries=5, domain_dtype=dtype)
+    rve.operator_equality(op1.nifty_equivalent, op1, ntries=5, domain_dtype=dtype)
+    rve.operator_equality(op2.nifty_equivalent, op2, ntries=5, domain_dtype=dtype)
 
 
 def test_varcov_gaussian_energy(dtype):
@@ -48,5 +48,5 @@ def test_varcov_gaussian_energy(dtype):
         "signal": dtype,
         "logicov": rve.dtype_complex2float(dtype, force=True),
     }
-    operator_equality(op1.nifty_equivalent, op1, ntries=5, domain_dtype=dt)
-    operator_equality(op2.nifty_equivalent, op2, ntries=5, domain_dtype=dt)
+    rve.operator_equality(op1.nifty_equivalent, op1, ntries=5, domain_dtype=dt)
+    rve.operator_equality(op2.nifty_equivalent, op2, ntries=5, domain_dtype=dt)

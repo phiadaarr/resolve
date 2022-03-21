@@ -222,3 +222,37 @@ def dtype_complex2float(dt, force=False):
         if dt in [np.float32, np.float64]:
             return dt
     raise ValueError
+
+
+def operator_equality(op0, op1, ntries=20, domain_dtype=np.float64):
+    dom = op0.domain
+    assert op0.domain == op1.domain
+    assert op0.target == op1.target
+    rtol = 1e-5 if is_single_precision(domain_dtype) else 1e-11
+    for ii in range(ntries):
+        loc = ift.from_random(dom, dtype=domain_dtype)
+        res0 = op0(loc)
+        res1 = op1(loc)
+        print("Test value...")
+        ift.extra.assert_allclose(res0, res1, rtol=rtol)
+        print("Done")
+
+        linloc = ift.Linearization.make_var(loc, want_metric=True)
+        res0 = op0(linloc)
+        res1 = op1(linloc)
+        print("Test jac...")
+        ift.extra.assert_allclose(res0.jac(0.23*loc), res1.jac(0.23*loc), rtol=rtol)
+        print("Done")
+        if res0.metric is not None:
+            print("Test metric...")
+            ift.extra.assert_allclose(res0.metric(loc), res1.metric(loc), rtol=rtol)
+            print("Done")
+
+        tgtloc = res0.jac(0.23*loc)*0+1
+        print("Test jac.adjoint...")
+        res0 = op0(linloc).jac.adjoint(tgtloc)
+        res1 = op1(linloc).jac.adjoint(tgtloc)
+        ift.extra.assert_allclose(res0, res1, rtol=rtol)
+        print("Done")
+    ift.extra.check_operator(op0, loc, ntries=ntries, tol=rtol)
+    ift.extra.check_operator(op1, loc, ntries=ntries, tol=rtol)
