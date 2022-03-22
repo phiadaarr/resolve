@@ -69,7 +69,8 @@ def test_calibration_distributor():
     args = ant1, ant2, time, tdom, pdom, fdom, key_phase, key_logampl, antenna_dct, nthreads
 
     idop = ift.Operator.identity_operator((pdom, ift.UnstructuredDomain(len(antenna_dct)), tdom, fdom))
-    op0 = rve.calibration_distribution(obs, idop.ducktape(key_phase), idop.ducktape(key_logampl), antenna_dct)  # reference operator
+    op0 = rve.calibration_distribution(obs, idop.ducktape(key_phase), idop.ducktape(key_logampl), antenna_dct, numpy=True)  # reference operator
+    op1 = rve.calibration_distribution(obs, idop.ducktape(key_phase), idop.ducktape(key_logampl), antenna_dct)
     op = my_operator(*args)
 
     rve.operator_equality(op0, op)

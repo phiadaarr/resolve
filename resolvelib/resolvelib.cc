@@ -576,7 +576,6 @@ public:
   }
 };
 
-#include <iostream>
 class CalibrationDistributor {
 private:
   const py::str key_logamplitude;
