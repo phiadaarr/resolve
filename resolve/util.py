@@ -224,27 +224,48 @@ def dtype_complex2float(dt, force=False):
     raise ValueError
 
 
-def operator_equality(op0, op1, ntries=20, domain_dtype=np.float64):
+def operator_equality(op0, op1, ntries=20, domain_dtype=np.float64, rtol=None, atol=0):
     dom = op0.domain
-    assert op0.domain == op1.domain
-    assert op0.target == op1.target
-    rtol = 1e-5 if is_single_precision(domain_dtype) else 1e-11
+    if op0.domain != op1.domain:
+        raise TypeError(f"Domains are incompatible.\n{op0.domain}\n\n{op1.domain}")
+    if op0.target != op1.target:
+        raise TypeError(f"Target domains are incompatible.\n{op0.target}\n\n{op1.target}")
+    if rtol is None:
+        rtol = 1e-5 if is_single_precision(domain_dtype) else 1e-11
     for ii in range(ntries):
         loc = ift.from_random(dom, dtype=domain_dtype)
         res0 = op0(loc)
         res1 = op1(loc)
-        ift.extra.assert_allclose(res0, res1, rtol=rtol)
+        ift.extra.assert_allclose(res0, res1, rtol=rtol, atol=atol)
 
         linloc = ift.Linearization.make_var(loc, want_metric=True)
         res0 = op0(linloc)
         res1 = op1(linloc)
-        ift.extra.assert_allclose(res0.jac(0.23*loc), res1.jac(0.23*loc), rtol=rtol)
+        ift.extra.assert_allclose(res0.jac(0.23*loc), res1.jac(0.23*loc), rtol=rtol, atol=atol)
         if res0.metric is not None:
-            ift.extra.assert_allclose(res0.metric(loc), res1.metric(loc), rtol=rtol)
+            ift.extra.assert_allclose(res0.metric(loc), res1.metric(loc), rtol=rtol, atol=atol)
 
         tgtloc = res0.jac(0.23*loc)
         res0 = op0(linloc).jac.adjoint(tgtloc)
         res1 = op1(linloc).jac.adjoint(tgtloc)
-        ift.extra.assert_allclose(res0, res1, rtol=rtol)
+        ift.extra.assert_allclose(res0, res1, rtol=rtol, atol=atol)
     ift.extra.check_operator(op0, loc, ntries=ntries, tol=rtol)
     ift.extra.check_operator(op1, loc, ntries=ntries, tol=rtol)
+
+
+def replace_array_with_dict(arr, dct):
+    """Replace all values in an array with the help of a dictionary
+
+    Parameters
+    ----------
+    arr : np.ndarray
+        Array that 
+    dct : dict
+        Dictionary that is used for translation.
+    """
+    k = np.array(list(dct.keys()))
+    v = np.array(list(dct.values()))
+    sort = k.argsort()
+    k = k[sort]
+    v = v[sort]
+    return v[np.searchsorted(k, arr)]
