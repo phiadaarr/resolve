@@ -52,9 +52,11 @@ def calibration_distribution(
     ant1 = replace_array_with_dict(observation.ant1, antenna_dct).astype(np.int32)
     ant2 = replace_array_with_dict(observation.ant2, antenna_dct).astype(np.int32)
     nants = len(set(ant1).union(set(ant2)))
-    domain = {"ph": phase_operator.target, "logampl": logamplitude_operator.target}
+    calibration_solutions = phase_operator.ducktape_left("ph") + logamplitude_operator.ducktape_left("logampl")
+    domain = calibration_solutions.target
     pdom, antdom, tdom, fdom = phase_operator.target
-    return Pybind11Operator(
+    target_fdom = observation.vis.domain[2]
+    distributor = Pybind11Operator(
         domain,
         target,
         resolvelib.CalibrationDistributor(
@@ -63,12 +65,13 @@ def calibration_distribution(
             observation.time,
             "logampl",
             "ph",
-            fdom.size,
+            target_fdom.size,
             tdom.size,
             tdom.distances[0],
             nthreads,
         ),
     )
+    return distributor @ calibration_solutions
 
 
 class CalibrationDistributor(ift.LinearOperator):
