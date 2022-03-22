@@ -237,7 +237,6 @@ def operator_equality(op0, op1, ntries=20, domain_dtype=np.float64, rtol=None, a
         res0 = op0(loc)
         res1 = op1(loc)
         ift.extra.assert_allclose(res0, res1, rtol=rtol, atol=atol)
-        print("Operator application done")
 
         linloc = ift.Linearization.make_var(loc, want_metric=True)
         res0 = op0(linloc)

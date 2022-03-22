@@ -590,6 +590,8 @@ private:
   const size_t ntime;
   const double dt;
 
+  size_t nthreads;
+
   size_t nrows() const {
     return ducc0::to_cmav<int, 1>(antenna_indices0).shape()[0];
   } // FIXME Use unsigned for indices
@@ -600,11 +602,11 @@ public:
                          const py::array &time_,
                          const py::str &key_logamplitude_,
                          const py::str &key_phase_, size_t nfreqs_,
-                         size_t ntime_, double dt_)
+                         size_t ntime_, double dt_, size_t nthreads_)
       : key_logamplitude(key_logamplitude_), key_phase(key_phase_),
         antenna_indices0(antenna_indices0_),
         antenna_indices1(antenna_indices1_), time(time_), nfreqs(nfreqs_),
-        ntime(ntime_), dt(dt_) {}
+        ntime(ntime_), dt(dt_), nthreads(nthreads_) {}
 
   py::array apply(const py::dict &inp_) const {
     // Parse input
@@ -622,26 +624,32 @@ public:
     const auto a1 = ducc0::to_cmav<int, 1>(antenna_indices1);
     const auto t = ducc0::to_cmav<double, 1>(time);
     for (size_t i0 = 0; i0 < out.shape()[0]; ++i0)
-      for (size_t i1 = 0; i1 < out.shape()[1]; ++i1)
-        for (size_t i2 = 0; i2 < out.shape()[2]; ++i2) {
-          const double frac{t(i1) / dt};
-          const auto tind0 = size_t(floor(frac));
-          const size_t tind1{tind0 + 1};
-          MR_assert(tind0 < ntime, "time outside region");
-          MR_assert(tind1 < ntime, "time outside region");
+      ducc0::execParallel(out.shape()[1], nthreads, [&](size_t lo, size_t hi) {
+        for (size_t i1 = lo; i1 < hi; ++i1)
+          for (size_t i2 = 0; i2 < out.shape()[2]; ++i2) {
+            const double frac{t(i1) / dt};
+            const auto tind0 = size_t(floor(frac));
+            const size_t tind1{tind0 + 1};
+            MR_assert(tind0 < ntime, "time outside region");
+            MR_assert(tind1 < ntime, "time outside region");
 
-          const auto getloggain = [&](const size_t tindex) {
-            const auto loggain = complex<double>( logampl(i0, a0(i1), tindex, i2) + logampl(i0, a1(i1), tindex, i2), ph(i0, a0(i1), tindex, i2) - ph(i0, a1(i1), tindex, i2));
-            return loggain;
-          };
-          const auto diff{frac - double(tind0)};
-          const auto loggain{(1 - diff) * getloggain(tind0) + diff * getloggain(tind1)};
-          const auto gain{exp(loggain)};
-          out(i0, i1, i2) = gain;
-        }
+            const auto getloggain = [&](const size_t tindex) {
+              const auto loggain = complex<double>(
+                  logampl(i0, a0(i1), tindex, i2) +
+                      logampl(i0, a1(i1), tindex, i2),
+                  ph(i0, a0(i1), tindex, i2) - ph(i0, a1(i1), tindex, i2));
+              return loggain;
+            };
+            const auto diff{frac - double(tind0)};
+            const auto loggain{(1 - diff) * getloggain(tind0) +
+                               diff * getloggain(tind1)};
+            const auto gain{exp(loggain)};
+            out(i0, i1, i2) = gain;
+          }
+      });
+
     return out_;
   }
-
 
   Linearization<py::dict, py::array> apply_with_jac(const py::dict &loc_) {
     // Parse input
@@ -673,33 +681,36 @@ public:
       // /Instantiate output array
 
       for (size_t i0 = 0; i0 < out.shape()[0]; ++i0)
-        for (size_t i1 = 0; i1 < out.shape()[1]; ++i1)
-          for (size_t i2 = 0; i2 < out.shape()[2]; ++i2) {
+        ducc0::execParallel(
+            out.shape()[1], nthreads, [&](size_t lo, size_t hi) {
+              for (size_t i1 = lo; i1 < hi; ++i1)
+                for (size_t i2 = 0; i2 < out.shape()[2]; ++i2) {
 
-            const double frac{t(i1) / dt};
-            const auto tind0 = size_t(floor(frac));
-            const size_t tind1{tind0 + 1};
-            MR_assert(t(i1) >= 0, "time outside region");
-            MR_assert(tind0 < ntime, "time outside region");
-            MR_assert(tind1 < ntime, "time outside region");
+                  const double frac{t(i1) / dt};
+                  const auto tind0 = size_t(floor(frac));
+                  const size_t tind1{tind0 + 1};
+                  MR_assert(t(i1) >= 0, "time outside region");
+                  MR_assert(tind0 < ntime, "time outside region");
+                  MR_assert(tind1 < ntime, "time outside region");
 
+                  auto gettmp = [&](const size_t tindex) {
+                    return applied(i0, i1, i2) *
+                           (inp_logampl(i0, a0(i1), tindex, i2) +
+                            inp_logampl(i0, a1(i1), tindex, i2) +
+                            complex<double>{0, 1} *
+                                (inp_ph(i0, a0(i1), tindex, i2) -
+                                 inp_ph(i0, a1(i1), tindex, i2)));
+                  };
 
-          auto gettmp = [&](const size_t tindex) {
-                return applied(i0, i1, i2) *
-                (inp_logampl(i0, a0(i1), tindex, i2) +
-                 inp_logampl(i0, a1(i1), tindex, i2) +
-                 complex<double>{0, 1} * (inp_ph(i0, a0(i1), tindex, i2) -
-                                          inp_ph(i0, a1(i1), tindex, i2)));
-          };
+                  const complex<double> tmp0{gettmp(tind0)};
+                  const complex<double> tmp1{gettmp(tind1)};
 
-            const complex<double> tmp0{gettmp(tind0)};
-            const complex<double> tmp1{gettmp(tind1)};
+                  auto diff{frac - double(tind0)};
+                  auto tmp{(1 - diff) * tmp0 + diff * tmp1};
 
-            auto diff{frac - double(tind0)};
-            auto tmp{(1 - diff) * tmp0 + diff * tmp1};
-
-            out(i0, i1, i2) = tmp;
-          }
+                  out(i0, i1, i2) = tmp;
+                }
+            });
       return out_;
     };
 
@@ -717,33 +728,35 @@ public:
           auto logph{ducc0::to_vmav<double, 4>(out_[key_phase])};
           ducc0::mav_apply([](double &inp) { inp = 0; }, 1, logampl);
           ducc0::mav_apply([](double &inp) { inp = 0; }, 1, logph);
-                                  
 
           for (size_t i0 = 0; i0 < inp.shape()[0]; ++i0)
-            for (size_t i1 = 0; i1 < inp.shape()[1]; ++i1)
-              for (size_t i2 = 0; i2 < inp.shape()[2]; ++i2) {
+            ducc0::execParallel(
+                inp.shape()[1], nthreads, [&](size_t lo, size_t hi) {
+                  for (size_t i1 = lo; i1 < hi; ++i1)
+                    for (size_t i2 = 0; i2 < inp.shape()[2]; ++i2) {
+                      const double frac{t(i1) / dt};
+                      const auto tind0 = size_t(floor(frac));
+                      const size_t tind1{tind0 + 1};
+                      MR_assert(tind0 < ntime, "time outside region");
+                      MR_assert(tind1 < ntime, "time outside region");
 
-                const double frac{t(i1) / dt};
-                const auto tind0 = size_t(floor(frac));
-                const size_t tind1{tind0 + 1};
-                MR_assert(tind0 < ntime, "time outside region");
-                MR_assert(tind1 < ntime, "time outside region");
+                      auto diff{frac - double(tind0)};
 
-                auto diff{frac - double(tind0)};
+                      const auto tmp{conj(applied(i0, i1, i2)) *
+                                     inp(i0, i1, i2)};
+                      const auto tmp0{(1 - diff) * tmp};
+                      const auto tmp1{diff * tmp};
 
-                const auto tmp{conj(applied(i0, i1, i2)) * inp(i0, i1, i2)};
-                const auto tmp0{(1 - diff) * tmp};
-                const auto tmp1{diff * tmp};
-
-                logampl(i0, a0(i1), tind0, i2) += real(tmp0);
-                logampl(i0, a1(i1), tind0, i2) += real(tmp0);
-                logph(i0, a0(i1), tind0, i2) += imag(tmp0);
-                logph(i0, a1(i1), tind0, i2) -= imag(tmp0);
-                logampl(i0, a0(i1), tind1, i2) += real(tmp1);
-                logampl(i0, a1(i1), tind1, i2) += real(tmp1);
-                logph(i0, a0(i1), tind1, i2) += imag(tmp1);
-                logph(i0, a1(i1), tind1, i2) -= imag(tmp1);
-              }
+                      logampl(i0, a0(i1), tind0, i2) += real(tmp0);
+                      logampl(i0, a1(i1), tind0, i2) += real(tmp0);
+                      logph(i0, a0(i1), tind0, i2) += imag(tmp0);
+                      logph(i0, a1(i1), tind0, i2) -= imag(tmp0);
+                      logampl(i0, a0(i1), tind1, i2) += real(tmp1);
+                      logampl(i0, a1(i1), tind1, i2) += real(tmp1);
+                      logph(i0, a0(i1), tind1, i2) += imag(tmp1);
+                      logph(i0, a1(i1), tind1, i2) -= imag(tmp1);
+                    }
+                });
           return out_;
         };
 
@@ -836,7 +849,7 @@ PYBIND11_MODULE(resolvelib, m) {
 
   py::class_<CalibrationDistributor>(m, "CalibrationDistributor")
       .def(py::init<py::array, py::array, py::array, py::str, py::str, size_t,
-                    size_t, double>())
+                    size_t, double, size_t>())
       .def("apply", &CalibrationDistributor::apply)
       .def("apply_with_jac", &CalibrationDistributor::apply_with_jac);
 

@@ -5,7 +5,7 @@ import resolvelib
 import nifty8 as ift
 
 
-def my_operator(ant1, ant2, time, tdom, pdom, fdom, key_phase, key_logampl, antenna_dct):
+def my_operator(ant1, ant2, time, tdom, pdom, fdom, key_phase, key_logampl, antenna_dct, nthreads):
     target = pdom, ift.UnstructuredDomain(len(ant1)), fdom
     ant1 = rve.replace_array_with_dict(ant1, antenna_dct)
     ant2 = rve.replace_array_with_dict(ant2, antenna_dct)
@@ -16,14 +16,14 @@ def my_operator(ant1, ant2, time, tdom, pdom, fdom, key_phase, key_logampl, ante
             dom,
         target,
         resolvelib.CalibrationDistributor(
-            ant1.astype(np.int32), ant2.astype(np.int32), time, key_logampl, key_phase, fdom.size, tdom.size, tdom.distances[0]
+            ant1.astype(np.int32), ant2.astype(np.int32), time, key_logampl, key_phase, fdom.size, tdom.size, tdom.distances[0], nthreads
         ),
     )
 
 def test_calibration_distributor():
     nt = 10
 
-    if True:
+    if False:
         obs = next(rve.ms2observations_all("~/data/CYG-ALL-2052-2MHZ.ms", "DATA"))
         obs = next(rve.ms2observations_all("~/data/meerkat-calibration/msdir/ms1_primary_subset.ms", "DATA"))
         tmin, tmax = rve.tmin_tmax(obs)
@@ -64,16 +64,12 @@ def test_calibration_distributor():
 
     antenna_dct = {aa: ii for ii, aa in enumerate(rve.unique_antennas(obs))}
 
-    args = ant1, ant2, time, tdom, pdom, fdom, key_phase, key_logampl, antenna_dct
+
+    nthreads = 1
+    args = ant1, ant2, time, tdom, pdom, fdom, key_phase, key_logampl, antenna_dct, nthreads
 
     idop = ift.Operator.identity_operator((pdom, ift.UnstructuredDomain(len(antenna_dct)), tdom, fdom))
     op0 = rve.calibration_distribution(obs, idop.ducktape(key_phase), idop.ducktape(key_logampl), antenna_dct)  # reference operator
     op = my_operator(*args)
 
-    print("Original")
-    ift.exec_time(op0)
-    print("New")
-    ift.exec_time(op)
-    return
-
-    rve.operator_equality(op0, op, rtol=1e-5, atol=1e-5)
+    rve.operator_equality(op0, op)
