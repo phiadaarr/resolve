@@ -619,10 +619,8 @@ public:
     MR_assert(out.shape()[0] == 1);
     for (size_t i1 = 0; i1 < out.shape()[1]; ++i1)
       for (size_t i2 = 0; i2 < out.shape()[2]; ++i2) {
-        double re{logampl(a0(i1), t(i1), i2) + logampl(a1(i1), t(i1), i2)};
-        double im{ph(a0(i1), t(i1), i2) - ph(a1(i1), t(i1), i2)};
-        complex<double> tmp{exp(complex<double>(re, im))};
-        out(0, i1, i2) = tmp;
+        out(0, i1, i2) = exp(complex<double>(logampl(a0(i1), t(i1), i2)+logampl(a1(i1), t(i1), i2),
+                                             ph(a0(i1), t(i1), i2)-ph(a1(i1), t(i1), i2)));
       }
     return out_;
   }
@@ -642,8 +640,6 @@ public:
     auto a0 = ducc0::to_cmav<int, 1>(antenna_indices0);
     auto a1 = ducc0::to_cmav<int, 1>(antenna_indices1);
     auto t = ducc0::to_cmav<int, 1>(time_indices);
-
-    const auto imagunit{complex<double>{0, 1}};  // FIXME
 
     function<py::array(const py::dict &)> ftimes =
         [=](const py::dict &inp_) {
@@ -665,7 +661,7 @@ public:
               const double term1{inp_logampl(a1(i1), t(i1), i2)};
               const double term2{inp_ph(a0(i1), t(i1), i2)};
               const double term3{inp_ph(a1(i1), t(i1), i2)};
-              out(0, i1, i2) = applied(0, i1, i2)*(term0+term1+imagunit*(term2-term3));
+              out(0, i1, i2) = applied(0, i1, i2)*(term0+term1+complex<double>{0, 1}*(term2-term3));
             }
           return out_;
         };
@@ -682,17 +678,18 @@ public:
           out_[key_phase] = ducc0::make_Pyarr<double>(inp_shape);
           auto logampl{ducc0::to_vmav<double, 3>(out_[key_logamplitude])};
           auto logph{ducc0::to_vmav<double, 3>(out_[key_phase])};
+          ducc0::mav_apply([](double &inp){inp=0;}, 1, logampl);  // FIXME @mtr??
+          ducc0::mav_apply([](double &inp){inp=0;}, 1, logph);  // FIXME @mtr??
           // /Instantiate output
 
           MR_assert(inp.shape()[0] == 1);
           for (size_t i1 = 0; i1 < inp.shape()[1]; ++i1)
             for (size_t i2 = 0; i2 < inp.shape()[2]; ++i2) {
-              const auto myinp {inp(0, i1, i2)};
-              // FIXME This is not correct yet
-              logampl(a0(i1), t(i1), i2) += real(myinp* applied(0, i1, i2)) ;
-              logampl(a1(i1), t(i1), i2) += real(myinp* applied(0, i1, i2));
-              logph(a0(i1), t(i1), i2) += imag(imagunit* myinp*applied(0, i1, i2));
-              logph(a1(i1), t(i1), i2) += imag(-1.*imagunit * myinp*applied(0, i1, i2));
+              const auto tmp {conj(applied(0, i1, i2))*inp(0, i1, i2)};
+              logampl(a0(i1), t(i1), i2) += real(tmp);
+              logampl(a1(i1), t(i1), i2) += real(tmp);
+              logph(a0(i1), t(i1), i2) += imag(tmp);
+              logph(a1(i1), t(i1), i2) -= imag(tmp);
             }
           return out_;
         };
