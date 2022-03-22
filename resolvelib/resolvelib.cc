@@ -680,21 +680,21 @@ public:
             const double frac{t(i1) / dt};
             const auto tind0 = size_t(floor(frac));
             const size_t tind1{tind0 + 1};
-            MR_assert(tind0 >= 0 && tind0 < ntime, "time outside region");
-            MR_assert(tind0 >= 0 && tind1 < ntime, "time outside region");
+            MR_assert(t(i1) >= 0, "time outside region");
+            MR_assert(tind0 < ntime, "time outside region");
+            MR_assert(tind1 < ntime, "time outside region");
 
-            const complex<double> tmp0{
-                applied(i0, i1, i2) *
-                (inp_logampl(i0, a0(i1), tind0, i2) +
-                 inp_logampl(i0, a1(i1), tind0, i2) +
-                 complex<double>{0, 1} * (inp_ph(i0, a0(i1), tind0, i2) -
-                                          inp_ph(i0, a1(i1), tind0, i2)))};
-            const complex<double> tmp1{
-                applied(i0, i1, i2) *
-                (inp_logampl(i0, a0(i1), tind1, i2) +
-                 inp_logampl(i0, a1(i1), tind1, i2) +
-                 complex<double>{0, 1} * (inp_ph(i0, a0(i1), tind1, i2) -
-                                          inp_ph(i0, a1(i1), tind1, i2)))};
+
+          auto gettmp = [&](const size_t tindex) {
+                return applied(i0, i1, i2) *
+                (inp_logampl(i0, a0(i1), tindex, i2) +
+                 inp_logampl(i0, a1(i1), tindex, i2) +
+                 complex<double>{0, 1} * (inp_ph(i0, a0(i1), tindex, i2) -
+                                          inp_ph(i0, a1(i1), tindex, i2)));
+          };
+
+            const complex<double> tmp0{gettmp(tind0)};
+            const complex<double> tmp1{gettmp(tind1)};
 
             auto diff{frac - double(tind0)};
             auto tmp{(1 - diff) * tmp0 + diff * tmp1};
