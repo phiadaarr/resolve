@@ -576,8 +576,7 @@ public:
   }
 };
 
-#include <iostream>
-class CalibrationHelper {
+class CalibrationDistributor {
 private:
   const py::str key_logamplitude;
   const py::str key_phase;
@@ -588,19 +587,20 @@ private:
 
   const size_t nfreqs;
 
-  size_t nrows() const{return ducc0::to_cmav<int, 1>(antenna_indices0).shape()[0];} // FIXME Use unsigned for indices
+  size_t nrows() const {
+    return ducc0::to_cmav<int, 1>(antenna_indices0).shape()[0];
+  } // FIXME Use unsigned for indices
 
 public:
-  CalibrationHelper(const py::array &antenna_indices0_,
-                    const py::array &antenna_indices1_,
-                    const py::array &time_indices_,
-                    const py::str &key_logamplitude_, const py::str &key_phase_,
-                    size_t nfreqs_)
+  CalibrationDistributor(const py::array &antenna_indices0_,
+                         const py::array &antenna_indices1_,
+                         const py::array &time_indices_,
+                         const py::str &key_logamplitude_,
+                         const py::str &key_phase_, size_t nfreqs_)
       : key_logamplitude(key_logamplitude_), key_phase(key_phase_),
         antenna_indices0(antenna_indices0_),
         antenna_indices1(antenna_indices1_), time_indices(time_indices_),
         nfreqs(nfreqs_) {}
-
 
   py::array apply(const py::dict &inp_) const {
     // Parse input
@@ -619,8 +619,10 @@ public:
     MR_assert(out.shape()[0] == 1);
     for (size_t i1 = 0; i1 < out.shape()[1]; ++i1)
       for (size_t i2 = 0; i2 < out.shape()[2]; ++i2) {
-        out(0, i1, i2) = exp(complex<double>(logampl(a0(i1), t(i1), i2)+logampl(a1(i1), t(i1), i2),
-                                             ph(a0(i1), t(i1), i2)-ph(a1(i1), t(i1), i2)));
+        complex<double> tmp{exp(complex<double>(
+            logampl(a0(i1), t(i1), i2) + logampl(a1(i1), t(i1), i2),
+            ph(a0(i1), t(i1), i2) - ph(a1(i1), t(i1), i2)))};
+        out(0, i1, i2) = tmp;
       }
     return out_;
   }
@@ -641,30 +643,30 @@ public:
     auto a1 = ducc0::to_cmav<int, 1>(antenna_indices1);
     auto t = ducc0::to_cmav<int, 1>(time_indices);
 
-    function<py::array(const py::dict &)> ftimes =
-        [=](const py::dict &inp_) {
-          // Parse input
-          const auto inp_logampl =
-              ducc0::to_cmav<double, 3>(inp_[key_logamplitude]);
-          const auto inp_ph = ducc0::to_cmav<double, 3>(inp_[key_phase]);
-          // /Parse input
+    function<py::array(const py::dict &)> ftimes = [=](const py::dict &inp_) {
+      // Parse input
+      const auto inp_logampl =
+          ducc0::to_cmav<double, 3>(inp_[key_logamplitude]);
+      const auto inp_ph = ducc0::to_cmav<double, 3>(inp_[key_phase]);
+      // /Parse input
 
-          // Instantiate output array
-          auto out_ = ducc0::make_Pyarr<complex<double>>({1, nrows(), nfreqs});
-          auto out = ducc0::to_vmav<complex<double>, 3>(out_);
-          // /Instantiate output array
+      // Instantiate output array
+      auto out_ = ducc0::make_Pyarr<complex<double>>({1, nrows(), nfreqs});
+      auto out = ducc0::to_vmav<complex<double>, 3>(out_);
+      // /Instantiate output array
 
-          MR_assert(out.shape()[0] == 1);
-          for (size_t i1 = 0; i1 < out.shape()[1]; ++i1)
-            for (size_t i2 = 0; i2 < out.shape()[2]; ++i2) {
-              const double term0{inp_logampl(a0(i1), t(i1), i2)};
-              const double term1{inp_logampl(a1(i1), t(i1), i2)};
-              const double term2{inp_ph(a0(i1), t(i1), i2)};
-              const double term3{inp_ph(a1(i1), t(i1), i2)};
-              out(0, i1, i2) = applied(0, i1, i2)*(term0+term1+complex<double>{0, 1}*(term2-term3));
-            }
-          return out_;
-        };
+      MR_assert(out.shape()[0] == 1);
+      for (size_t i1 = 0; i1 < out.shape()[1]; ++i1)
+        for (size_t i2 = 0; i2 < out.shape()[2]; ++i2) {
+          const complex<double> tmp{
+              applied(0, i1, i2) *
+              (inp_logampl(a0(i1), t(i1), i2) + inp_logampl(a1(i1), t(i1), i2) +
+               complex<double>{0, 1} *
+                   (inp_ph(a0(i1), t(i1), i2) - inp_ph(a1(i1), t(i1), i2)))};
+          out(0, i1, i2) = tmp;
+        }
+      return out_;
+    };
 
     function<py::dict(const py::array &)> fadjtimes =
         [=](const py::array &inp_) {
@@ -678,14 +680,16 @@ public:
           out_[key_phase] = ducc0::make_Pyarr<double>(inp_shape);
           auto logampl{ducc0::to_vmav<double, 3>(out_[key_logamplitude])};
           auto logph{ducc0::to_vmav<double, 3>(out_[key_phase])};
-          ducc0::mav_apply([](double &inp){inp=0;}, 1, logampl);  // FIXME @mtr??
-          ducc0::mav_apply([](double &inp){inp=0;}, 1, logph);  // FIXME @mtr??
+          ducc0::mav_apply([](double &inp) { inp = 0; }, 1,
+                           logampl); // FIXME @mtr??
+          ducc0::mav_apply([](double &inp) { inp = 0; }, 1,
+                           logph); // FIXME @mtr??
           // /Instantiate output
 
           MR_assert(inp.shape()[0] == 1);
           for (size_t i1 = 0; i1 < inp.shape()[1]; ++i1)
             for (size_t i2 = 0; i2 < inp.shape()[2]; ++i2) {
-              const auto tmp {conj(applied(0, i1, i2))*inp(0, i1, i2)};
+              const auto tmp{conj(applied(0, i1, i2)) * inp(0, i1, i2)};
               logampl(a0(i1), t(i1), i2) += real(tmp);
               logampl(a1(i1), t(i1), i2) += real(tmp);
               logph(a0(i1), t(i1), i2) += imag(tmp);
@@ -781,11 +785,11 @@ PYBIND11_MODULE(resolvelib, m) {
            &VariableCovarianceDiagonalGaussianLikelihood<float,
                                                          true>::apply_with_jac);
 
-  py::class_<CalibrationHelper>(m, "CalibrationHelper")
+  py::class_<CalibrationDistributor>(m, "CalibrationDistributor")
       .def(
           py::init<py::array, py::array, py::array, py::str, py::str, size_t>())
-      .def("apply", &CalibrationHelper::apply)
-      .def("apply_with_jac", &CalibrationHelper::apply_with_jac);
+      .def("apply", &CalibrationDistributor::apply)
+      .def("apply_with_jac", &CalibrationDistributor::apply_with_jac);
 
   add_linearization<py::array, py::array>(m, "Linearization_field2field");
   add_linearization<py::array, py::dict>(m, "Linearization_field2mfield");
