@@ -618,31 +618,30 @@ public:
     auto out = ducc0::to_vmav<complex<double>, 3>(out_);
     // /Instantiate output array
 
-    auto a0 = ducc0::to_cmav<int, 1>(antenna_indices0);
-    auto a1 = ducc0::to_cmav<int, 1>(antenna_indices1);
-    auto t = ducc0::to_cmav<double, 1>(time);
+    const auto a0 = ducc0::to_cmav<int, 1>(antenna_indices0);
+    const auto a1 = ducc0::to_cmav<int, 1>(antenna_indices1);
+    const auto t = ducc0::to_cmav<double, 1>(time);
     for (size_t i0 = 0; i0 < out.shape()[0]; ++i0)
       for (size_t i1 = 0; i1 < out.shape()[1]; ++i1)
         for (size_t i2 = 0; i2 < out.shape()[2]; ++i2) {
           const double frac{t(i1) / dt};
           const auto tind0 = size_t(floor(frac));
           const size_t tind1{tind0 + 1};
-          MR_assert(tind0 >= 0 && tind0 < ntime, "time outside region");
-          MR_assert(tind0 >= 0 && tind1 < ntime, "time outside region");
+          MR_assert(tind0 < ntime, "time outside region");
+          MR_assert(tind1 < ntime, "time outside region");
 
-          auto gettmp = [&](const size_t tindex) {
-            complex<double> tmp0{exp(complex<double>(
-                logampl(i0, a0(i1), tindex, i2) +
-                    logampl(i0, a1(i1), tindex, i2),
-                ph(i0, a0(i1), tindex, i2) - ph(i0, a1(i1), tindex, i2)))};
-            return tmp0;
+          const auto getloggain = [&](const size_t tindex) {
+            const auto loggain = complex<double>( logampl(i0, a0(i1), tindex, i2) + logampl(i0, a1(i1), tindex, i2), ph(i0, a0(i1), tindex, i2) - ph(i0, a1(i1), tindex, i2));
+            return loggain;
           };
-          auto diff{frac - double(tind0)};
-          auto tmp{(1 - diff) * gettmp(tind0) + diff * gettmp(tind1)};
-          out(i0, i1, i2) = tmp;
+          const auto diff{frac - double(tind0)};
+          const auto loggain{(1 - diff) * getloggain(tind0) + diff * getloggain(tind1)};
+          const auto gain{exp(loggain)};
+          out(i0, i1, i2) = gain;
         }
     return out_;
   }
+
 
   Linearization<py::dict, py::array> apply_with_jac(const py::dict &loc_) {
     // Parse input
@@ -716,11 +715,9 @@ public:
           out_[key_phase] = ducc0::make_Pyarr<double>(inp_shape);
           auto logampl{ducc0::to_vmav<double, 4>(out_[key_logamplitude])};
           auto logph{ducc0::to_vmav<double, 4>(out_[key_phase])};
-          ducc0::mav_apply([](double &inp) { inp = 0; }, 1,
-                           logampl); // FIXME @mtr??
-          ducc0::mav_apply([](double &inp) { inp = 0; }, 1,
-                           logph); // FIXME @mtr??
-                                   // /Instantiate output
+          ducc0::mav_apply([](double &inp) { inp = 0; }, 1, logampl);
+          ducc0::mav_apply([](double &inp) { inp = 0; }, 1, logph);
+                                  
 
           for (size_t i0 = 0; i0 < inp.shape()[0]; ++i0)
             for (size_t i1 = 0; i1 < inp.shape()[1]; ++i1)
@@ -729,8 +726,8 @@ public:
                 const double frac{t(i1) / dt};
                 const auto tind0 = size_t(floor(frac));
                 const size_t tind1{tind0 + 1};
-                MR_assert(tind0 >= 0 && tind0 < ntime, "time outside region");
-                MR_assert(tind0 >= 0 && tind1 < ntime, "time outside region");
+                MR_assert(tind0 < ntime, "time outside region");
+                MR_assert(tind1 < ntime, "time outside region");
 
                 auto diff{frac - double(tind0)};
 
