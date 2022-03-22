@@ -24,31 +24,50 @@ def reference_operator(ant1, ant2, time, tdom, pdom, fdom, key_phase, key_logamp
 def my_operator(ant1, ant2, time, tdom, pdom, fdom, key_phase, key_logampl):
     nants = len(set(ant1).union(set(ant2)))
     target = pdom, ift.UnstructuredDomain(len(ant1)), fdom
-    dom = ift.UnstructuredDomain(nants), tdom, fdom
+    dom = pdom, ift.UnstructuredDomain(nants), tdom, fdom
     dom = {kk: dom for kk in [key_phase, key_logampl]}
     return rve.Pybind11Operator(
             dom,
         target,
         resolvelib.CalibrationDistributor(
-            ant1, ant2, time, key_logampl, key_phase, fdom.size
+            ant1, ant2, time, key_logampl, key_phase, fdom.size, tdom.size, tdom.distances[0]
         ),
     )
 
 def test_calibration_distributor():
-    nfreq = 2
+    # obs = next(rve.ms2observations_all("~/data/CYG-ALL-2052-2MHZ.ms", "DATA"))
+    # obs = obs[:500]
+    # tmin, tmax = rve.tmin_tmax(obs)
+    # obs = obs.move_time(-tmin)
+    # tmin, tmax = rve.tmin_tmax(obs)
 
-    ant1 = np.array([0, 0, 0]).astype(np.int32)
-    ant2 = np.array([1, 2, 2]).astype(np.int32)
-    time = np.array([0, 0, 1]).astype(np.int32)
+    # ant1 = obs.ant1
+    # ant2 = obs.ant2
+    # time = obs.time
+
+    # pdom = obs.vis.domain[0]
+    # fdom = obs.vis.domain[2]
+
+    nt = 10
+    tmax = 2
+    tdom = ift.RGSpace(nt, tmax/nt*2)
 
     pdom = ift.UnstructuredDomain(1)
-    fdom = ift.UnstructuredDomain(nfreq)
-    tdom = ift.RGSpace(10, 0.2)
+    fdom = ift.UnstructuredDomain(1)
+    ant1 = np.array([0, 0, 1]).astype(np.int32)
+    ant2 = np.array([1, 2, 2]).astype(np.int32)
+    time = np.array([0.1, 1., 1.5])
 
     key_phase, key_logampl = "p", "a"
 
     args = ant1, ant2, time, tdom, pdom, fdom, key_phase, key_logampl
 
-    op0 = reference_operator(*args)
+    #op0 = reference_operator(*args)
     op = my_operator(*args)
+    loc = ift.from_random(op.domain)
+    loc = ift.full(op.domain, 1.)
+    print(op(loc))
+    return
+    ift.extra.check_operator(op, ift.from_random(op.domain), ntries=3)
+    return
     rve.operator_equality(op0, op)
