@@ -34,7 +34,7 @@ def calibration_distribution(
     numpy=False,
     nthreads=1,
 ):
-    if numpy:
+    if numpy or time_dct is not None:
         my_assert_isinstance(observation, Observation)
         my_assert_isinstance(phase_operator, logamplitude_operator, ift.Operator)
         dom = phase_operator.target
