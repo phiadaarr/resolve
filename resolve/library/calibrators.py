@@ -47,7 +47,7 @@ def calibrator_spectrum(nu, src):
                     0.11417312472848717, 9.069178705870204e-08]
     nu0 = 1.4e9
     w = nu/nu0
-    logw = np.log10(w)
+    logw = np.log(w)
     expon = reduce(add, [coeff*(logw**ii) for ii, coeff in enumerate(coefficients)])
     if isinstance(nu, np.ndarray):
         assert expon.shape == nu.shape
