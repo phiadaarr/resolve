@@ -269,3 +269,9 @@ def replace_array_with_dict(arr, dct):
     k = k[sort]
     v = v[sort]
     return v[np.searchsorted(k, arr)]
+
+
+def dict_inverse(dct):
+    vals = dct.values()
+    assert len(vals) == len(set(vals))
+    return {vv: kk for kk, vv in dct.items()}
