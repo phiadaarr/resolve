@@ -31,9 +31,25 @@ def test_cfm(total_N, prefix):
 
     dofdex = list(range(total_N))
     args0 = dict(prefix=prefix, total_N=total_N)
-    args1 = dict(target_subdomain=dom0, fluctuations=(1., 1.), flexibility=(2., 2), asperity=(0.1, 0.1), loglogavgslope=(-2, .1), prefix="dom0", dofdex=dofdex)
-    args2 = dict(target_subdomain=dom1, fluctuations=(2., 0.1), flexibility=(1., 2), asperity=(0.2, 0.1), loglogavgslope=(-3, .321), prefix="dom1", dofdex=dofdex)
-    args3 = dict(offset_mean=1.2, offset_std=(1., 0.2), dofdex=dofdex)
+    args1 = dict(
+        target_subdomain=dom0,
+        fluctuations=(1.0, 1.0),
+        flexibility=(2.0, 2),
+        asperity=(0.1, 0.1),
+        loglogavgslope=(-2, 0.1),
+        prefix="dom0",
+        dofdex=dofdex,
+    )
+    args2 = dict(
+        target_subdomain=dom1,
+        fluctuations=(2.0, 0.1),
+        flexibility=(1.0, 2),
+        asperity=(0.2, 0.1),
+        loglogavgslope=(-3, 0.321),
+        prefix="dom1",
+        dofdex=dofdex,
+    )
+    args3 = dict(offset_mean=1.2, offset_std=(1.0, 0.2), dofdex=dofdex)
     cfm = ift.CorrelatedFieldMaker(**args0)
     cfm.add_fluctuations(**args1)
     cfm.add_fluctuations(**args2)
@@ -46,4 +62,6 @@ def test_cfm(total_N, prefix):
     cfm.set_amplitude_total_offset(**args3)
     op1 = cfm.finalize()
 
+    op1(ift.from_random(op1.domain))
+    return
     rve.operator_equality(op0, op1)

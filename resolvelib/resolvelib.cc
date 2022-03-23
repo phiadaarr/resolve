@@ -19,11 +19,14 @@
 /* Copyright (C) 2021-2022 Max-Planck-Society, Philipp Arras
    Authors: Philipp Arras */
 
+#define QUICKCOMPILE
+
 // Includes related to pybind11
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
 #include "ducc0/bindings/pybind_utils.h"
+#include "ducc0/fft/fft.h"
 using namespace pybind11::literals;
 namespace py = pybind11;
 auto None = py::none();
@@ -88,6 +91,7 @@ void add_linearization_with_metric(py::module_ &msup, const char *name) {
       .def("apply_metric", &LinearizationWithMetric<Tin>::apply_metric);
 }
 
+#ifndef QUICKCOMPILE
 template <typename T, bool complex_mean,
           typename Tmean = conditional_t<complex_mean, complex<T>, T>,
           typename Tacc = long double,
@@ -762,8 +766,10 @@ public:
     return Linearization<py::dict, py::array>(applied_, ftimes, fadjtimes);
   }
 };
+#endif
 
 #include <iostream>
+//#include <pybind11/stl.h>
 class CfmCore {
 private:
   const py::list amplitude_keys;
@@ -772,31 +778,49 @@ private:
   size_t nthreads;
 
   using shape_t = vector<size_t>;
-  shape_t targetShape() const {
-    auto shp = shape_t{};
-    auto iter = py::iter(amplitude_keys);
-    while (iter != py::iterator::sentinel()){
-      py::print("got value ", *iter);
-      ++iter;
-    }
-    //for (auto kk: iter)
-      //shp.emplace_back(kk);
-    return shp;
+
+  ducc0::cfmav<int64_t>
+  pindex(const size_t &index) const { // FIXME @mtr is this type correct? This
+                                      // is at least what python gives me
+    return ducc0::to_cfmav<int64_t>(pindices[index]);
   }
 
 public:
-  CfmCore(const py::list &pindices_, const py::list &amplitude_keys_, const py::str &key_xi_, size_t nthreads_)
-      : amplitude_keys(amplitude_keys_), pindices(pindices_), key_xi(key_xi_), nthreads(nthreads_) {
-        cout << "Shape is " ;
-        for (auto x: targetShape()){cout << x << " " ;}
-        cout << endl;
-      }
+  CfmCore(const py::list &pindices_, const py::list &amplitude_keys_,
+          const py::str &key_xi_, size_t nthreads_)
+      : amplitude_keys(amplitude_keys_), pindices(pindices_), key_xi(key_xi_),
+        nthreads(nthreads_) {}
 
   py::array apply(const py::dict &inp_) const {
     const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
     auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
     auto out = ducc0::to_vfmav<double>(out_);
-    ducc0::mav_apply([](double &xx) { xx = 0; }, 1, out);
+    ducc0::mav_apply([](double &xx) { xx = 1; }, 1, out);
+
+    // Power distributor
+    size_t ndom{py::len(amplitude_keys)};
+    size_t currentDim{0};
+    for (size_t idom = 0; idom < ndom; ++idom) {
+      py::print("Work on space", idom, "Current dimension", currentDim);
+      auto pspec = ducc0::to_cfmav<double>(inp_[amplitude_keys[idom]]);
+      pindex(idom); // Relevant pindices
+      currentDim += pindex(idom).ndim();
+    }
+    // /Power distributor
+
+#ifndef QUICKCOMPILE
+    // THE FOLLOWING GIVES A SEGMENTATION FAULT
+
+    // FFT
+    shape_t axes(size_t(out.ndim() - 1));
+    for (size_t i = 1; i < out.size(); ++i)
+      axes[i - 1] = i;
+    double fct{1};
+    ducc0::r2r_genuine_hartley(out, out, axes, fct, nthreads);
+    // FIXME Volume factors
+    // /FFT
+#endif
+
     return out_;
   }
 
@@ -810,7 +834,8 @@ public:
   //   //auto applied = ducc0::to_cmav<complex<double>, 3>(applied_);
   //   //// /Instantiate output array
 
-  //   function<py::array(const py::dict &)> ftimes = [=](const py::dict &inp_) {
+  //   function<py::array(const py::dict &)> ftimes = [=](const py::dict &inp_)
+  //   {
   //   //  // Parse input
   //   //  const auto inp_logampl =
   //   //      ducc0::to_cmav<double, 4>(inp_[key_logamplitude]);
@@ -846,7 +871,10 @@ public:
 };
 
 PYBIND11_MODULE(resolvelib, m) {
+
   m.attr("__name__") = "resolvelib";
+
+#ifndef QUICKCOMPILE
   py::class_<PolarizationMatrixExponential<double, 1>>(
       m, "PolarizationMatrixExponential1")
       .def(py::init<size_t>())
@@ -933,11 +961,12 @@ PYBIND11_MODULE(resolvelib, m) {
                     size_t, double, size_t>())
       .def("apply", &CalibrationDistributor::apply)
       .def("apply_with_jac", &CalibrationDistributor::apply_with_jac);
+#endif
 
   py::class_<CfmCore>(m, "CfmCore")
       .def(py::init<py::list, py::list, py::str, size_t>())
       .def("apply", &CfmCore::apply);
-      //.def("apply_with_jac", &CfmCore::apply_with_jac);
+  //.def("apply_with_jac", &CfmCore::apply_with_jac);
 
   add_linearization<py::array, py::array>(m, "Linearization_field2field");
   add_linearization<py::array, py::dict>(m, "Linearization_field2mfield");
