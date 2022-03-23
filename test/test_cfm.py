@@ -23,11 +23,11 @@ import pytest
 pmp = pytest.mark.parametrize
 
 
-@pmp("total_N", [0, 1, 3])
+@pmp("total_N", [1, 3])
 @pmp("prefix", ["", "b"])
 def test_cfm(total_N, prefix):
     dom0 = ift.RGSpace(10)
-    dom1 = ift.RGSpace(10)
+    dom1 = ift.RGSpace([13, 4])
 
     dofdex = list(range(total_N))
     args0 = dict(prefix=prefix, total_N=total_N)

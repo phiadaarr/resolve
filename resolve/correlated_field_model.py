@@ -15,23 +15,93 @@
 # Copyright(C) 2022 Max-Planck-Society, Philipp Arras
 # Author: Philipp Arras
 
+from functools import reduce
+from operator import add, mul
+import nifty8 as ift
+import resolvelib
+import numpy as np
+from .cpp2py import Pybind11Operator
 
-class CorrelatedFieldMaker:
-    def __init__(self, prefix, total_N=0):
-        raise NotImplementedError
-    def add_fluctuations(self,
-                         target_subdomain,
-                         fluctuations,
-                         flexibility,
-                         asperity,
-                         loglogavgslope,
-                         prefix='',
-                         index=None,
-                         dofdex=None,
-                         harmonic_partner=None):
-        raise NotImplementedError
 
-    def set_amplitude_total_offset(self, offset_mean, offset_std, dofdex=None):
-        raise NotImplementedError
+class CorrelatedFieldMaker(ift.CorrelatedFieldMaker):
+    def __init__(self, prefix, total_N=1, nthreads=1):
+        if total_N <= 0:
+            raise ValueError("total_N must be > 0.")
+        self._nthreads = nthreads
+        super(CorrelatedFieldMaker, self).__init__(prefix, total_N)
+
     def finalize(self, prior_info=100):
-        raise NotImplementedError
+        n_amplitudes = len(self._a)
+        hspace = ift.makeDomain(
+            [ift.UnstructuredDomain(self._total_N)] +
+            [dd.target[-1].harmonic_partner for dd in self._a])
+        spaces = tuple(range(1, n_amplitudes + 1))
+        amp_space = 1
+
+        a = list(self.get_normalized_amplitudes())
+        pspaces = [aa.target for aa in a]
+        power_keys = [str(ii) for ii in range(len(a))]
+
+        core = CfmCore(pspaces, power_keys, self._prefix + 'xi', self._total_N, self._target_subdomains, self._offset_mean, self.azm, self._nthreads)
+
+        from .util import operator_equality
+        operator_equality(core, core.nifty_equivalent)
+        print("SUCCESS core same")
+
+        amplitudes = reduce(add, [aa.ducktape_left(kk) for kk, aa in zip(power_keys, self.get_normalized_amplitudes())])
+        op = core @ amplitudes
+
+        for dd in amplitudes.target.values():
+            print(dd[1])
+            print(dd[1].pindex)
+
+        self.statistics_summary(prior_info)
+        return op
+
+
+def CfmCore(pdomains, power_keys, excitation_field_key, total_N, target_subdomains, offset_mean, azm, nthreads=1):
+    hspace = ift.makeDomain(
+        [ift.UnstructuredDomain(total_N)] +
+        [dd[-1].harmonic_partner for dd in pdomains])
+    n_amplitudes = len(pdomains)
+    assert len(pdomains) == len(power_keys)
+    spaces = tuple(range(1, n_amplitudes + 1))
+    amp_space = 1
+
+    ht = ift.HarmonicTransformOperator(hspace,
+                                   target_subdomains[0][amp_space],
+                                   space=spaces[0])
+    for i in range(1, n_amplitudes):
+        ht = ift.HarmonicTransformOperator(ht.target,
+                                       target_subdomains[i][amp_space],
+                                       space=spaces[i]) @ ht
+    a = []
+    for ii in range(n_amplitudes):
+        co = ift.ContractionOperator(hspace, spaces[:ii] + spaces[ii + 1:])
+        pp = pdomains[ii][amp_space]
+        pd = ift.PowerDistributor(co.target, pp, amp_space)
+        a.append(co.adjoint @ pd @ ift.Operator.identity_operator(pd.domain).ducktape(power_keys[ii]))
+    corr = reduce(mul, a)
+    xi = ift.ducktape(hspace, None, excitation_field_key)
+    if np.isscalar(azm):
+        op = ht(corr * xi)
+    else:
+        expander = ift.ContractionOperator(hspace, spaces=spaces).adjoint
+        azm = expander @ azm
+        op = ht(azm * corr * xi)
+
+    if offset_mean is not None:
+        offset = offset_mean
+        # Deviations from this offset must not be considered here as they
+        # are learned by the zeromode
+        if isinstance(offset, (ift.Field, ift.MultiField)):
+            op = ift.Adder(offset) @ op
+        else:
+            offset = float(offset)
+            op = ift.Adder(ift.full(op.target, offset)) @ op
+
+    pindices = [pp[amp_space].pindex for pp in pdomains]
+
+    return Pybind11Operator(op.domain, op.target,
+                            resolvelib.CfmCore(pindices, power_keys, excitation_field_key, nthreads),
+                            nifty_equivalent=op)

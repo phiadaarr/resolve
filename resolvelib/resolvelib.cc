@@ -763,6 +763,88 @@ public:
   }
 };
 
+#include <iostream>
+class CfmCore {
+private:
+  const py::list amplitude_keys;
+  const py::list pindices;
+  const py::str key_xi;
+  size_t nthreads;
+
+  using shape_t = vector<size_t>;
+  shape_t targetShape() const {
+    auto shp = shape_t{};
+    auto iter = py::iter(amplitude_keys);
+    while (iter != py::iterator::sentinel()){
+      py::print("got value ", *iter);
+      ++iter;
+    }
+    //for (auto kk: iter)
+      //shp.emplace_back(kk);
+    return shp;
+  }
+
+public:
+  CfmCore(const py::list &pindices_, const py::list &amplitude_keys_, const py::str &key_xi_, size_t nthreads_)
+      : amplitude_keys(amplitude_keys_), pindices(pindices_), key_xi(key_xi_), nthreads(nthreads_) {
+        cout << "Shape is " ;
+        for (auto x: targetShape()){cout << x << " " ;}
+        cout << endl;
+      }
+
+  py::array apply(const py::dict &inp_) const {
+    const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
+    auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
+    auto out = ducc0::to_vfmav<double>(out_);
+    ducc0::mav_apply([](double &xx) { xx = 0; }, 1, out);
+    return out_;
+  }
+
+  // Linearization<py::dict, py::array> apply_with_jac(const py::dict &loc_) {
+  //   // Parse input
+  //   const auto loc_xi = ducc0::to_cfmav<double>(loc_[key_xi]);
+  //   // /Parse input
+
+  //   //// Instantiate output array
+  //   //auto applied_ = apply(loc_);
+  //   //auto applied = ducc0::to_cmav<complex<double>, 3>(applied_);
+  //   //// /Instantiate output array
+
+  //   function<py::array(const py::dict &)> ftimes = [=](const py::dict &inp_) {
+  //   //  // Parse input
+  //   //  const auto inp_logampl =
+  //   //      ducc0::to_cmav<double, 4>(inp_[key_logamplitude]);
+  //   //  const auto inp_ph = ducc0::to_cmav<double, 4>(inp_[key_phase]);
+  //   //  // /Parse input
+
+  //   // Instantiate output array
+  //   auto out_ = ducc0::make_Pyarr<complex<double>>({npol, nrows(), nfreqs});
+  //   //  auto out = ducc0::to_vmav<complex<double>, 3>(out_);
+  //   //  // /Instantiate output array
+
+  //   //  return out_;
+  //   };
+
+  //   function<py::dict(const py::array &)> fadjtimes =
+  //       [=](const py::array &inp_) {
+  //   //       // Parse input
+  //   //       auto inp{ducc0::to_cmav<complex<double>, 3>(inp_)};
+  //   //       // /Parse input
+
+  //   //       // Instantiate output
+  //   //       py::dict out_;
+  //   //       out_[key_logamplitude] = ducc0::make_Pyarr<double>(inp_shape);
+  //   //       out_[key_phase] = ducc0::make_Pyarr<double>(inp_shape);
+  //   //       auto logampl{ducc0::to_vmav<double, 4>(out_[key_logamplitude])};
+  //   //       auto logph{ducc0::to_vmav<double, 4>(out_[key_phase])};
+
+  //   //       return out_;
+  //       };
+
+  //   return Linearization<py::dict, py::array>(applied_, ftimes, fadjtimes);
+  // }
+};
+
 PYBIND11_MODULE(resolvelib, m) {
   m.attr("__name__") = "resolvelib";
   py::class_<PolarizationMatrixExponential<double, 1>>(
@@ -851,6 +933,11 @@ PYBIND11_MODULE(resolvelib, m) {
                     size_t, double, size_t>())
       .def("apply", &CalibrationDistributor::apply)
       .def("apply_with_jac", &CalibrationDistributor::apply_with_jac);
+
+  py::class_<CfmCore>(m, "CfmCore")
+      .def(py::init<py::list, py::list, py::str, size_t>())
+      .def("apply", &CfmCore::apply);
+      //.def("apply_with_jac", &CfmCore::apply_with_jac);
 
   add_linearization<py::array, py::array>(m, "Linearization_field2field");
   add_linearization<py::array, py::dict>(m, "Linearization_field2mfield");
