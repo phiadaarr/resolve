@@ -67,18 +67,13 @@ cfm = rve.CorrelatedFieldMaker(**args0, nthreads=nthreads)
 cfm.add_fluctuations(**args1)
 cfm.add_fluctuations(**args2)
 cfm.set_amplitude_total_offset(**args3)
-op1 = cfm.finalize()
+op1 = cfm.finalize(0)
 
 pos = ift.from_random(op0.domain)
 
 print("New implementation")
-try:
-    ift.exec_time(op0)
-except:
-    pass
+verbose = False
+ift.exec_time(op1, verbose=verbose)
 
 print("Old implementation")
-try:
-    ift.exec_time(op1)
-except:
-    pass
+ift.exec_time(op0, verbose=verbose)

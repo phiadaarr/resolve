@@ -56,19 +56,8 @@ class CorrelatedFieldMaker(ift.CorrelatedFieldMaker):
 
         # TEMPORARY
         from .util import operator_equality
-        plottingdom = core.target[0], ift.RGSpace(core.target.shape[1:])
-        pos = ift.from_random(core.domain)
-        val0 = core(pos).ducktape_left(plottingdom)
-        val1 = core.nifty_equivalent(pos).ducktape_left(plottingdom)
         operator_equality(core, core.nifty_equivalent, rtol=1e-8)
-        print("SUCCESS core same")
-        from time import time
-        t0 = time()
-        print("New core")
-        ift.exec_time(core)
-        print("Old core")
-        ift.exec_time(core.nifty_equivalent)
-        exit()
+        print("SUCCESS, REMOVE TEMPORARY")
         # /TEMPORARY
 
         amplitudes = reduce(
@@ -78,12 +67,7 @@ class CorrelatedFieldMaker(ift.CorrelatedFieldMaker):
                 for kk, aa in zip(power_keys, self.get_normalized_amplitudes())
             ],
         )
-        op = core @ amplitudes
-
-        for dd in amplitudes.target.values():
-            print(dd[1])
-            print(dd[1].pindex)
-
+        op = core.partial_insert(amplitudes)
         self.statistics_summary(prior_info)
         return op
 

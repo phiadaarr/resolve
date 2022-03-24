@@ -916,7 +916,7 @@ public:
           auto out_pspec0 = ducc0::to_vfmav<double>(out_[amplitude_keys[0]]);
           auto out_pspec1 = ducc0::to_vfmav<double>(out_[amplitude_keys[1]]);
 
-          //ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_xi);
+          // ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_xi);
           ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_azm);
           ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_pspec0);
           ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_pspec1);
@@ -929,11 +929,12 @@ public:
           ducc0::mav_apply_with_index(
               [&](const double &xi0, double &dxi, const shape_t &inds) {
                 const int64_t ind0{p0(inds[1])}, ind1{p1(inds[2])};
-                const double fac0{inp_pspec0(inds[0], ind0)}, fac1{inp_pspec1(inds[0], ind1)}, fac2{inp_azm(inds[0])}, fac3{xi0};
-                double &d0{out_pspec0(inds[0], ind0)}, &d1{out_pspec1(inds[0], ind1)}, &d2{out_azm(inds[0])};
-                d0 += fac1 * fac2 * fac3 * dxi;
-                d1 += fac0 * fac2 * fac3 * dxi;
-                d2 += fac0 * fac1 * fac3 * dxi;
+                const double fac0{inp_pspec0(inds[0], ind0)},
+                    fac1{inp_pspec1(inds[0], ind1)}, fac2{inp_azm(inds[0])},
+                    fac3{xi0};
+                out_pspec0(inds[0], ind0) += fac1 * fac2 * fac3 * dxi;
+                out_pspec1(inds[0], ind1) += fac0 * fac2 * fac3 * dxi;
+                out_azm(inds[0]) += fac0 * fac1 * fac3 * dxi;
                 dxi *= fac0 * fac1 * fac2;
               },
               nthreads, inp_xi, out_xi);
