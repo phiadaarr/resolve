@@ -794,33 +794,32 @@ public:
       : amplitude_keys(amplitude_keys_), pindices(pindices_), key_xi(key_xi_),
         key_azm(key_azm_), offset_mean(offset_mean_), nthreads(nthreads_) {}
 
-
   py::array apply(const py::dict &inp_) const {
     const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
     const auto inp_azm = ducc0::to_cfmav<double>(inp_[key_azm]);
+    const auto inp_pspec0{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[0]])};
+    const auto inp_pspec1{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[1]])};
+
     auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
     auto out = ducc0::to_vfmav<double>(out_);
 
     // xi and Power distributor
     const auto p0{pindex(0)};
     const auto p1{pindex(1)};
-
-    const auto pspec0{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[0]])};
-    const auto pspec1{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[1]])};
-
     ducc0::mav_apply_with_index(
         [&](double &oo, const double &xi, const shape_t &inds) {
           const int64_t ind0{p0(inds[1])};
           const int64_t ind1{p1(inds[2])};
-          const double foo{pspec0(inds[0], ind0) * pspec1(inds[0], ind1)* inp_azm(inds[0])*xi};
+          const double foo{inp_pspec0(inds[0], ind0) *
+                           inp_pspec1(inds[0], ind1) * inp_azm(inds[0]) * xi};
           oo = foo;
         },
         nthreads, out, inp_xi);
     // /Power distributor
-   
+
     // Offset mean
     vector<ducc0::slice> slcs(3);
-    for (size_t i=0; i<out.shape(0); ++i)
+    for (size_t i = 0; i < out.shape(0); ++i)
       out(i, 0, 0) += offset_mean;
     // /Offset mean
 
