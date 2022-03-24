@@ -799,26 +799,25 @@ public:
     ducc0::mav_apply([](double &xx, const double &inp) { xx = inp; }, nthreads, out, inp_xi);
 
     // Power distributor
-    // const auto p0{pindex(0)};
-    // const auto p1{pindex(1)};
+    const auto p0{pindex(0)};
+    const auto p1{pindex(1)};
 
-    // const auto pspec0{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[0]])};
-    // const auto pspec1{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[1]])};
+    const auto pspec0{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[0]])};
+    const auto pspec1{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[1]])};
 
-    //ducc0::mav_apply_with_index(
-    //    [=](double &xx, const shape_t &inds) {
-    //      const int64_t ind0{p0(inds[1])};
-    //      const int64_t ind1{p1(inds[2])};
-    //      const double foo{pspec0(inds[0], ind0) * pspec1(inds[0], ind1)};
-    //      xx *= foo;
-    //    },
-    //    nthreads, out);
+    ducc0::mav_apply_with_index(
+       [=](double &xx, const shape_t &inds) {
+         const int64_t ind0{p0(inds[1])};
+         const int64_t ind1{p1(inds[2])};
+         const double foo{pspec0(inds[0], ind0) * pspec1(inds[0], ind1)};
+         xx *= foo;
+       },
+       nthreads, out);
     // /Power distributor
 
     // FFT
-    //double fct{1};
-    //ducc0::r2r_genuine_hartley(out, out, {1, 2}, fct, nthreads);
-    // FIXME Volume factors
+    ducc0::r2r_genuine_hartley(out, out, {1}, 1., nthreads);
+    ducc0::r2r_genuine_hartley(out, out, {2}, 1., nthreads);
     // /FFT
     
     return out_;

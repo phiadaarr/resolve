@@ -136,7 +136,7 @@ def CfmCore(
     #     op = ht(azm * corr * xi)
 
     #op = ht(corr * xi)  # TEMPORARY
-    op = xi  # TEMPORARY
+    op = ht(corr * xi)  # TEMPORARY
 
     # if offset_mean is not None:
     #     if not isinstance(offset_mean, (ift.Field, ift.MultiField)):
