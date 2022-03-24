@@ -822,20 +822,16 @@ public:
         nthreads, out);
     // /Power distributor
    
-    // // Offset mean
-    // vector<ducc0::slice> slcs(3);
-    // for (size_t i=0; i<out.shape(0); ++i)
-    //   out(i, 0, 0) += offset_mean;
-    // // /Offset mean
+    // Offset mean
+    vector<ducc0::slice> slcs(3);
+    for (size_t i=0; i<out.shape(0); ++i)
+      out(i, 0, 0) += offset_mean;
+    // /Offset mean
 
     // FFT
     ducc0::r2r_genuine_hartley(out, out, {1}, 1., nthreads);
     ducc0::r2r_genuine_hartley(out, out, {2}, 1., nthreads);
     // /FFT
-
-    // Offset mean
-    ducc0::mav_apply([&](double &xx) { xx += offset_mean; }, nthreads, out);
-    // /Offset mean
 
     return out_;
   }

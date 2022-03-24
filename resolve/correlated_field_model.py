@@ -151,7 +151,6 @@ def CfmCore(
         op.domain,
         op.target,
         resolvelib.CfmCore(pindices, power_keys, excitation_field_key, azm_key, offset_mean, nthreads),
-        nifty_equivalent=op,
     ).partial_insert(azm.ducktape_left(azm_key))
     res.nifty_equivalent = op
     return res
