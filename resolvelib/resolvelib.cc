@@ -794,6 +794,7 @@ public:
       : amplitude_keys(amplitude_keys_), pindices(pindices_), key_xi(key_xi_),
         key_azm(key_azm_), offset_mean(offset_mean_), nthreads(nthreads_) {}
 
+
   py::array apply(const py::dict &inp_) const {
     const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
     const auto inp_azm = ducc0::to_cfmav<double>(inp_[key_azm]);
@@ -823,11 +824,11 @@ public:
         nthreads, out);
     // /Power distributor
    
-    // Offset mean
-    vector<ducc0::slice> slcs(3);
-    for (size_t i=0; i<out.shape(0); ++i)
-      out(i, 0, 0) += offset_mean;
-    // /Offset mean
+    // // Offset mean
+    // vector<ducc0::slice> slcs(3);
+    // for (size_t i=0; i<out.shape(0); ++i)
+    //   out(i, 0, 0) += offset_mean;
+    // // /Offset mean
 
     // FFT
     ducc0::r2r_genuine_hartley(out, out, {1}, 1., nthreads);
@@ -835,9 +836,6 @@ public:
     // /FFT
 
     // Offset mean
-    // FIXME Do this before FFT on zero modes
-    // FIXME Do we need to support multiple offset means for the different
-    // copies?
     ducc0::mav_apply([&](double &xx) { xx += offset_mean; }, nthreads, out);
     // /Offset mean
 

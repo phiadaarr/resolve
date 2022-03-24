@@ -66,8 +66,14 @@ class CorrelatedFieldMaker(ift.CorrelatedFieldMaker):
         pos = ift.from_random(core.domain)
         val0 = core(pos).ducktape_left(plottingdom)
         val1 = core.nifty_equivalent(pos).ducktape_left(plottingdom)
-        operator_equality(core, core.nifty_equivalent)
+        operator_equality(core, core.nifty_equivalent, rtol=1e-8)
         print("SUCCESS core same")
+        from time import time
+        t0 = time()
+        print("New core")
+        ift.exec_time(core)
+        print("Old core")
+        ift.exec_time(core.nifty_equivalent)
         exit()
         # /TEMPORARY
 
