@@ -775,6 +775,8 @@ private:
   const py::list amplitude_keys;
   const py::list pindices;
   const py::str key_xi;
+  const py::str key_azm;
+  const double offset_mean;
   size_t nthreads;
 
   using shape_t = vector<size_t>;
@@ -787,16 +789,21 @@ private:
 
 public:
   CfmCore(const py::list &pindices_, const py::list &amplitude_keys_,
-          const py::str &key_xi_, size_t nthreads_)
+          const py::str &key_xi_, const py::str &key_azm_, const double &offset_mean_, const size_t nthreads_)
       : amplitude_keys(amplitude_keys_), pindices(pindices_), key_xi(key_xi_),
-        nthreads(nthreads_) {}
+        key_azm(key_azm_),offset_mean(offset_mean_), nthreads(nthreads_) {}
 
   py::array apply(const py::dict &inp_) const {
     const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
+    const auto inp_azm = ducc0::to_cfmav<double>(inp_[key_azm]);
     auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
     auto out = ducc0::to_vfmav<double>(out_);
 
-    ducc0::mav_apply([](double &xx, const double &inp) { xx = inp; }, nthreads, out, inp_xi);
+    // xi*azm
+    ducc0::mav_apply([](double &xx, const double &inp,
+                        const double &inp2) { xx = inp * inp2; },
+                     nthreads, out, inp_xi, inp_azm);
+    // /xi*azm
 
     // Power distributor
     const auto p0{pindex(0)};
@@ -806,20 +813,24 @@ public:
     const auto pspec1{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[1]])};
 
     ducc0::mav_apply_with_index(
-       [=](double &xx, const shape_t &inds) {
-         const int64_t ind0{p0(inds[1])};
-         const int64_t ind1{p1(inds[2])};
-         const double foo{pspec0(inds[0], ind0) * pspec1(inds[0], ind1)};
-         xx *= foo;
-       },
-       nthreads, out);
+        [&](double &xx, const shape_t &inds) {
+          const int64_t ind0{p0(inds[1])};
+          const int64_t ind1{p1(inds[2])};
+          const double foo{pspec0(inds[0], ind0) * pspec1(inds[0], ind1)};
+          xx *= foo;
+        },
+        nthreads, out);
     // /Power distributor
 
     // FFT
     ducc0::r2r_genuine_hartley(out, out, {1}, 1., nthreads);
     ducc0::r2r_genuine_hartley(out, out, {2}, 1., nthreads);
     // /FFT
-    
+
+    // Offset mean
+    ducc0::mav_apply([&](double &xx) { xx += offset_mean; }, nthreads, out);
+    // /Offset mean
+
     return out_;
   }
 
@@ -963,7 +974,7 @@ PYBIND11_MODULE(resolvelib, m) {
 #endif
 
   py::class_<CfmCore>(m, "CfmCore")
-      .def(py::init<py::list, py::list, py::str, size_t>())
+      .def(py::init<py::list, py::list, py::str, py::str, double, size_t>())
       .def("apply", &CfmCore::apply);
   //.def("apply_with_jac", &CfmCore::apply_with_jac);
 

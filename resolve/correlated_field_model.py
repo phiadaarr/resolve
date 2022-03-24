@@ -43,6 +43,12 @@ class CorrelatedFieldMaker(ift.CorrelatedFieldMaker):
         pspaces = [aa.target for aa in a]
         power_keys = [str(ii) for ii in range(len(a))]
 
+        if np.isscalar(self.azm):
+            raise NotImplementedError
+        expander = ift.ContractionOperator(hspace, spaces=spaces).adjoint
+        azm = expander @ self.azm
+        azm_key = "azm"
+
         core = CfmCore(
             pspaces,
             power_keys,
@@ -50,25 +56,24 @@ class CorrelatedFieldMaker(ift.CorrelatedFieldMaker):
             self._total_N,
             self._target_subdomains,
             self._offset_mean,
-            self.azm,
+            azm_key,
             self._nthreads,
         )
 
         # TEMPORARY
         from .util import operator_equality
-
         plottingdom = core.target[0], ift.RGSpace(core.target.shape[1:])
         pos = ift.from_random(core.domain)
         val0 = core(pos).ducktape_left(plottingdom)
         val1 = core.nifty_equivalent(pos).ducktape_left(plottingdom)
-        p = ift.Plot()
-        p.add(val1, title="ref")
-        p.add(val0, title="cpp")
-        p.output(name="debug.png")
         operator_equality(core, core.nifty_equivalent)
         print("SUCCESS core same")
         exit()
         # /TEMPORARY
+
+        # FIXME Probably azm needs to be incorporated into c++ as well. Now it
+        # lives on the big domain, but actually it is an outer product
+        core = core.partial_insert(azm.ducktape_left(azm_key))
 
         amplitudes = reduce(
             add,
@@ -94,7 +99,7 @@ def CfmCore(
     total_N,
     target_subdomains,
     offset_mean,
-    azm,
+    azm_key,
     nthreads=1,
 ):
     hspace = ift.makeDomain(
@@ -128,26 +133,21 @@ def CfmCore(
     corr = reduce(mul, a)
     xi = ift.ducktape(hspace, None, excitation_field_key)
 
-    # if np.isscalar(azm):
-    #     op = ht(corr * xi)
-    # else:
-    #     expander = ift.ContractionOperator(hspace, spaces=spaces).adjoint
-    #     azm = expander @ azm
-    #     op = ht(azm * corr * xi)
+    azm_inp = ift.Operator.identity_operator(xi.target).ducktape(azm_key)
+    op = ht(azm_inp * corr * xi)
 
-    #op = ht(corr * xi)  # TEMPORARY
-    op = ht(corr * xi)  # TEMPORARY
-
-    # if offset_mean is not None:
-    #     if not isinstance(offset_mean, (ift.Field, ift.MultiField)):
-    #         offset_mean = ift.full(op.target, float(offset_mean))
-    #     op = ift.Adder(offset_mean) @ op
+    if offset_mean is None:
+        offset_mean = 0.
+    else:
+        if not isinstance(offset_mean, float):
+            raise NotImplementedError
+        op = ift.Adder(ift.full(op.target, float(offset_mean))) @ op
 
     pindices = [pp[amp_space].pindex for pp in pdomains]
 
     return Pybind11Operator(
         op.domain,
         op.target,
-        resolvelib.CfmCore(pindices, power_keys, excitation_field_key, nthreads),
+        resolvelib.CfmCore(pindices, power_keys, excitation_field_key, azm_key, offset_mean, nthreads),
         nifty_equivalent=op,
     )
