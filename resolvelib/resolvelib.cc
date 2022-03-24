@@ -801,11 +801,7 @@ public:
     auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
     auto out = ducc0::to_vfmav<double>(out_);
 
-    // xi
-    ducc0::mav_apply([](double &xx, const double &inp) { xx = inp; }, nthreads, out, inp_xi);
-    // /xi
-
-    // Power distributor
+    // xi and Power distributor
     const auto p0{pindex(0)};
     const auto p1{pindex(1)};
 
@@ -813,13 +809,13 @@ public:
     const auto pspec1{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[1]])};
 
     ducc0::mav_apply_with_index(
-        [&](double &xx, const shape_t &inds) {
+        [&](double &oo, const double &xi, const shape_t &inds) {
           const int64_t ind0{p0(inds[1])};
           const int64_t ind1{p1(inds[2])};
-          const double foo{pspec0(inds[0], ind0) * pspec1(inds[0], ind1)};
-          xx *= foo * inp_azm(inds[0]);
+          const double foo{pspec0(inds[0], ind0) * pspec1(inds[0], ind1)* inp_azm(inds[0])*xi};
+          oo = foo;
         },
-        nthreads, out);
+        nthreads, out, inp_xi);
     // /Power distributor
    
     // Offset mean
