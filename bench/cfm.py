@@ -27,8 +27,8 @@ nthreads = 1
 
 if len(sys.argv) == 2 and sys.argv[1] == "quick":
     total_N = 2
-    dom0 = ift.RGSpace(20)
-    dom1 = ift.RGSpace(22)
+    dom0 = ift.RGSpace(4)
+    dom1 = ift.RGSpace(5)
 else:
     total_N = 60
     dom0 = ift.RGSpace(1000)

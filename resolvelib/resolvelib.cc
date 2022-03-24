@@ -911,28 +911,32 @@ public:
               ducc0::make_Pyarr<double>(inp_pspec0.shape());
           out_[amplitude_keys[1]] =
               ducc0::make_Pyarr<double>(inp_pspec1.shape());
+          auto out_xi = ducc0::to_vfmav<double>(out_[key_xi]);
+          auto out_azm = ducc0::to_vfmav<double>(out_[key_azm]);
+          auto out_pspec0 = ducc0::to_vfmav<double>(out_[amplitude_keys[0]]);
+          auto out_pspec1 = ducc0::to_vfmav<double>(out_[amplitude_keys[1]]);
 
-          auto cube{
-              ducc0::vfmav<double>(cotangent.shape(), ducc0::UNINITIALIZED)};
+          //ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_xi);
+          ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_azm);
+          ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_pspec0);
+          ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_pspec1);
 
           // FFT
-          ducc0::r2r_genuine_hartley(cotangent, cube, {2}, 1., nthreads);
-          ducc0::r2r_genuine_hartley(cube, cube, {1}, 1., nthreads);
+          ducc0::r2r_genuine_hartley(cotangent, out_xi, {2}, 1., nthreads);
+          ducc0::r2r_genuine_hartley(out_xi, out_xi, {1}, 1., nthreads);
 
-          //  // xi and Power distributor
-          //  ducc0::mav_apply_with_index(
-          //      [&](double &oo, const double &xi0, const double &dxi, const
-          //      shape_t &inds) {
-          //        const int64_t ind0{p0(inds[1])},ind1{p1(inds[2])};
-          //        const double fac0{inp_pspec0(inds[0], ind0)},
-          //        fac1{inp_pspec1(inds[0], ind1)}, fac2{inp_azm(inds[0])},
-          //        fac3{xi0}; const double d0{tangent_pspec0(inds[0], ind0)},
-          //        d1{tangent_pspec1(inds[0], ind1)}, d2{tangent_azm(inds[0])},
-          //        d3{dxi}; const double foo{d0*fac1*fac2*fac3 +
-          //        fac0*d1*fac2*fac3 +fac0*fac1*d2*fac3+ fac0*fac1*fac2*d3}; oo
-          //        = foo;
-          //      },
-          //      nthreads, inp_xi, tangent_xi);
+          // xi and Power distributor
+          ducc0::mav_apply_with_index(
+              [&](const double &xi0, double &dxi, const shape_t &inds) {
+                const int64_t ind0{p0(inds[1])}, ind1{p1(inds[2])};
+                const double fac0{inp_pspec0(inds[0], ind0)}, fac1{inp_pspec1(inds[0], ind1)}, fac2{inp_azm(inds[0])}, fac3{xi0};
+                double &d0{out_pspec0(inds[0], ind0)}, &d1{out_pspec1(inds[0], ind1)}, &d2{out_azm(inds[0])};
+                d0 += fac1 * fac2 * fac3 * dxi;
+                d1 += fac0 * fac2 * fac3 * dxi;
+                d2 += fac0 * fac1 * fac3 * dxi;
+                dxi *= fac0 * fac1 * fac2;
+              },
+              nthreads, inp_xi, out_xi);
 
           return out_;
         };
