@@ -548,6 +548,10 @@ class Observation(BaseObservation):
         slc = self._antpos.ant1 == self._antpos.ant2
         return self[slc]
 
+    def remove_autocorrelations(self):
+        slc = self._antpos.ant1 != self._antpos.ant2
+        return self[slc]
+
     def move_time(self, t0):
         # FIXME Do I need to change something in self._auxiliary_tables?
         antpos = self._antpos.move_time(t0)
