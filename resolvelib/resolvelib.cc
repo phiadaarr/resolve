@@ -819,7 +819,7 @@ public:
 
     // Offset mean
     vector<ducc0::slice> slcs(3);
-    for (size_t i = 0; i < out.shape(0); ++i)
+    for (size_t i = 0; i < inp_xi.shape(0); ++i)
       out(i, 0, 0) += offset_mean;
     // /Offset mean
 
@@ -831,50 +831,114 @@ public:
     return out_;
   }
 
-  // Linearization<py::dict, py::array> apply_with_jac(const py::dict &loc_) {
-  //   // Parse input
-  //   const auto loc_xi = ducc0::to_cfmav<double>(loc_[key_xi]);
-  //   // /Parse input
+  Linearization<py::dict, py::array> apply_with_jac(const py::dict &inp_) {
+    const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
+    const auto inp_azm = ducc0::to_cfmav<double>(inp_[key_azm]);
+    const auto inp_pspec0{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[0]])};
+    const auto inp_pspec1{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[1]])};
 
-  //   //// Instantiate output array
-  //   //auto applied_ = apply(loc_);
-  //   //auto applied = ducc0::to_cmav<complex<double>, 3>(applied_);
-  //   //// /Instantiate output array
+    auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
+    auto out = ducc0::to_vfmav<double>(out_);
 
-  //   function<py::array(const py::dict &)> ftimes = [=](const py::dict &inp_)
-  //   {
-  //   //  // Parse input
-  //   //  const auto inp_logampl =
-  //   //      ducc0::to_cmav<double, 4>(inp_[key_logamplitude]);
-  //   //  const auto inp_ph = ducc0::to_cmav<double, 4>(inp_[key_phase]);
-  //   //  // /Parse input
+    // xi and Power distributor
+    const auto p0{pindex(0)};
+    const auto p1{pindex(1)};
+    ducc0::mav_apply_with_index(
+        [&](double &oo, const double &xi, const shape_t &inds) {
+          const int64_t ind0{p0(inds[1])}, ind1{p1(inds[2])};
+          const double fac0{inp_pspec0(inds[0], ind0)},
+              fac1{inp_pspec1(inds[0], ind1)}, fac2{inp_azm(inds[0])}, fac3{xi};
+          const double foo{fac0 * fac1 * fac2 * fac3};
+          oo = foo;
+        },
+        nthreads, out, inp_xi);
+    // /Power distributor
 
-  //   // Instantiate output array
-  //   auto out_ = ducc0::make_Pyarr<complex<double>>({npol, nrows(), nfreqs});
-  //   //  auto out = ducc0::to_vmav<complex<double>, 3>(out_);
-  //   //  // /Instantiate output array
+    // Offset mean
+    vector<ducc0::slice> slcs(3);
+    for (size_t i = 0; i < inp_xi.shape(0); ++i)
+      out(i, 0, 0) += offset_mean;
+    // /Offset mean
 
-  //   //  return out_;
-  //   };
+    // FFT
+    ducc0::r2r_genuine_hartley(out, out, {1}, 1., nthreads);
+    ducc0::r2r_genuine_hartley(out, out, {2}, 1., nthreads);
+    // /FFT
 
-  //   function<py::dict(const py::array &)> fadjtimes =
-  //       [=](const py::array &inp_) {
-  //   //       // Parse input
-  //   //       auto inp{ducc0::to_cmav<complex<double>, 3>(inp_)};
-  //   //       // /Parse input
+    function<py::array(const py::dict &)> ftimes =
+        [=](const py::dict &tangent_) {
+          auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
+          auto out = ducc0::to_vfmav<double>(out_);
+          const auto tangent_xi = ducc0::to_cfmav<double>(tangent_[key_xi]);
+          const auto tangent_azm = ducc0::to_cfmav<double>(tangent_[key_azm]);
+          const auto tangent_pspec0{
+              ducc0::to_cmav<double, 2>(tangent_[amplitude_keys[0]])};
+          const auto tangent_pspec1{
+              ducc0::to_cmav<double, 2>(tangent_[amplitude_keys[1]])};
 
-  //   //       // Instantiate output
-  //   //       py::dict out_;
-  //   //       out_[key_logamplitude] = ducc0::make_Pyarr<double>(inp_shape);
-  //   //       out_[key_phase] = ducc0::make_Pyarr<double>(inp_shape);
-  //   //       auto logampl{ducc0::to_vmav<double, 4>(out_[key_logamplitude])};
-  //   //       auto logph{ducc0::to_vmav<double, 4>(out_[key_phase])};
+          // xi and Power distributor
+          ducc0::mav_apply_with_index(
+              [&](double &oo, const double &xi0, const double &dxi,
+                  const shape_t &inds) {
+                const int64_t ind0{p0(inds[1])}, ind1{p1(inds[2])};
+                const double fac0{inp_pspec0(inds[0], ind0)},
+                    fac1{inp_pspec1(inds[0], ind1)}, fac2{inp_azm(inds[0])},
+                    fac3{xi0};
+                const double d0{tangent_pspec0(inds[0], ind0)},
+                    d1{tangent_pspec1(inds[0], ind1)}, d2{tangent_azm(inds[0])},
+                    d3{dxi};
+                const double foo{
+                    d0 * fac1 * fac2 * fac3 + fac0 * d1 * fac2 * fac3 +
+                    fac0 * fac1 * d2 * fac3 + fac0 * fac1 * fac2 * d3};
+                oo = foo;
+              },
+              nthreads, out, inp_xi, tangent_xi);
+          // /Power distributor
+          // FFT
+          ducc0::r2r_genuine_hartley(out, out, {1}, 1., nthreads);
+          ducc0::r2r_genuine_hartley(out, out, {2}, 1., nthreads);
+          // /FFT
+          return out_;
+        };
 
-  //   //       return out_;
-  //       };
+    function<py::dict(const py::array &)> fadjtimes =
+        [=](const py::array &cotangent_) {
+          const auto cotangent = ducc0::to_cfmav<double>(cotangent_);
+          py::dict out_;
+          out_[key_xi] = ducc0::make_Pyarr<double>(inp_xi.shape());
+          out_[key_azm] = ducc0::make_Pyarr<double>(inp_azm.shape());
+          out_[amplitude_keys[0]] =
+              ducc0::make_Pyarr<double>(inp_pspec0.shape());
+          out_[amplitude_keys[1]] =
+              ducc0::make_Pyarr<double>(inp_pspec1.shape());
 
-  //   return Linearization<py::dict, py::array>(applied_, ftimes, fadjtimes);
-  // }
+          auto cube{
+              ducc0::vfmav<double>(cotangent.shape(), ducc0::UNINITIALIZED)};
+
+          // FFT
+          ducc0::r2r_genuine_hartley(cotangent, cube, {2}, 1., nthreads);
+          ducc0::r2r_genuine_hartley(cube, cube, {1}, 1., nthreads);
+
+          //  // xi and Power distributor
+          //  ducc0::mav_apply_with_index(
+          //      [&](double &oo, const double &xi0, const double &dxi, const
+          //      shape_t &inds) {
+          //        const int64_t ind0{p0(inds[1])},ind1{p1(inds[2])};
+          //        const double fac0{inp_pspec0(inds[0], ind0)},
+          //        fac1{inp_pspec1(inds[0], ind1)}, fac2{inp_azm(inds[0])},
+          //        fac3{xi0}; const double d0{tangent_pspec0(inds[0], ind0)},
+          //        d1{tangent_pspec1(inds[0], ind1)}, d2{tangent_azm(inds[0])},
+          //        d3{dxi}; const double foo{d0*fac1*fac2*fac3 +
+          //        fac0*d1*fac2*fac3 +fac0*fac1*d2*fac3+ fac0*fac1*fac2*d3}; oo
+          //        = foo;
+          //      },
+          //      nthreads, inp_xi, tangent_xi);
+
+          return out_;
+        };
+
+    return Linearization<py::dict, py::array>(out_, ftimes, fadjtimes);
+  }
 };
 
 PYBIND11_MODULE(resolvelib, m) {
@@ -972,8 +1036,8 @@ PYBIND11_MODULE(resolvelib, m) {
 
   py::class_<CfmCore>(m, "CfmCore")
       .def(py::init<py::list, py::list, py::str, py::str, double, size_t>())
-      .def("apply", &CfmCore::apply);
-  //.def("apply_with_jac", &CfmCore::apply_with_jac);
+      .def("apply", &CfmCore::apply)
+      .def("apply_with_jac", &CfmCore::apply_with_jac);
 
   add_linearization<py::array, py::array>(m, "Linearization_field2field");
   add_linearization<py::array, py::dict>(m, "Linearization_field2mfield");
