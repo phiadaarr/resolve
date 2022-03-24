@@ -23,11 +23,11 @@ import pytest
 pmp = pytest.mark.parametrize
 
 
-@pmp("total_N", [1, 3])
+@pmp("total_N", [1])
 @pmp("prefix", ["", "b"])
 def test_cfm(total_N, prefix):
-    dom0 = ift.RGSpace(10)
-    dom1 = ift.RGSpace([13, 4])
+    dom0 = ift.RGSpace(20)
+    dom1 = ift.RGSpace(22)
 
     dofdex = list(range(total_N))
     args0 = dict(prefix=prefix, total_N=total_N)
@@ -62,6 +62,4 @@ def test_cfm(total_N, prefix):
     cfm.set_amplitude_total_offset(**args3)
     op1 = cfm.finalize()
 
-    op1(ift.from_random(op1.domain))
-    return
     rve.operator_equality(op0, op1)

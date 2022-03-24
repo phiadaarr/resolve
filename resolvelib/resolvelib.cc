@@ -795,32 +795,32 @@ public:
     const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
     auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
     auto out = ducc0::to_vfmav<double>(out_);
-    ducc0::mav_apply([](double &xx) { xx = 1; }, 1, out);
+
+    ducc0::mav_apply([](double &xx, const double &inp) { xx = inp; }, nthreads, out, inp_xi);
 
     // Power distributor
-    size_t ndom{py::len(amplitude_keys)};
-    size_t currentDim{0};
-    for (size_t idom = 0; idom < ndom; ++idom) {
-      py::print("Work on space", idom, "Current dimension", currentDim);
-      auto pspec = ducc0::to_cfmav<double>(inp_[amplitude_keys[idom]]);
-      pindex(idom); // Relevant pindices
-      currentDim += pindex(idom).ndim();
-    }
+    // const auto p0{pindex(0)};
+    // const auto p1{pindex(1)};
+
+    // const auto pspec0{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[0]])};
+    // const auto pspec1{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[1]])};
+
+    //ducc0::mav_apply_with_index(
+    //    [=](double &xx, const shape_t &inds) {
+    //      const int64_t ind0{p0(inds[1])};
+    //      const int64_t ind1{p1(inds[2])};
+    //      const double foo{pspec0(inds[0], ind0) * pspec1(inds[0], ind1)};
+    //      xx *= foo;
+    //    },
+    //    nthreads, out);
     // /Power distributor
 
-#ifndef QUICKCOMPILE
-    // THE FOLLOWING GIVES A SEGMENTATION FAULT
-
     // FFT
-    shape_t axes(size_t(out.ndim() - 1));
-    for (size_t i = 1; i < out.size(); ++i)
-      axes[i - 1] = i;
-    double fct{1};
-    ducc0::r2r_genuine_hartley(out, out, axes, fct, nthreads);
+    //double fct{1};
+    //ducc0::r2r_genuine_hartley(out, out, {1, 2}, fct, nthreads);
     // FIXME Volume factors
     // /FFT
-#endif
-
+    
     return out_;
   }
 

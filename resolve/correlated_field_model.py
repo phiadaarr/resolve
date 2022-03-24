@@ -57,8 +57,17 @@ class CorrelatedFieldMaker(ift.CorrelatedFieldMaker):
         # TEMPORARY
         from .util import operator_equality
 
+        plottingdom = core.target[0], ift.RGSpace(core.target.shape[1:])
+        pos = ift.from_random(core.domain)
+        val0 = core(pos).ducktape_left(plottingdom)
+        val1 = core.nifty_equivalent(pos).ducktape_left(plottingdom)
+        p = ift.Plot()
+        p.add(val1, title="ref")
+        p.add(val0, title="cpp")
+        p.output(name="debug.png")
         operator_equality(core, core.nifty_equivalent)
         print("SUCCESS core same")
+        exit()
         # /TEMPORARY
 
         amplitudes = reduce(
@@ -118,17 +127,21 @@ def CfmCore(
         )
     corr = reduce(mul, a)
     xi = ift.ducktape(hspace, None, excitation_field_key)
-    if np.isscalar(azm):
-        op = ht(corr * xi)
-    else:
-        expander = ift.ContractionOperator(hspace, spaces=spaces).adjoint
-        azm = expander @ azm
-        op = ht(azm * corr * xi)
 
-    if offset_mean is not None:
-        if not isinstance(offset_mean, (ift.Field, ift.MultiField)):
-            offset_mean = ift.full(op.target, float(offset_mean))
-        op = ift.Adder(offset_mean) @ op
+    # if np.isscalar(azm):
+    #     op = ht(corr * xi)
+    # else:
+    #     expander = ift.ContractionOperator(hspace, spaces=spaces).adjoint
+    #     azm = expander @ azm
+    #     op = ht(azm * corr * xi)
+
+    #op = ht(corr * xi)  # TEMPORARY
+    op = xi  # TEMPORARY
+
+    # if offset_mean is not None:
+    #     if not isinstance(offset_mean, (ift.Field, ift.MultiField)):
+    #         offset_mean = ift.full(op.target, float(offset_mean))
+    #     op = ift.Adder(offset_mean) @ op
 
     pindices = [pp[amp_space].pindex for pp in pdomains]
 
