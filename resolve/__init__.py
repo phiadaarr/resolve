@@ -11,6 +11,7 @@ from .data.direction import *
 from .data.ms_import import *
 from .data.observation import *
 from .data.polarization import Polarization
+from .dirty_image import *
 from .dtype_converter import DtypeConverter
 from .energy_operators import *
 from .extra import mpi_load
