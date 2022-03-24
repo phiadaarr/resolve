@@ -801,11 +801,9 @@ public:
     auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
     auto out = ducc0::to_vfmav<double>(out_);
 
-    // xi*azm
-    ducc0::mav_apply([](double &xx, const double &inp,
-                        const double &inp2) { xx = inp * inp2; },
-                     nthreads, out, inp_xi, inp_azm);
-    // /xi*azm
+    // xi
+    ducc0::mav_apply([](double &xx, const double &inp) { xx = inp; }, nthreads, out, inp_xi);
+    // /xi
 
     // Power distributor
     const auto p0{pindex(0)};
@@ -819,7 +817,7 @@ public:
           const int64_t ind0{p0(inds[1])};
           const int64_t ind1{p1(inds[2])};
           const double foo{pspec0(inds[0], ind0) * pspec1(inds[0], ind1)};
-          xx *= foo;
+          xx *= foo * inp_azm(inds[0]);
         },
         nthreads, out);
     // /Power distributor

@@ -43,12 +43,6 @@ class CorrelatedFieldMaker(ift.CorrelatedFieldMaker):
         pspaces = [aa.target for aa in a]
         power_keys = [str(ii) for ii in range(len(a))]
 
-        if np.isscalar(self.azm):
-            raise NotImplementedError
-        expander = ift.ContractionOperator(hspace, spaces=spaces).adjoint
-        azm = expander @ self.azm
-        azm_key = "azm"
-
         core = CfmCore(
             pspaces,
             power_keys,
@@ -56,7 +50,7 @@ class CorrelatedFieldMaker(ift.CorrelatedFieldMaker):
             self._total_N,
             self._target_subdomains,
             self._offset_mean,
-            azm_key,
+            self.azm,
             self._nthreads,
         )
 
@@ -76,10 +70,6 @@ class CorrelatedFieldMaker(ift.CorrelatedFieldMaker):
         ift.exec_time(core.nifty_equivalent)
         exit()
         # /TEMPORARY
-
-        # FIXME Probably azm needs to be incorporated into c++ as well. Now it
-        # lives on the big domain, but actually it is an outer product
-        core = core.partial_insert(azm.ducktape_left(azm_key))
 
         amplitudes = reduce(
             add,
@@ -105,7 +95,7 @@ def CfmCore(
     total_N,
     target_subdomains,
     offset_mean,
-    azm_key,
+    azm,
     nthreads=1,
 ):
     hspace = ift.makeDomain(
@@ -139,8 +129,14 @@ def CfmCore(
     corr = reduce(mul, a)
     xi = ift.ducktape(hspace, None, excitation_field_key)
 
-    azm_inp = ift.Operator.identity_operator(xi.target).ducktape(azm_key)
-    op = ht(azm_inp * corr * xi)
+    from nifty8.library.correlated_fields import _Distributor
+    expander = ift.ContractionOperator(hspace, spaces=spaces).adjoint
+    dofdex = range(total_N)
+    distributor = _Distributor(dofdex, azm.target, ift.UnstructuredDomain(total_N))
+
+    azm_key = azm.domain.keys()[0]
+
+    op = ht((expander @ distributor @ azm) * corr * xi)
 
     if offset_mean is None:
         offset_mean = 0.
@@ -151,9 +147,11 @@ def CfmCore(
 
     pindices = [pp[amp_space].pindex for pp in pdomains]
 
-    return Pybind11Operator(
+    res = Pybind11Operator(
         op.domain,
         op.target,
         resolvelib.CfmCore(pindices, power_keys, excitation_field_key, azm_key, offset_mean, nthreads),
         nifty_equivalent=op,
-    )
+    ).partial_insert(azm.ducktape_left(azm_key))
+    res.nifty_equivalent = op
+    return res
