@@ -789,9 +789,10 @@ private:
 
 public:
   CfmCore(const py::list &pindices_, const py::list &amplitude_keys_,
-          const py::str &key_xi_, const py::str &key_azm_, const double &offset_mean_, const size_t nthreads_)
+          const py::str &key_xi_, const py::str &key_azm_,
+          const double &offset_mean_, const size_t nthreads_)
       : amplitude_keys(amplitude_keys_), pindices(pindices_), key_xi(key_xi_),
-        key_azm(key_azm_),offset_mean(offset_mean_), nthreads(nthreads_) {}
+        key_azm(key_azm_), offset_mean(offset_mean_), nthreads(nthreads_) {}
 
   py::array apply(const py::dict &inp_) const {
     const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
@@ -828,6 +829,9 @@ public:
     // /FFT
 
     // Offset mean
+    // FIXME Do this before FFT on zero modes
+    // FIXME Do we need to support multiple offset means for the different
+    // copies?
     ducc0::mav_apply([&](double &xx) { xx += offset_mean; }, nthreads, out);
     // /Offset mean
 
