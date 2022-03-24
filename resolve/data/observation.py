@@ -180,6 +180,10 @@ class BaseObservation:
             return False
         return compare_attributes(self, other, self._eq_attributes)
 
+    @property
+    def antenna_names(self):
+        return list(self.auxiliary_table("ANTENNA")["NAME"])
+
 
 class SingleDishObservation(BaseObservation):
     """Provide an interface to single-dish observation.
