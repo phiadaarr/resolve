@@ -24,6 +24,7 @@
 #include <pybind11/pybind11.h>
 
 #include "ducc0/bindings/pybind_utils.h"
+#include "ducc0/fft/fft.h"
 using namespace pybind11::literals;
 namespace py = pybind11;
 auto None = py::none();
@@ -267,7 +268,6 @@ public:
     // /value
 
     // gradient
-    // FIXME better variable names for everything...
     ducc0::mav_apply(
         [](const Tmean &m, const Tmean &s, const T &lic, Tmean &gs, T &glic) {
           auto explic{exp(lic)};
@@ -763,8 +763,189 @@ public:
   }
 };
 
+class CfmCore {
+private:
+  const py::list amplitude_keys;
+  const py::list pindices;
+  const py::str key_xi;
+  const py::str key_azm;
+  const double offset_mean;
+  size_t nthreads;
+
+  using shape_t = vector<size_t>;
+
+  ducc0::cfmav<int64_t>
+  pindex(const size_t &index) const { // FIXME @mtr is this type correct? This
+                                      // is at least what python gives me
+    return ducc0::to_cfmav<int64_t>(pindices[index]);
+  }
+
+public:
+  CfmCore(const py::list &pindices_, const py::list &amplitude_keys_,
+          const py::str &key_xi_, const py::str &key_azm_,
+          const double &offset_mean_, const size_t nthreads_)
+      : amplitude_keys(amplitude_keys_), pindices(pindices_), key_xi(key_xi_),
+        key_azm(key_azm_), offset_mean(offset_mean_), nthreads(nthreads_) {}
+
+  py::array apply(const py::dict &inp_) const {
+    const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
+    const auto inp_azm = ducc0::to_cfmav<double>(inp_[key_azm]);
+    const auto inp_pspec0{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[0]])};
+    const auto inp_pspec1{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[1]])};
+
+    auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
+    auto out = ducc0::to_vfmav<double>(out_);
+
+    // xi and Power distributor
+    const auto p0{pindex(0)};
+    const auto p1{pindex(1)};
+    ducc0::mav_apply_with_index(
+        [&](double &oo, const double &xi, const shape_t &inds) {
+          const int64_t ind0{p0(inds[1])};
+          const int64_t ind1{p1(inds[2])};
+          const double foo{inp_pspec0(inds[0], ind0) *
+                           inp_pspec1(inds[0], ind1) * inp_azm(inds[0]) * xi};
+          oo = foo;
+        },
+        nthreads, out, inp_xi);
+    // /Power distributor
+
+    // Offset mean
+    vector<ducc0::slice> slcs(3);
+    for (size_t i = 0; i < inp_xi.shape(0); ++i)
+      out(i, 0, 0) += offset_mean;
+    // /Offset mean
+
+    // FFT
+    ducc0::r2r_genuine_hartley(out, out, {1}, 1., nthreads);
+    ducc0::r2r_genuine_hartley(out, out, {2}, 1., nthreads);
+    // /FFT
+
+    return out_;
+  }
+
+  Linearization<py::dict, py::array> apply_with_jac(const py::dict &inp_) {
+    const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
+    const auto inp_azm = ducc0::to_cfmav<double>(inp_[key_azm]);
+    const auto inp_pspec0{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[0]])};
+    const auto inp_pspec1{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[1]])};
+
+    auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
+    auto out = ducc0::to_vfmav<double>(out_);
+
+    // xi and Power distributor
+    const auto p0{pindex(0)};
+    const auto p1{pindex(1)};
+    ducc0::mav_apply_with_index(
+        [&](double &oo, const double &xi, const shape_t &inds) {
+          const int64_t ind0{p0(inds[1])}, ind1{p1(inds[2])};
+          const double fac0{inp_pspec0(inds[0], ind0)},
+              fac1{inp_pspec1(inds[0], ind1)}, fac2{inp_azm(inds[0])}, fac3{xi};
+          const double foo{fac0 * fac1 * fac2 * fac3};
+          oo = foo;
+        },
+        nthreads, out, inp_xi);
+    // /Power distributor
+
+    // Offset mean
+    vector<ducc0::slice> slcs(3);
+    for (size_t i = 0; i < inp_xi.shape(0); ++i)
+      out(i, 0, 0) += offset_mean;
+    // /Offset mean
+
+    // FFT
+    ducc0::r2r_genuine_hartley(out, out, {1}, 1., nthreads);
+    ducc0::r2r_genuine_hartley(out, out, {2}, 1., nthreads);
+    // /FFT
+
+    function<py::array(const py::dict &)> ftimes =
+        [=](const py::dict &tangent_) {
+          auto inpcopy = inp_; // keep inp_ alive to avoid dangling references
+          auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
+          auto out = ducc0::to_vfmav<double>(out_);
+          const auto tangent_xi = ducc0::to_cfmav<double>(tangent_[key_xi]);
+          const auto tangent_azm = ducc0::to_cfmav<double>(tangent_[key_azm]);
+          const auto tangent_pspec0{
+              ducc0::to_cmav<double, 2>(tangent_[amplitude_keys[0]])};
+          const auto tangent_pspec1{
+              ducc0::to_cmav<double, 2>(tangent_[amplitude_keys[1]])};
+
+          // xi and Power distributor
+          ducc0::mav_apply_with_index(
+              [&](double &oo, const double &xi0, const double &dxi,
+                  const shape_t &inds) {
+                const int64_t ind0{p0(inds[1])}, ind1{p1(inds[2])};
+                const double fac0{inp_pspec0(inds[0], ind0)},
+                    fac1{inp_pspec1(inds[0], ind1)}, fac2{inp_azm(inds[0])},
+                    fac3{xi0};
+                const double d0{tangent_pspec0(inds[0], ind0)},
+                    d1{tangent_pspec1(inds[0], ind1)}, d2{tangent_azm(inds[0])},
+                    d3{dxi};
+                const double foo{
+                    d0 * fac1 * fac2 * fac3 + fac0 * d1 * fac2 * fac3 +
+                    fac0 * fac1 * d2 * fac3 + fac0 * fac1 * fac2 * d3};
+                oo = foo;
+              },
+              nthreads, out, inp_xi, tangent_xi);
+          // /Power distributor
+          // FFT
+          ducc0::r2r_genuine_hartley(out, out, {1}, 1., nthreads);
+          ducc0::r2r_genuine_hartley(out, out, {2}, 1., nthreads);
+          // /FFT
+          return out_;
+        };
+
+    function<py::dict(const py::array &)> fadjtimes =
+        [=](const py::array &cotangent_) {
+          // FIXME Check this in all other functions
+          auto inpcopy = inp_; // keep inp_ alive to avoid dangling references
+          const auto cotangent = ducc0::to_cfmav<double>(cotangent_);
+          py::dict out_;
+          out_[key_xi] = ducc0::make_Pyarr<double>(inp_xi.shape());
+          out_[key_azm] = ducc0::make_Pyarr<double>(inp_azm.shape());
+          out_[amplitude_keys[0]] =
+              ducc0::make_Pyarr<double>(inp_pspec0.shape());
+          out_[amplitude_keys[1]] =
+              ducc0::make_Pyarr<double>(inp_pspec1.shape());
+          auto out_xi = ducc0::to_vfmav<double>(out_[key_xi]);
+          auto out_azm = ducc0::to_vfmav<double>(out_[key_azm]);
+          auto out_pspec0 = ducc0::to_vfmav<double>(out_[amplitude_keys[0]]);
+          auto out_pspec1 = ducc0::to_vfmav<double>(out_[amplitude_keys[1]]);
+
+          // ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_xi);
+          ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_azm);
+          ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_pspec0);
+          ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_pspec1);
+
+          // FFT
+          ducc0::r2r_genuine_hartley(cotangent, out_xi, {2}, 1., nthreads);
+          ducc0::r2r_genuine_hartley(out_xi, out_xi, {1}, 1., nthreads);
+
+          // xi and Power distributor
+          ducc0::mav_apply_with_index(
+              [&](const double &xi0, double &dxi, const shape_t &inds) {
+                const int64_t ind0{p0(inds[1])}, ind1{p1(inds[2])};
+                const double fac0{inp_pspec0(inds[0], ind0)},
+                    fac1{inp_pspec1(inds[0], ind1)}, fac2{inp_azm(inds[0])},
+                    fac3{xi0};
+                out_pspec0(inds[0], ind0) += fac1 * fac2 * fac3 * dxi;
+                out_pspec1(inds[0], ind1) += fac0 * fac2 * fac3 * dxi;
+                out_azm(inds[0]) += fac0 * fac1 * fac3 * dxi;
+                dxi *= fac0 * fac1 * fac2;
+              },
+              1, inp_xi, out_xi);
+
+          return out_;
+        };
+
+    return Linearization<py::dict, py::array>(out_, ftimes, fadjtimes);
+  }
+};
+
 PYBIND11_MODULE(resolvelib, m) {
+
   m.attr("__name__") = "resolvelib";
+
   py::class_<PolarizationMatrixExponential<double, 1>>(
       m, "PolarizationMatrixExponential1")
       .def(py::init<size_t>())
@@ -851,6 +1032,11 @@ PYBIND11_MODULE(resolvelib, m) {
                     size_t, double, size_t>())
       .def("apply", &CalibrationDistributor::apply)
       .def("apply_with_jac", &CalibrationDistributor::apply_with_jac);
+
+  py::class_<CfmCore>(m, "CfmCore")
+      .def(py::init<py::list, py::list, py::str, py::str, double, size_t>())
+      .def("apply", &CfmCore::apply)
+      .def("apply_with_jac", &CfmCore::apply_with_jac);
 
   add_linearization<py::array, py::array>(m, "Linearization_field2field");
   add_linearization<py::array, py::dict>(m, "Linearization_field2mfield");

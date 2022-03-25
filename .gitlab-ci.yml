@@ -54,6 +54,7 @@ test_bench:
   script:
     - python3 bench/polarization_matrix_exponential.py quick
     - python3 bench/gaussian_energy.py quick
+    - python3 bench/cfm.py quick
 
 pages:
   stage: release

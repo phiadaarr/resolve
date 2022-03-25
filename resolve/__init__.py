@@ -5,6 +5,7 @@ from .calibration import CalibrationDistributor, calibration_distribution
 from .config_utils import *
 from .constants import *
 from .cpp2py import *
+from .correlated_field_model import *
 from .data.antenna_positions import AntennaPositions
 from .data.averaging import *
 from .data.direction import *

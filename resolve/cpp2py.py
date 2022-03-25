@@ -22,10 +22,11 @@ from .logger import logger
 
 
 class Pybind11Operator(ift.Operator):
-    def __init__(self, dom, tgt, op):
+    def __init__(self, dom, tgt, op, nifty_equivalent=None):
         self._domain = ift.makeDomain(dom)
         self._target = ift.makeDomain(tgt)
         self._op = op
+        self._nifty_equivalent = nifty_equivalent
 
     def apply(self, x):
         self._check_input(x)
@@ -37,6 +38,10 @@ class Pybind11Operator(ift.Operator):
             pos = ift.makeField(self._target, lin.position())
             return x.new(pos, jac)
         return ift.makeField(self.target, self._op.apply(x.val))
+
+    @property
+    def nifty_equivalent(self):
+        return self._nifty_equivalent
 
 
 class Pybind11LikelihoodEnergyOperator(ift.LikelihoodEnergyOperator):
