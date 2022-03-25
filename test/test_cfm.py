@@ -23,7 +23,7 @@ import pytest
 pmp = pytest.mark.parametrize
 
 
-@pmp("total_N", [1])
+@pmp("total_N", [1, 2])
 @pmp("prefix", ["", "b"])
 @pmp("small", [False, True])
 def test_cfm(total_N, prefix, small):
