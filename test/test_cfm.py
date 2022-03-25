@@ -25,14 +25,15 @@ pmp = pytest.mark.parametrize
 
 @pmp("total_N", [1, 2])
 @pmp("prefix", ["", "b"])
+@pmp("nthreads", [1, 2])
 @pmp("small", [False, True])
-def test_cfm(total_N, prefix, small):
+def test_cfm(total_N, prefix, small, nthreads):
     if small:
         dom0 = ift.RGSpace(20)
         dom1 = ift.RGSpace(22)
     else:
-        dom0 = ift.RGSpace(200)
-        dom1 = ift.RGSpace(1500)
+        dom0 = ift.RGSpace(100)
+        dom1 = ift.RGSpace(200)
 
     dofdex = list(range(total_N))
     args0 = dict(prefix=prefix, total_N=total_N)
@@ -61,10 +62,10 @@ def test_cfm(total_N, prefix, small):
     cfm.set_amplitude_total_offset(**args3)
     op0 = cfm.finalize(0)
 
-    cfm = rve.CorrelatedFieldMaker(**args0)
+    cfm = rve.CorrelatedFieldMaker(**args0, nthreads=nthreads)
     cfm.add_fluctuations(**args1)
     cfm.add_fluctuations(**args2)
     cfm.set_amplitude_total_offset(**args3)
     op1 = cfm.finalize()
 
-    rve.operator_equality(op0, op1, rtol=1e-6)
+    rve.operator_equality(op0, op1, rtol=1e-2, ntries=3)
