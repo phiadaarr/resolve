@@ -25,9 +25,14 @@ pmp = pytest.mark.parametrize
 
 @pmp("total_N", [1])
 @pmp("prefix", ["", "b"])
-def test_cfm(total_N, prefix):
-    dom0 = ift.RGSpace(20)
-    dom1 = ift.RGSpace(22)
+@pmp("small", [False, True])
+def test_cfm(total_N, prefix, small):
+    if small:
+        dom0 = ift.RGSpace(20)
+        dom1 = ift.RGSpace(22)
+    else:
+        dom0 = ift.RGSpace(200)
+        dom1 = ift.RGSpace(1500)
 
     dofdex = list(range(total_N))
     args0 = dict(prefix=prefix, total_N=total_N)
