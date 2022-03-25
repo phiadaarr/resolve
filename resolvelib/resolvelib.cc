@@ -903,6 +903,7 @@ public:
 
     function<py::dict(const py::array &)> fadjtimes =
         [=](const py::array &cotangent_) {
+          auto inpcopy = inp_; // keep inp_ alive to avoid dangling references
           const auto cotangent = ducc0::to_cfmav<double>(cotangent_);
           py::dict out_;
           out_[key_xi] = ducc0::make_Pyarr<double>(inp_xi.shape());
