@@ -32,8 +32,8 @@ def test_cfm(total_N, prefix, small, nthreads):
         dom0 = ift.RGSpace(20)
         dom1 = ift.RGSpace(22)
     else:
-        dom0 = ift.RGSpace(100)
-        dom1 = ift.RGSpace(200)
+        dom0 = ift.RGSpace(100, 1000)
+        dom1 = ift.RGSpace(200, 1.2)
 
     dofdex = list(range(total_N))
     args0 = dict(prefix=prefix, total_N=total_N)
@@ -61,14 +61,15 @@ def test_cfm(total_N, prefix, small, nthreads):
     cfm.add_fluctuations(**args2)
     cfm.set_amplitude_total_offset(**args3)
     op0 = cfm.finalize(0)
+    ift.set_nthreads(nthreads)
 
     cfm = rve.CorrelatedFieldMaker(**args0, nthreads=nthreads)
     cfm.add_fluctuations(**args1)
     cfm.add_fluctuations(**args2)
     cfm.set_amplitude_total_offset(**args3)
-    op1 = cfm.finalize()
+    op1 = cfm.finalize(0)
 
     op2 = op1.nifty_equivalent
 
-    rve.operator_equality(op0, op1, rtol=1e-2, ntries=3)
-    rve.operator_equality(op0, op2, rtol=1e-2, ntries=3)
+    rve.operator_equality(op0, op1, rtol=1e-5, ntries=3)  # FIXME Why is the accuracy so low?
+    rve.operator_equality(op0, op2, rtol=1e-5, ntries=3)

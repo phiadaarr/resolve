@@ -770,6 +770,7 @@ private:
   const py::str key_xi;
   const py::str key_azm;
   const double offset_mean;
+  const double scalar_dvol;
   size_t nthreads;
 
   using shape_t = vector<size_t>;
@@ -783,9 +784,9 @@ private:
 public:
   CfmCore(const py::list &pindices_, const py::list &amplitude_keys_,
           const py::str &key_xi_, const py::str &key_azm_,
-          const double &offset_mean_, const size_t nthreads_)
+          const double &offset_mean_, const double &scalar_dvol_, const size_t nthreads_)
       : amplitude_keys(amplitude_keys_), pindices(pindices_), key_xi(key_xi_),
-        key_azm(key_azm_), offset_mean(offset_mean_), nthreads(nthreads_) {}
+        key_azm(key_azm_), offset_mean(offset_mean_), scalar_dvol(scalar_dvol_),  nthreads(nthreads_) {}
 
   py::array apply(const py::dict &inp_) const {
     const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
@@ -817,7 +818,7 @@ public:
     // /Offset mean
 
     // FFT
-    ducc0::r2r_genuine_hartley(out, out, {1}, 1., nthreads);
+    ducc0::r2r_genuine_hartley(out, out, {1}, scalar_dvol, nthreads);
     ducc0::r2r_genuine_hartley(out, out, {2}, 1., nthreads);
     // /FFT
 
@@ -854,7 +855,7 @@ public:
     // /Offset mean
 
     // FFT
-    ducc0::r2r_genuine_hartley(out, out, {1}, 1., nthreads);
+    ducc0::r2r_genuine_hartley(out, out, {1}, scalar_dvol, nthreads);
     ducc0::r2r_genuine_hartley(out, out, {2}, 1., nthreads);
     // /FFT
 
@@ -889,7 +890,7 @@ public:
               nthreads, out, inp_xi, tangent_xi);
           // /Power distributor
           // FFT
-          ducc0::r2r_genuine_hartley(out, out, {1}, 1., nthreads);
+          ducc0::r2r_genuine_hartley(out, out, {1}, scalar_dvol, nthreads);
           ducc0::r2r_genuine_hartley(out, out, {2}, 1., nthreads);
           // /FFT
           return out_;
@@ -919,7 +920,7 @@ public:
 
           // FFT
           ducc0::r2r_genuine_hartley(cotangent, out_xi, {2}, 1., nthreads);
-          ducc0::r2r_genuine_hartley(out_xi, out_xi, {1}, 1., nthreads);
+          ducc0::r2r_genuine_hartley(out_xi, out_xi, {1}, scalar_dvol, nthreads);
 
           // xi and Power distributor
           ducc0::mav_apply_with_index(
@@ -1034,7 +1035,7 @@ PYBIND11_MODULE(resolvelib, m) {
       .def("apply_with_jac", &CalibrationDistributor::apply_with_jac);
 
   py::class_<CfmCore>(m, "CfmCore")
-      .def(py::init<py::list, py::list, py::str, py::str, double, size_t>())
+      .def(py::init<py::list, py::list, py::str, py::str, double, double, size_t>())
       .def("apply", &CfmCore::apply)
       .def("apply_with_jac", &CfmCore::apply_with_jac);
 

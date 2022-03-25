@@ -142,10 +142,13 @@ def CfmCore(
 
     pindices = [pp[amp_space].pindex for pp in pdomains]
 
+    scalar_dvol = ht.domain.scalar_weight((1, 2))
+    offset_mean /= scalar_dvol
+
     res = Pybind11Operator(
         op.domain,
         op.target,
-        resolvelib.CfmCore(pindices, power_keys, excitation_field_key, azm_key, offset_mean, nthreads),
+        resolvelib.CfmCore(pindices, power_keys, excitation_field_key, azm_key, offset_mean, scalar_dvol, nthreads),
     ).partial_insert(azm.ducktape_left(azm_key))
     res.nifty_equivalent = op
     return res
