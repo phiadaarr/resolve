@@ -268,7 +268,6 @@ public:
     // /value
 
     // gradient
-    // FIXME better variable names for everything...
     ducc0::mav_apply(
         [](const Tmean &m, const Tmean &s, const T &lic, Tmean &gs, T &glic) {
           auto explic{exp(lic)};
@@ -861,6 +860,7 @@ public:
 
     function<py::array(const py::dict &)> ftimes =
         [=](const py::dict &tangent_) {
+          auto inpcopy = inp_; // keep inp_ alive to avoid dangling references
           auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
           auto out = ducc0::to_vfmav<double>(out_);
           const auto tangent_xi = ducc0::to_cfmav<double>(tangent_[key_xi]);
@@ -897,6 +897,7 @@ public:
 
     function<py::dict(const py::array &)> fadjtimes =
         [=](const py::array &cotangent_) {
+          // FIXME Check this in all other functions
           auto inpcopy = inp_; // keep inp_ alive to avoid dangling references
           const auto cotangent = ducc0::to_cfmav<double>(cotangent_);
           py::dict out_;
