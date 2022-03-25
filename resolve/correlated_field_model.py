@@ -30,6 +30,22 @@ class CorrelatedFieldMaker(ift.CorrelatedFieldMaker):
         self._nthreads = nthreads
         super(CorrelatedFieldMaker, self).__init__(prefix, total_N)
 
+    def add_fluctuations(self, *args, **kwargs):
+        if "dofdex" not in kwargs:
+            raise RuntimeError("Need to specify dofdex")
+        wanted = list(range(self._total_N))
+        if list(kwargs["dofdex"]) != wanted:
+            raise ValueError(f"Only dofdex={wanted} is supported")
+        super(CorrelatedFieldMaker, self).add_fluctuations(*args, **kwargs)
+
+    def set_amplitude_total_offset(self, *args, **kwargs):
+        if "dofdex" not in kwargs:
+            raise RuntimeError("Need to specify dofdex")
+        wanted = list(range(self._total_N))
+        if list(kwargs["dofdex"]) != wanted:
+            raise ValueError(f"Only dofdex={wanted} is supported")
+        super(CorrelatedFieldMaker, self).set_amplitude_total_offset(*args, **kwargs)
+
     def finalize(self, prior_info=100):
         n_amplitudes = len(self._a)
         hspace = ift.makeDomain(
@@ -62,6 +78,7 @@ class CorrelatedFieldMaker(ift.CorrelatedFieldMaker):
             ],
         )
         op = core.partial_insert(amplitudes)
+        op.nifty_equivalent = core.nifty_equivalent.partial_insert(amplitudes)
         self.statistics_summary(prior_info)
         return op
 

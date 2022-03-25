@@ -68,4 +68,7 @@ def test_cfm(total_N, prefix, small, nthreads):
     cfm.set_amplitude_total_offset(**args3)
     op1 = cfm.finalize()
 
+    op2 = op1.nifty_equivalent
+
     rve.operator_equality(op0, op1, rtol=1e-2, ntries=3)
+    rve.operator_equality(op0, op2, rtol=1e-2, ntries=3)
