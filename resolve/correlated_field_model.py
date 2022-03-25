@@ -54,12 +54,6 @@ class CorrelatedFieldMaker(ift.CorrelatedFieldMaker):
             self._nthreads,
         )
 
-        # TEMPORARY
-        from .util import operator_equality
-        operator_equality(core, core.nifty_equivalent, rtol=1e-8)
-        print("SUCCESS, REMOVE TEMPORARY")
-        # /TEMPORARY
-
         amplitudes = reduce(
             add,
             [

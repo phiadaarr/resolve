@@ -22,17 +22,15 @@ import pytest
 
 pmp = pytest.mark.parametrize
 
-nthreads = 1
-
 
 if len(sys.argv) == 2 and sys.argv[1] == "quick":
     total_N = 2
     dom0 = ift.RGSpace(4)
     dom1 = ift.RGSpace(5)
 else:
-    total_N = 60
-    dom0 = ift.RGSpace(1000)
-    dom1 = ift.RGSpace(100)
+    total_N = 58
+    dom0 = ift.RGSpace(1120)
+    dom1 = ift.RGSpace(200)
 
 
 dofdex = list(range(total_N))
@@ -61,19 +59,24 @@ cfm.add_fluctuations(**args1)
 cfm.add_fluctuations(**args2)
 cfm.set_amplitude_total_offset(**args3)
 op0 = cfm.finalize(0)
-ift.set_nthreads(nthreads)
 
-cfm = rve.CorrelatedFieldMaker(**args0, nthreads=nthreads)
-cfm.add_fluctuations(**args1)
-cfm.add_fluctuations(**args2)
-cfm.set_amplitude_total_offset(**args3)
-op1 = cfm.finalize(0)
+
+def get_cpp_op(nthreads):
+    cfm = rve.CorrelatedFieldMaker(**args0, nthreads=nthreads)
+    cfm.add_fluctuations(**args1)
+    cfm.add_fluctuations(**args2)
+    cfm.set_amplitude_total_offset(**args3)
+    return cfm.finalize(0)
+
 
 pos = ift.from_random(op0.domain)
 
-print("New implementation")
 verbose = False
-ift.exec_time(op1, verbose=verbose)
+for nthreads in [1, 8, 16]:
+    print(f"New implementation (nthreads={nthreads})")
+    ift.exec_time(get_cpp_op(nthreads), verbose=verbose)
 
-print("Old implementation")
-ift.exec_time(op0, verbose=verbose)
+    print(f"Old implementation (nthreads={nthreads})")
+    ift.set_nthreads(nthreads)
+    ift.exec_time(op0, verbose=verbose)
+    print()

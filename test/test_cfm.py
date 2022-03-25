@@ -62,4 +62,4 @@ def test_cfm(total_N, prefix):
     cfm.set_amplitude_total_offset(**args3)
     op1 = cfm.finalize()
 
-    rve.operator_equality(op0, op1)
+    rve.operator_equality(op0, op1, rtol=1e-6)

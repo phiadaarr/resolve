@@ -248,10 +248,6 @@ def operator_equality(op0, op1, ntries=20, domain_dtype=np.float64, rtol=None, a
         tgtloc = res0.jac(0.23*loc)
         res0 = op0(linloc).jac.adjoint(tgtloc)
         res1 = op1(linloc).jac.adjoint(tgtloc)
-        # TEMPORARY
-        print(res0.val)
-        print(res1.val)
-        # /TEMPORARY
         ift.extra.assert_allclose(res0, res1, rtol=rtol, atol=atol)
     ift.extra.check_operator(op0, loc, ntries=ntries, tol=rtol)
     ift.extra.check_operator(op1, loc, ntries=ntries, tol=rtol)

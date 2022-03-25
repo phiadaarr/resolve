@@ -19,8 +19,6 @@
 /* Copyright (C) 2021-2022 Max-Planck-Society, Philipp Arras
    Authors: Philipp Arras */
 
-#define QUICKCOMPILE
-
 // Includes related to pybind11
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
@@ -91,7 +89,6 @@ void add_linearization_with_metric(py::module_ &msup, const char *name) {
       .def("apply_metric", &LinearizationWithMetric<Tin>::apply_metric);
 }
 
-#ifndef QUICKCOMPILE
 template <typename T, bool complex_mean,
           typename Tmean = conditional_t<complex_mean, complex<T>, T>,
           typename Tacc = long double,
@@ -766,10 +763,7 @@ public:
     return Linearization<py::dict, py::array>(applied_, ftimes, fadjtimes);
   }
 };
-#endif
 
-#include <iostream>
-//#include <pybind11/stl.h>
 class CfmCore {
 private:
   const py::list amplitude_keys;
@@ -951,7 +945,6 @@ PYBIND11_MODULE(resolvelib, m) {
 
   m.attr("__name__") = "resolvelib";
 
-#ifndef QUICKCOMPILE
   py::class_<PolarizationMatrixExponential<double, 1>>(
       m, "PolarizationMatrixExponential1")
       .def(py::init<size_t>())
@@ -1038,7 +1031,6 @@ PYBIND11_MODULE(resolvelib, m) {
                     size_t, double, size_t>())
       .def("apply", &CalibrationDistributor::apply)
       .def("apply_with_jac", &CalibrationDistributor::apply_with_jac);
-#endif
 
   py::class_<CfmCore>(m, "CfmCore")
       .def(py::init<py::list, py::list, py::str, py::str, double, size_t>())
