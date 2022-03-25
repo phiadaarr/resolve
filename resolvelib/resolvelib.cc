@@ -937,7 +937,7 @@ public:
                 out_azm(inds[0]) += fac0 * fac1 * fac3 * dxi;
                 dxi *= fac0 * fac1 * fac2;
               },
-              nthreads, inp_xi, out_xi);
+              1, inp_xi, out_xi);
 
           return out_;
         };
