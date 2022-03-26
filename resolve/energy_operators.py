@@ -67,17 +67,24 @@ def DiagonalGaussianLikelihood(data, inverse_covariance, nthreads=1):
     else:
         raise TypeError("Dtype of data not supported. Supported dtypes: c8, c16.")
 
+    # Replace 0. with NaN such that degrees of freedom are counted by
+    # ift.minisanity correctly
+    icov_nan = inverse_covariance.val_rw()
+    icov_nan[icov_nan == 0.] = np.nan
+    icov_nan = ift.makeField(inverse_covariance.domain, icov_nan)
+
     return Pybind11LikelihoodEnergyOperator(
         data.domain,
         f(data.val, inverse_covariance.val, nthreads),
         nifty_equivalent=ift.GaussianEnergy(
-            data=data, inverse_covariance=ift.makeOp(inverse_covariance, sampling_dtype=dt),
-        ),
+            data=data,
+            inverse_covariance=ift.makeOp(icov_nan, sampling_dtype=dt),
+        )
     )
 
 
 def VariableCovarianceDiagonalGaussianLikelihood(
-    data, key_signal, key_log_inverse_covariance, nthreads=1
+    data, key_signal, key_log_inverse_covariance, mask, nthreads=1
 ):
     """Variable covariance Gaussian energy as NIFTy operator that is implemented in C++
 
@@ -89,6 +96,8 @@ def VariableCovarianceDiagonalGaussianLikelihood(
 
     key_log_inverse_covariance : str
 
+    mask : Field or None
+
     nthreads : int
 
     Note
@@ -99,6 +108,8 @@ def VariableCovarianceDiagonalGaussianLikelihood(
     """
     if not ift.is_fieldlike(data):
         raise TypeError("data needs to be a Field")
+    if mask is not None:
+        raise NotImplementedError
     dt = data.dtype
 
     if dt == np.float64:
