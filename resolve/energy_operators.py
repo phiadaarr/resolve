@@ -79,7 +79,7 @@ def DiagonalGaussianLikelihood(data, inverse_covariance, mask=None, nthreads=1):
         nifty_equivalent=ift.GaussianEnergy(
             data=mask_operator(data),
             inverse_covariance=ift.makeOp(mask_operator(inverse_covariance), sampling_dtype=dt),
-        )
+        ) @ mask_operator
     )
 
 
