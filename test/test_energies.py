@@ -60,5 +60,5 @@ def test_varcov_gaussian_energy(dtype, with_mask):
         "signal": dtype,
         "logicov": rve.dtype_complex2float(dtype, force=True),
     }
-    rve.operator_equality(op1.nifty_equivalent, op1, ntries=5, domain_dtype=dt)
-    rve.operator_equality(op2.nifty_equivalent, op2, ntries=5, domain_dtype=dt)
+    rve.operator_equality(op1.nifty_equivalent, op1, ntries=5, domain_dtype=dt, rtol=2e-5)
+    rve.operator_equality(op2.nifty_equivalent, op2, ntries=5, domain_dtype=dt, rtol=2e-5)
