@@ -226,9 +226,9 @@ public:
                                                const py::array &mask_,
                                                size_t nthreads_ = 1)
       : nthreads(nthreads_), pymean(mean_), key_signal(key_signal_),
-        key_log_icov(key_log_icov_), mean(ducc0::to_cfmav<Tmean>(mean_)),
-        pymask(mask_), mask(ducc0::to_cfmav<Tmask>(mask_))
-  {}
+        key_log_icov(key_log_icov_), pymask(mask_),
+        mean(ducc0::to_cfmav<Tmean>(mean_)),
+        mask(ducc0::to_cfmav<Tmask>(mask_)) {}
 
   py::array apply(const py::dict &inp_) const {
     auto signal{ducc0::to_cfmav<Tmean>(inp_[key_signal])};
@@ -237,15 +237,17 @@ public:
     {
       py::gil_scoped_release release;
       ducc0::mav_apply(
-          [&acc](const Tmean &m, const T &lic, const Tmean &l) {
+          [&acc](const Tmean &m, const T &lic, const Tmean &l,
+                 const Tmask &msk) {
             Tacc_cplx mm(m), ll(l);
-            Tacc iicc(exp(lic));
+            Tacc iicc{exp(lic)};
             Tacc logiicc(lic);
             if (complex_mean)
               logiicc *= 2;
-            acc += iicc * norm(ll - mm) - logiicc;
+            acc += (iicc * norm(ll - mm) - logiicc) * T(msk);
           },
-          1, mean, logicov, signal); // not parallelized because accumulating
+          1, mean, logicov, signal,
+          mask); // not parallelized because accumulating
       acc *= 0.5;
     }
     return py::array(py::cast(Tenergy(acc)));
@@ -260,22 +262,23 @@ public:
 
     // value
     ducc0::mav_apply(
-        [&acc](const Tmean &m, const T &lic, const Tmean &l) {
+        [&acc](const Tmean &m, const T &lic, const Tmean &l, const Tmask &msk) {
           Tacc_cplx mm(m), ll(l);
-          Tacc iicc(exp(lic));
-          Tacc logiicc(lic);
+          Tacc iicc{exp(lic)};
+          Tacc logiicc{lic};
           if (complex_mean)
             logiicc *= 2;
-          acc += iicc * norm(ll - mm) - logiicc;
+          acc += (iicc * norm(ll - mm) - logiicc) * T(msk);
         },
-        1, mean, loc_lic, loc_s); // not parallelized because accumulating
+        1, mean, loc_lic, loc_s, mask); // not parallelized because accumulating
     acc *= 0.5;
     auto energy{Tenergy(acc)};
     // /value
 
     // gradient
     ducc0::mav_apply(
-        [](const Tmean &m, const Tmean &s, const T &lic, Tmean &gs, T &glic) {
+        [](const Tmean &m, const Tmean &s, const T &lic, Tmean &gs, T &glic,
+           const Tmask &msk) {
           auto explic{exp(lic)};
           auto tmp2{(s - m) * explic};
           T fct;
@@ -284,10 +287,10 @@ public:
           else
             fct = 1;
           T tmp3{T(0.5) * (explic * norm(m - s) - fct)};
-          gs = tmp2;
-          glic = tmp3;
+          gs = tmp2 * T(msk);
+          glic = tmp3 * T(msk);
         },
-        nthreads, mean, loc_s, loc_lic, grad_s, grad_lic);
+        nthreads, mean, loc_s, loc_lic, grad_s, grad_lic, mask);
     // /gradient
 
     // Jacobian
@@ -337,7 +340,8 @@ public:
     // Metric
     function<py::dict(const py::dict &)> apply_metric =
         [nthreads = nthreads, key_signal = key_signal,
-         key_log_icov = key_log_icov, loc_lic = loc_lic](const py::dict &inp_) {
+         key_log_icov = key_log_icov, loc_lic = loc_lic,
+         mask = mask](const py::dict &inp_) {
           auto inp_s{ducc0::to_cfmav<Tmean>(inp_[key_signal])};
           auto inp_lic{ducc0::to_cfmav<T>(inp_[key_log_icov])};
 
@@ -349,13 +353,13 @@ public:
 
           ducc0::mav_apply(
               [](const T &lic, const Tmean &ins, const T &inlic, Tmean &os,
-                 T &olic) {
-                os = exp(lic) * ins;
-                olic = inlic;
+                 T &olic, const Tmask &msk) {
+                os = exp(lic) * ins * T(msk);
+                olic = inlic * T(msk);
                 if (!complex_mean)
                   olic *= T(0.5);
               },
-              nthreads, loc_lic, inp_s, inp_lic, outs, outlic);
+              nthreads, loc_lic, inp_s, inp_lic, outs, outlic, mask);
           return out_;
         };
     // /Metric
@@ -790,9 +794,11 @@ private:
 public:
   CfmCore(const py::list &pindices_, const py::list &amplitude_keys_,
           const py::str &key_xi_, const py::str &key_azm_,
-          const double &offset_mean_, const double &scalar_dvol_, const size_t nthreads_)
+          const double &offset_mean_, const double &scalar_dvol_,
+          const size_t nthreads_)
       : amplitude_keys(amplitude_keys_), pindices(pindices_), key_xi(key_xi_),
-        key_azm(key_azm_), offset_mean(offset_mean_), scalar_dvol(scalar_dvol_),  nthreads(nthreads_) {}
+        key_azm(key_azm_), offset_mean(offset_mean_), scalar_dvol(scalar_dvol_),
+        nthreads(nthreads_) {}
 
   py::array apply(const py::dict &inp_) const {
     const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
@@ -926,7 +932,8 @@ public:
 
           // FFT
           ducc0::r2r_genuine_hartley(cotangent, out_xi, {2}, 1., nthreads);
-          ducc0::r2r_genuine_hartley(out_xi, out_xi, {1}, scalar_dvol, nthreads);
+          ducc0::r2r_genuine_hartley(out_xi, out_xi, {1}, scalar_dvol,
+                                     nthreads);
 
           // xi and Power distributor
           ducc0::mav_apply_with_index(
@@ -1005,21 +1012,21 @@ PYBIND11_MODULE(resolvelib, m) {
 
   py::class_<VariableCovarianceDiagonalGaussianLikelihood<double, false>>(
       m, "VariableCovarianceDiagonalGaussianLikelihood_f8")
-      .def(py::init<py::array, py::str, py::str, size_t>())
+      .def(py::init<py::array, py::str, py::str, py::array, size_t>())
       .def("apply",
            &VariableCovarianceDiagonalGaussianLikelihood<double, false>::apply)
       .def("apply_with_jac", &VariableCovarianceDiagonalGaussianLikelihood<
                                  double, false>::apply_with_jac);
   py::class_<VariableCovarianceDiagonalGaussianLikelihood<float, false>>(
       m, "VariableCovarianceDiagonalGaussianLikelihood_f4")
-      .def(py::init<py::array, py::str, py::str, size_t>())
+      .def(py::init<py::array, py::str, py::str, py::array, size_t>())
       .def("apply",
            &VariableCovarianceDiagonalGaussianLikelihood<float, false>::apply)
       .def("apply_with_jac", &VariableCovarianceDiagonalGaussianLikelihood<
                                  float, false>::apply_with_jac);
   py::class_<VariableCovarianceDiagonalGaussianLikelihood<double, true>>(
       m, "VariableCovarianceDiagonalGaussianLikelihood_c16")
-      .def(py::init<py::array, py::str, py::str, size_t>())
+      .def(py::init<py::array, py::str, py::str, py::array, size_t>())
       .def("apply",
            &VariableCovarianceDiagonalGaussianLikelihood<double, true>::apply)
       .def("apply_with_jac",
@@ -1027,7 +1034,7 @@ PYBIND11_MODULE(resolvelib, m) {
                                                          true>::apply_with_jac);
   py::class_<VariableCovarianceDiagonalGaussianLikelihood<float, true>>(
       m, "VariableCovarianceDiagonalGaussianLikelihood_c8")
-      .def(py::init<py::array, py::str, py::str, size_t>())
+      .def(py::init<py::array, py::str, py::str, py::array, size_t>())
       .def("apply",
            &VariableCovarianceDiagonalGaussianLikelihood<float, true>::apply)
       .def("apply_with_jac",
@@ -1041,7 +1048,8 @@ PYBIND11_MODULE(resolvelib, m) {
       .def("apply_with_jac", &CalibrationDistributor::apply_with_jac);
 
   py::class_<CfmCore>(m, "CfmCore")
-      .def(py::init<py::list, py::list, py::str, py::str, double, double, size_t>())
+      .def(py::init<py::list, py::list, py::str, py::str, double, double,
+                    size_t>())
       .def("apply", &CfmCore::apply)
       .def("apply_with_jac", &CfmCore::apply_with_jac);
 

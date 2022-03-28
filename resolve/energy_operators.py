@@ -124,10 +124,12 @@ def VariableCovarianceDiagonalGaussianLikelihood(
 
     if mask is None:
         mask_operator = ift.Operator.identity_operator(data.domain)
+        mask = np.ones(data.shape, np.uint8)
     else:
         mask = mask.val != 0.0
         # FIXME Somewhen fix this strange NIFTy convention
         mask_operator = ift.MaskOperator(ift.makeField(data.domain, ~mask))
+        mask = mask.astype(np.uint8)
 
     flagged_data = mask_operator(data)
 
@@ -141,6 +143,6 @@ def VariableCovarianceDiagonalGaussianLikelihood(
             (ift.Adder(flagged_data, neg=True) @ mask_operator)
             .ducktape_left("residual")
             .ducktape(key_signal)
-            + mask_operator.exp().ducktape_left("icov").ducktape(key_log_inverse_covariance)
+            + (mask_operator @ ift.Operator.identity_operator(data.domain).exp()).ducktape_left("icov").ducktape(key_log_inverse_covariance)
         ),
     )
