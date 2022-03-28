@@ -206,23 +206,29 @@ template <typename T, bool complex_mean,
           typename Tacc = long double,
           typename Tacc_cplx = conditional_t<complex_mean, complex<Tacc>, Tacc>>
 class VariableCovarianceDiagonalGaussianLikelihood {
+  using Tenergy = double;
+  using Tmask = uint8_t;
+
 private:
   const size_t nthreads;
   const py::array pymean;
   const py::str key_signal;
   const py::str key_log_icov;
+  const py::array pymask;
 
 public:
   const ducc0::cfmav<Tmean> mean;
-
-  using Tenergy = double;
+  const ducc0::cfmav<Tmask> mask;
 
   VariableCovarianceDiagonalGaussianLikelihood(const py::array &mean_,
                                                const py::str &key_signal_,
                                                const py::str &key_log_icov_,
+                                               const py::array &mask_,
                                                size_t nthreads_ = 1)
       : nthreads(nthreads_), pymean(mean_), key_signal(key_signal_),
-        key_log_icov(key_log_icov_), mean(ducc0::to_cfmav<Tmean>(mean_)) {}
+        key_log_icov(key_log_icov_), mean(ducc0::to_cfmav<Tmean>(mean_)),
+        pymask(mask_), mask(ducc0::to_cfmav<Tmask>(mask_))
+  {}
 
   py::array apply(const py::dict &inp_) const {
     auto signal{ducc0::to_cfmav<Tmean>(inp_[key_signal])};

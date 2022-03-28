@@ -76,9 +76,9 @@ class _InterferometryResponse(ift.LinearOperator):
                 if any(np.array(ooo.vis.shape) == 0):
                     rrr = None
                 else:
-                    # FIXME Future: Include mask here?
                     rrr = SingleResponse(domain[3], ooo.uvw, ooo.freq, do_wgridding=do_wgridding,
-                                         epsilon=epsilon, verbosity=verbosity, nthreads=nthreads)
+                                         epsilon=epsilon, verbosity=verbosity, nthreads=nthreads,
+                                         mask=ooo.mask)
                 sr_tmp.append(rrr)
                 t_tmp.append(tind)
                 f_tmp.append(find)
