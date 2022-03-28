@@ -76,9 +76,10 @@ class _InterferometryResponse(ift.LinearOperator):
                 if any(np.array(ooo.vis.shape) == 0):
                     rrr = None
                 else:
+                    # FIXME Include mask in the future here? Problem is that
+                    # the mask may be different for different polarizations
                     rrr = SingleResponse(domain[3], ooo.uvw, ooo.freq, do_wgridding=do_wgridding,
-                                         epsilon=epsilon, verbosity=verbosity, nthreads=nthreads,
-                                         mask=ooo.mask)
+                                         epsilon=epsilon, verbosity=verbosity, nthreads=nthreads)
                 sr_tmp.append(rrr)
                 t_tmp.append(tind)
                 f_tmp.append(find)
@@ -140,6 +141,8 @@ class SingleResponse(ift.LinearOperator):
         self._domain = ift.DomainTuple.make(domain)
         tgt = ift.UnstructuredDomain(uvw.shape[0]), ift.UnstructuredDomain(freq.size)
         self._target = ift.makeDomain(tgt)
+        if mask is not None:
+            assert mask.shape == self._target.shape
         self._capability = self.TIMES | self.ADJOINT_TIMES
         self._args = {
             "uvw": uvw,
@@ -153,7 +156,7 @@ class SingleResponse(ift.LinearOperator):
             "verbosity": verbosity
         }
         if mask is not None:
-            self._args["mask"] = mask.astype(np.uint8)
+            self._args["mask"] = mask.val.astype(np.uint8)
         self._vol = self._domain[0].scalar_dvol
         self._ofac = None
         self._facets = facets
