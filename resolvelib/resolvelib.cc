@@ -829,10 +829,7 @@ public:
       out(i, 0, 0) += offset_mean;
     // /Offset mean
 
-    // FFT
-    ducc0::r2r_genuine_hartley(out, out, {1}, scalar_dvol, nthreads);
-    ducc0::r2r_genuine_hartley(out, out, {2}, 1., nthreads);
-    // /FFT
+    ducc0::r2r_separable_hartley(out, out, {1, 2}, scalar_dvol, nthreads);
 
     return out_;
   }
@@ -866,13 +863,13 @@ public:
       out(i, 0, 0) += offset_mean;
     // /Offset mean
 
-    // FFT
-    ducc0::r2r_genuine_hartley(out, out, {1}, scalar_dvol, nthreads);
-    ducc0::r2r_genuine_hartley(out, out, {2}, 1., nthreads);
-    // /FFT
+    ducc0::r2r_separable_hartley(out, out, {1, 2}, scalar_dvol, nthreads);
 
     function<py::array(const py::dict &)> ftimes =
         [=](const py::dict &tangent_) {
+          // FIXME Check this in all other functions
+          // FIXME Do not allocate memory in c++ that survives function call.
+          // Check this
           auto inpcopy = inp_; // keep inp_ alive to avoid dangling references
           auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
           auto out = ducc0::to_vfmav<double>(out_);
@@ -901,10 +898,9 @@ public:
               },
               nthreads, out, inp_xi, tangent_xi);
           // /Power distributor
-          // FFT
-          ducc0::r2r_genuine_hartley(out, out, {1}, scalar_dvol, nthreads);
-          ducc0::r2r_genuine_hartley(out, out, {2}, 1., nthreads);
-          // /FFT
+
+          ducc0::r2r_separable_hartley(out, out, {1, 2}, scalar_dvol, nthreads);
+
           return out_;
         };
 
@@ -930,10 +926,8 @@ public:
           ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_pspec0);
           ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_pspec1);
 
-          // FFT
-          ducc0::r2r_genuine_hartley(cotangent, out_xi, {2}, 1., nthreads);
-          ducc0::r2r_genuine_hartley(out_xi, out_xi, {1}, scalar_dvol,
-                                     nthreads);
+          ducc0::r2r_separable_hartley(cotangent, out_xi, {1, 2}, scalar_dvol,
+                                       nthreads);
 
           // xi and Power distributor
           ducc0::mav_apply_with_index(
