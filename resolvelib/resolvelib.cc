@@ -121,7 +121,8 @@ public:
           [&acc](const Tmean &m, const T &ic, const Tmean &l) {
             Tacc_cplx mm(m), ll(l);
             Tacc iicc(ic);
-            acc += iicc * norm(ll - mm);
+            auto foo{iicc * norm(ll - mm)};
+            acc += foo;
           },
           1, mean, icov, inp); // not parallelized because accumulating
       acc *= 0.5;

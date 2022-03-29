@@ -68,10 +68,12 @@ def DiagonalGaussianLikelihood(data, inverse_covariance, mask=None, nthreads=1):
     if mask is None:
         mask_operator = ift.Operator.identity_operator(data.domain)
     else:
+        foo = inverse_covariance.val.dtype
         mask = mask.val != 0.0
         # FIXME Somewhen fix this strange NIFTy convention
         mask_operator = ift.MaskOperator(ift.makeField(data.domain, ~mask))
         inverse_covariance = ift.makeField(data.domain, mask) * inverse_covariance
+        assert inverse_covariance.val.dtype == foo
 
     return Pybind11LikelihoodEnergyOperator(
         data.domain,
