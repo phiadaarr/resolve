@@ -47,7 +47,7 @@ print("Variable covariance Gaussian energy")
 print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
 for nthreads in [1, 4, 8]:
     op = rve.VariableCovarianceDiagonalGaussianLikelihood(mean, "signal", "logicov",
-                                                          nthreads=nthreads)
+                                                          mask=None, nthreads=nthreads)
     print(f"New implementation (nthreads={nthreads})")
     ift.exec_time(op)
     print()
