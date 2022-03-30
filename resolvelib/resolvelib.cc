@@ -118,8 +118,8 @@ public:
     Tacc acc{0};
     ducc0::mav_apply(
         [&acc](const Tmean &m, const T &ic, const Tmean &l) {
-          auto foo{ic * norm(l - m)};
-          auto foo2 = Tacc(foo);
+          const auto foo{ic * norm(l - m)};
+          const auto foo2 = Tacc(foo);
           acc += foo2;
         },
         1, mean, icov, inp); // not parallelized because accumulating
@@ -132,11 +132,11 @@ public:
     auto gradient{ducc0::vfmav<Tmean>(loc.shape(), ducc0::UNINITIALIZED)};
     Tacc acc{0};
 
-    // value
+    // value FIXME duplicate
     ducc0::mav_apply(
         [&acc](const Tmean &m, const T &ic, const Tmean &l) {
-          auto foo{ic * norm(l - m)};
-          auto foo2 = Tacc(foo);
+          const auto foo{ic * norm(l - m)};
+          const auto foo2 = Tacc(foo);
           acc += foo2;
         },
         1, mean, icov, loc); // not parallelized because accumulating
@@ -147,7 +147,7 @@ public:
     // gradient
     ducc0::mav_apply(
         [](const Tmean &m, const T &ic, const Tmean &l, Tmean &g) {
-          auto tmp2{(l - m) * ic};
+          const auto tmp2{(l - m) * ic};
           g = tmp2;
         },
         nthreads, mean, icov, loc, gradient);
@@ -161,8 +161,8 @@ public:
 
           ducc0::mav_apply(
               [&acc](const Tmean &i, const Tmean &g) {
-                T foo{real(i) * real(g) + imag(i) * imag(g)};
-                auto foo2 = Tacc(foo);
+                const T foo{real(i) * real(g) + imag(i) * imag(g)};
+                const auto foo2 = Tacc(foo);
                 acc += foo2;
               },
               1, inp, gradient); // not parallelized because accumulating
@@ -175,7 +175,10 @@ public:
           auto out_{ducc0::make_Pyarr<Tmean>(gradient.shape())};
           auto out{ducc0::to_vfmav<Tmean>(out_)};
           ducc0::mav_apply(
-              [inpT = inpT](const Tmean &g, Tmean &o) { o = inpT * g; },
+              [inpT = inpT](const Tmean &g, Tmean &o) {
+                const Tmean foo{inpT * g};
+                o = foo;
+              },
               nthreads, gradient, out);
           return out_;
         };
@@ -188,7 +191,10 @@ public:
           auto out_{ducc0::make_Pyarr<Tmean>(inp.shape())};
           auto out{ducc0::to_vfmav<Tmean>(out_)};
           ducc0::mav_apply(
-              [](const Tmean &i, const T &ic, Tmean &o) { o = i * ic; },
+              [](const Tmean &i, const T &ic, Tmean &o) {
+                const Tmean foo{i * ic};
+                o = foo;
+              },
               nthreads, inp, icov, out);
           return out_;
         };
@@ -237,7 +243,8 @@ public:
           T fct{1};
           if (complex_mean)
             fct *= 2;
-          acc += (exp(lic) * norm(l - m) - fct * lic) * T(msk);
+          const Tacc foo{(exp(lic) * norm(l - m) - fct * lic) * T(msk)};
+          acc += foo;
         },
         1, mean, logicov, signal,
         mask); // not parallelized because accumulating
@@ -258,7 +265,8 @@ public:
           T fct{1};
           if (complex_mean)
             fct *= 2;
-          acc += (exp(lic) * norm(l - m) - fct * lic) * T(msk);
+          const Tacc foo{(exp(lic) * norm(l - m) - fct * lic) * T(msk)};
+          acc += foo;
         },
         1, mean, loc_lic, loc_s, mask); // not parallelized because accumulating
     acc *= 0.5;
@@ -269,16 +277,16 @@ public:
     ducc0::mav_apply(
         [](const Tmean &m, const Tmean &s, const T &lic, Tmean &gs, T &glic,
            const Tmask &msk) {
-          auto explic{exp(lic)};
-          auto tmp2{(s - m) * explic};
+          const auto explic{exp(lic)};
+          const auto tmp2{(s - m) * explic * T(msk)};
           T fct;
           if (complex_mean)
             fct = 2;
           else
             fct = 1;
-          T tmp3{T(0.5) * (explic * norm(m - s) - fct)};
-          gs = tmp2 * T(msk);
-          glic = tmp3 * T(msk);
+          const T tmp3{T(0.5) * (explic * norm(m - s) - fct) * T(msk)};
+          gs = tmp2;
+          glic = tmp3;
         },
         nthreads, mean, loc_s, loc_lic, grad_s, grad_lic, mask);
     // /gradient
@@ -295,8 +303,9 @@ public:
           ducc0::mav_apply(
               [&acc](const Tmean &is, const T &ilic, const Tmean &gs,
                      const T &glic) {
-                acc += real(is) * real(gs) + imag(is) * imag(gs);
-                acc += ilic * glic;
+                const Tacc foo{real(is) * real(gs) + imag(is) * imag(gs) +
+                               ilic * glic};
+                acc += foo;
               },
               1, inp_s, inp_lic, grad_s,
               grad_lic); // not parallelized because accumulating
@@ -317,8 +326,10 @@ public:
           ducc0::mav_apply(
               [inpT = inpT](const Tmean &gs, const T &glic, Tmean &os,
                             T &olic) {
-                os = inpT * gs;
-                olic = inpT * glic;
+                const Tmean foo{inpT * gs};
+                const T foo2{inpT * glic};
+                os = foo;
+                olic = foo2;
               },
               nthreads, grad_s, grad_lic, outs, outlic);
           return out_;
@@ -342,10 +353,13 @@ public:
           ducc0::mav_apply(
               [](const T &lic, const Tmean &ins, const T &inlic, Tmean &os,
                  T &olic, const Tmask &msk) {
-                os = exp(lic) * ins * T(msk);
-                olic = inlic * T(msk);
+                T fac{1};
                 if (!complex_mean)
-                  olic *= T(0.5);
+                  fac *= 0.5;
+                const Tmean foo{exp(lic) * ins * T(msk)};
+                const T foo2{inlic * T(msk) * fac};
+                os = foo;
+                olic = foo2;
               },
               nthreads, loc_lic, inp_s, inp_lic, outs, outlic, mask);
           return out_;
@@ -389,14 +403,19 @@ public:
     ducc0::mav_apply(
         [](const auto &ii, const auto &qq, const auto &uu, const auto &vv,
            auto &oii, auto &oqq, auto &ouu, auto &ovv) {
-          auto pol{sqrt(qq * qq + uu * uu + vv * vv)};
-          auto expii{exp(ii)};
-          auto exppol{exp(pol)};
-          oii = 0.5 * (expii * exppol + expii / exppol);
-          auto tmp{0.5 * ((expii / pol) * exppol - (expii / pol) / exppol)};
-          oqq = tmp * qq;
-          ouu = tmp * uu;
-          ovv = tmp * vv;
+          const auto pol{sqrt(qq * qq + uu * uu + vv * vv)};
+          const auto expii{exp(ii)};
+          const auto exppol{exp(pol)};
+          const auto tmp{0.5 *
+                         ((expii / pol) * exppol - (expii / pol) / exppol)};
+          const auto tmpi{0.5 * (expii * exppol + expii / exppol)};
+          const auto tmpq{tmp * qq};
+          const auto tmpu{tmp * uu};
+          const auto tmpv{tmp * vv};
+          oii = tmpi;
+          oqq = tmpq;
+          ouu = tmpu;
+          ovv = tmpv;
         },
         nthreads, I, Q, U, V, outI, outQ, outU, outV);
     return out_;
@@ -437,36 +456,36 @@ public:
     ducc0::mav_apply(
         [](const auto &ii, const auto &qq, const auto &uu, const auto &vv,
            auto &dii, auto &dqi, auto &dui, auto &dvi, auto &d) {
-          auto pol0{qq * qq + uu * uu + vv * vv};
-          auto pol{sqrt(pol0)};
-          auto expii{exp(ii)};
-          auto exppol{exp(pol)};
-          auto eplus0{expii * exppol}, eminus0{expii / exppol};
-          auto tmp2{0.5 / pol * (eplus0 - eminus0)};
+          const auto pol0{qq * qq + uu * uu + vv * vv};
+          const auto pol{sqrt(pol0)};
+          const auto expii{exp(ii)};
+          const auto exppol{exp(pol)};
+          const auto eplus0{expii * exppol}, eminus0{expii / exppol};
+          const auto tmp2{0.5 / pol * (eplus0 - eminus0)};
           dii = 0.5 * (eplus0 + eminus0);
           d.iq = tmp2 * qq;
           d.iu = tmp2 * uu;
           d.iv = tmp2 * vv;
 
-          // Tip: never define several variables "auto" together!
-          auto eplus{(expii / pol) * exppol};
-          auto eminus{(expii / pol) / exppol};
-          auto tmp{0.5 * (eplus - eminus)};
-          auto tmp3{0.5 / pol0 * (eplus * (pol - 1.) + eminus * (pol + 1.))};
+          const auto eplus{(expii / pol) * exppol};
+          const auto eminus{(expii / pol) / exppol};
+          const auto tmp{0.5 * (eplus - eminus)};
+          const auto tmp3{0.5 / pol0 *
+                          (eplus * (pol - 1.) + eminus * (pol + 1.))};
 
-          auto tmpq{tmp3 * qq};
+          const auto tmpq{tmp3 * qq};
           dqi = tmp * qq;
           d.qq = qq * tmpq + tmp;
           d.qu = uu * tmpq;
           d.qv = vv * tmpq;
 
-          auto tmpu{tmp3 * uu};
+          const auto tmpu{tmp3 * uu};
           dui = tmp * uu;
           d.uq = qq * tmpu;
           d.uu = uu * tmpu + tmp;
           d.uv = vv * tmpu;
 
-          auto tmpv{tmp3 * vv};
+          const auto tmpv{tmp3 * vv};
           dvi = tmp * vv;
           d.vq = qq * tmpv;
           d.vu = uu * tmpv;
@@ -505,10 +524,10 @@ public:
                  const auto &dvi, const auto &d, const auto &ii, const auto &qq,
                  const auto &uu, const auto &vv, auto &iiout, auto &qqout,
                  auto &uuout, auto &vvout) {
-                auto ti = dii * ii + d.iq * qq + d.iu * uu + d.iv * vv;
-                auto tq = dqi * ii + d.qq * qq + d.qu * uu + d.qv * vv;
-                auto tu = dui * ii + d.uq * qq + d.uu * uu + d.uv * vv;
-                auto tv = dvi * ii + d.vq * qq + d.vu * uu + d.vv * vv;
+                const auto ti = dii * ii + d.iq * qq + d.iu * uu + d.iv * vv;
+                const auto tq = dqi * ii + d.qq * qq + d.qu * uu + d.qv * vv;
+                const auto tu = dui * ii + d.uq * qq + d.uu * uu + d.uv * vv;
+                const auto tv = dvi * ii + d.vq * qq + d.vu * uu + d.vv * vv;
                 iiout = ti;
                 qqout = tq;
                 uuout = tu;
@@ -555,10 +574,10 @@ public:
                  const auto &dvi, const auto &d, const auto &ii, const auto &qq,
                  const auto &uu, const auto &vv, auto &iiout, auto &qqout,
                  auto &uuout, auto &vvout) {
-                auto ti = dii * ii + dqi * qq + dui * uu + dvi * vv;
-                auto tq = d.iq * ii + d.qq * qq + d.uq * uu + d.vq * vv;
-                auto tu = d.iu * ii + d.qu * qq + d.uu * uu + d.vu * vv;
-                auto tv = d.iv * ii + d.qv * qq + d.uv * uu + d.vv * vv;
+                const auto ti = dii * ii + dqi * qq + dui * uu + dvi * vv;
+                const auto tq = d.iq * ii + d.qq * qq + d.uq * uu + d.vq * vv;
+                const auto tu = d.iu * ii + d.qu * qq + d.uu * uu + d.vu * vv;
+                const auto tv = d.iv * ii + d.qv * qq + d.uv * uu + d.vv * vv;
                 iiout = ti;
                 qqout = tq;
                 uuout = tu;
@@ -702,8 +721,8 @@ public:
                   const complex<double> tmp0{gettmp(tind0)};
                   const complex<double> tmp1{gettmp(tind1)};
 
-                  auto diff{frac - double(tind0)};
-                  auto tmp{(1 - diff) * tmp0 + diff * tmp1};
+                  const auto diff{frac - double(tind0)};
+                  const auto tmp{(1 - diff) * tmp0 + diff * tmp1};
 
                   out(i0, i1, i2) = tmp;
                 }
@@ -737,7 +756,7 @@ public:
                       MR_assert(tind0 < ntime, "time outside region");
                       MR_assert(tind1 < ntime, "time outside region");
 
-                      auto diff{frac - double(tind0)};
+                      const auto diff{frac - double(tind0)};
 
                       const auto tmp{conj(applied(i0, i1, i2)) *
                                      inp(i0, i1, i2)};
@@ -858,7 +877,8 @@ public:
           // FIXME Check this in all other functions
           // FIXME Do not allocate memory in c++ that survives function call.
           // Check this
-          auto inpcopy = inp_; // keep inp_ alive to avoid dangling references
+          const auto inpcopy =
+              inp_; // keep inp_ alive to avoid dangling references
           auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
           auto out = ducc0::to_vfmav<double>(out_);
           const auto tangent_xi = ducc0::to_cfmav<double>(tangent_[key_xi]);
@@ -895,7 +915,8 @@ public:
     function<py::dict(const py::array &)> fadjtimes =
         [=](const py::array &cotangent_) {
           // FIXME Check this in all other functions
-          auto inpcopy = inp_; // keep inp_ alive to avoid dangling references
+          const auto inpcopy =
+              inp_; // keep inp_ alive to avoid dangling references
           const auto cotangent = ducc0::to_cfmav<double>(cotangent_);
           py::dict out_;
           out_[key_xi] = ducc0::make_Pyarr<double>(inp_xi.shape());
