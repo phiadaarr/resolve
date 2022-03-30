@@ -19,6 +19,8 @@
 /* Copyright (C) 2021-2022 Max-Planck-Society, Philipp Arras
    Authors: Philipp Arras */
 
+// FIXME Release GIL around mav_applys
+
 // Includes related to pybind11
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
@@ -114,17 +116,14 @@ public:
   py::array apply(const py::array &inp_) const {
     auto inp{ducc0::to_cfmav<Tmean>(inp_)};
     Tacc acc{0};
-    {
-      py::gil_scoped_release release;
-      ducc0::mav_apply(
-          [&acc](const Tmean &m, const T &ic, const Tmean &l) {
-            auto foo{ic * norm(l - m)};
-            auto foo2 = Tacc(foo);
-            acc += foo2;
-          },
-          1, mean, icov, inp); // not parallelized because accumulating
-      acc *= 0.5;
-    }
+    ducc0::mav_apply(
+        [&acc](const Tmean &m, const T &ic, const Tmean &l) {
+          auto foo{ic * norm(l - m)};
+          auto foo2 = Tacc(foo);
+          acc += foo2;
+        },
+        1, mean, icov, inp); // not parallelized because accumulating
+    acc *= 0.5;
     return py::array(py::cast(Tenergy(acc)));
   }
 
@@ -233,20 +232,16 @@ public:
     auto signal{ducc0::to_cfmav<Tmean>(inp_[key_signal])};
     auto logicov{ducc0::to_cfmav<T>(inp_[key_log_icov])};
     Tacc acc{0};
-    {
-      py::gil_scoped_release release;
-      ducc0::mav_apply(
-          [&acc](const Tmean &m, const T &lic, const Tmean &l,
-                 const Tmask &msk) {
-            T fct{1};
-            if (complex_mean)
-              fct *= 2;
-            acc += (exp(lic) * norm(l - m) - fct * lic) * T(msk);
-          },
-          1, mean, logicov, signal,
-          mask); // not parallelized because accumulating
-      acc *= 0.5;
-    }
+    ducc0::mav_apply(
+        [&acc](const Tmean &m, const T &lic, const Tmean &l, const Tmask &msk) {
+          T fct{1};
+          if (complex_mean)
+            fct *= 2;
+          acc += (exp(lic) * norm(l - m) - fct * lic) * T(msk);
+        },
+        1, mean, logicov, signal,
+        mask); // not parallelized because accumulating
+    acc *= 0.5;
     return py::array(py::cast(Tenergy(acc)));
   }
 
