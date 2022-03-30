@@ -201,9 +201,7 @@ public:
 };
 
 template <typename T, bool complex_mean,
-          typename Tmean = conditional_t<complex_mean, complex<T>, T>,
-          typename Tacc = long double,
-          typename Tacc_cplx = conditional_t<complex_mean, complex<Tacc>, Tacc>>
+          typename Tmean = conditional_t<complex_mean, complex<T>, T>>
 class VariableCovarianceDiagonalGaussianLikelihood {
   using Tenergy = double;
   using Tmask = uint8_t;
@@ -218,6 +216,8 @@ private:
 public:
   const ducc0::cfmav<Tmean> mean;
   const ducc0::cfmav<Tmask> mask;
+
+  using Tacc = double;
 
   VariableCovarianceDiagonalGaussianLikelihood(const py::array &mean_,
                                                const py::str &key_signal_,
@@ -238,12 +238,10 @@ public:
       ducc0::mav_apply(
           [&acc](const Tmean &m, const T &lic, const Tmean &l,
                  const Tmask &msk) {
-            Tacc_cplx mm(m), ll(l);
-            Tacc iicc{exp(lic)};
-            Tacc logiicc(lic);
+            T fct{1};
             if (complex_mean)
-              logiicc *= 2;
-            acc += (iicc * norm(ll - mm) - logiicc) * T(msk);
+              fct *= 2;
+            acc += (exp(lic) * norm(l - m) - fct * lic) * T(msk);
           },
           1, mean, logicov, signal,
           mask); // not parallelized because accumulating
@@ -259,15 +257,13 @@ public:
     auto grad_lic{ducc0::vfmav<T>(loc_lic.shape(), ducc0::UNINITIALIZED)};
     Tacc acc{0};
 
-    // value
+    // value FIXME This is a duplicate
     ducc0::mav_apply(
         [&acc](const Tmean &m, const T &lic, const Tmean &l, const Tmask &msk) {
-          Tacc_cplx mm(m), ll(l);
-          Tacc iicc{exp(lic)};
-          Tacc logiicc{lic};
+          T fct{1};
           if (complex_mean)
-            logiicc *= 2;
-          acc += (iicc * norm(ll - mm) - logiicc) * T(msk);
+            fct *= 2;
+          acc += (exp(lic) * norm(l - m) - fct * lic) * T(msk);
         },
         1, mean, loc_lic, loc_s, mask); // not parallelized because accumulating
     acc *= 0.5;
@@ -304,10 +300,8 @@ public:
           ducc0::mav_apply(
               [&acc](const Tmean &is, const T &ilic, const Tmean &gs,
                      const T &glic) {
-                Tacc_cplx ii{is}, gg{gs};
-                Tacc jj{ilic}, hh{glic};
-                acc += real(ii) * real(gg) + imag(ii) * imag(gg);
-                acc += jj * hh;
+                acc += real(is) * real(gs) + imag(is) * imag(gs);
+                acc += ilic * glic;
               },
               1, inp_s, inp_lic, grad_s,
               grad_lic); // not parallelized because accumulating
