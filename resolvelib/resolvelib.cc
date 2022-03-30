@@ -91,8 +91,7 @@ void add_linearization_with_metric(py::module_ &msup, const char *name) {
 
 template <typename T, bool complex_mean,
           typename Tmean = conditional_t<complex_mean, complex<T>, T>,
-          typename Tacc = long double,
-          typename Tacc_cplx = conditional_t<complex_mean, complex<Tacc>, Tacc>>
+          typename Tacc = long double>
 class DiagonalGaussianLikelihood {
 private:
   const size_t nthreads;
@@ -119,10 +118,9 @@ public:
       py::gil_scoped_release release;
       ducc0::mav_apply(
           [&acc](const Tmean &m, const T &ic, const Tmean &l) {
-            Tacc_cplx mm(m), ll(l);
-            Tacc iicc(ic);
-            auto foo{iicc * norm(ll - mm)};
-            acc += foo;
+            auto foo{ic * norm(l - m)};
+            auto foo2 = Tacc(foo);
+            acc += foo2;
           },
           1, mean, icov, inp); // not parallelized because accumulating
       acc *= 0.5;
@@ -138,10 +136,9 @@ public:
     // value
     ducc0::mav_apply(
         [&acc](const Tmean &m, const T &ic, const Tmean &l) {
-          Tacc_cplx mm(m), ll(l);
-          Tacc iicc(ic);
-          auto tmp1{iicc * norm(ll - mm)};
-          acc += tmp1;
+          auto foo{ic * norm(l - m)};
+          auto foo2 = Tacc(foo);
+          acc += foo2;
         },
         1, mean, icov, loc); // not parallelized because accumulating
     acc *= 0.5;
@@ -165,8 +162,9 @@ public:
 
           ducc0::mav_apply(
               [&acc](const Tmean &i, const Tmean &g) {
-                Tacc_cplx ii{i}, gg{g};
-                acc += real(ii) * real(gg) + imag(ii) * imag(gg);
+                T foo{real(i) * real(g) + imag(i) * imag(g)};
+                auto foo2 = Tacc(foo);
+                acc += foo2;
               },
               1, inp, gradient); // not parallelized because accumulating
           return py::array(py::cast(Tenergy(acc)));
