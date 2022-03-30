@@ -113,8 +113,12 @@ public:
         mean(ducc0::to_cfmav<Tmean>(mean_)),
         icov(ducc0::to_cfmav<T>(inverse_covariance_)) {}
 
-  py::array apply(const py::array &inp_) const {
-    auto inp{ducc0::to_cfmav<Tmean>(inp_)};
+private:
+  Tenergy energy_value(const py::array &inp) const {
+    return energy_value(ducc0::to_cfmav<Tmean>(inp));
+  }
+
+  Tenergy energy_value(const ducc0::cfmav<Tmean> &inp) const {
     Tacc acc{0};
     ducc0::mav_apply(
         [&acc](const Tmean &m, const T &ic, const Tmean &l) {
@@ -122,26 +126,20 @@ public:
           const auto foo2 = Tacc(foo);
           acc += foo2;
         },
-        1, mean, icov, inp); // not parallelized because accumulating
-    acc *= 0.5;
-    return py::array(py::cast(Tenergy(acc)));
+        1, mean, icov, inp);
+    return 0.5 * acc;
+  }
+
+public:
+  py::array apply(const py::array &inp_) const {
+    return py::array(py::cast(energy_value(inp_)));
   }
 
   LinearizationWithMetric<py::array> apply_with_jac(const py::array &loc_) {
     auto loc{ducc0::to_cfmav<Tmean>(loc_)};
     auto gradient{ducc0::vfmav<Tmean>(loc.shape(), ducc0::UNINITIALIZED)};
-    Tacc acc{0};
 
-    // value FIXME duplicate
-    ducc0::mav_apply(
-        [&acc](const Tmean &m, const T &ic, const Tmean &l) {
-          const auto foo{ic * norm(l - m)};
-          const auto foo2 = Tacc(foo);
-          acc += foo2;
-        },
-        1, mean, icov, loc); // not parallelized because accumulating
-    acc *= 0.5;
-    auto energy{Tenergy(acc)};
+    const auto energy{energy_value(loc)};
     // /value
 
     // gradient
