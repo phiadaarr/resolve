@@ -33,8 +33,8 @@ else:
     dom1 = ift.RGSpace(200)
 
 total_N = 200
-dom0 = ift.RGSpace([32, 32], [0.1, 0.1])
-dom1 = ift.RGSpace(200, 0.893)
+dom0 = ift.RGSpace([42, 42], [0.1, 0.1])
+dom1 = ift.RGSpace(88, 0.893)
 
 
 dofdex = list(range(total_N))
@@ -76,7 +76,7 @@ def get_cpp_op(nthreads):
 pos = ift.from_random(op0.domain)
 
 # TEMPORARY
-op1 = get_cpp_op(16)
+op1 = get_cpp_op(1)
 from time import time
 t0 = time()
 op0(pos)
