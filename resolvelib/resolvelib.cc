@@ -136,25 +136,24 @@ public:
   }
 
   LinearizationWithMetric<py::array> apply_with_jac(const py::array &loc_) {
-    auto loc{ducc0::to_cfmav<Tmean>(loc_)};
-    auto gradient{ducc0::vfmav<Tmean>(loc.shape(), ducc0::UNINITIALIZED)};
-
-    const auto energy{energy_value(loc)};
-    // /value
+    const auto loc{ducc0::to_cfmav<Tmean>(loc_)};
+    const auto energy = energy_value(loc);
 
     // gradient
+    // Allocate memory with Python to inform Python's GC
+    auto gradient_ = py::array_t<Tmean>(loc.shape());
     ducc0::mav_apply(
         [](const Tmean &m, const T &ic, const Tmean &l, Tmean &g) {
           const auto tmp2{(l - m) * ic};
           g = tmp2;
         },
-        nthreads, mean, icov, loc, gradient);
+        nthreads, mean, icov, loc, ducc0::to_vfmav<Tmean>(gradient_));
     // /gradient
 
     // Jacobian
     function<py::array(const py::array &)> ftimes =
-        [gradient = gradient](const py::array &inp_) {
-          auto inp{ducc0::to_cfmav<Tmean>(inp_)};
+        [gradient_ = gradient_](const py::array &inp_) {
+          const auto inp{ducc0::to_cfmav<Tmean>(inp_)};
           Tacc acc{0};
 
           ducc0::mav_apply(
@@ -163,13 +162,14 @@ public:
                 const auto foo2 = Tacc(foo);
                 acc += foo2;
               },
-              1, inp, gradient); // not parallelized because accumulating
+              1, inp, ducc0::to_cfmav<Tmean>(gradient_));
           return py::array(py::cast(Tenergy(acc)));
         };
     function<py::array(const py::array &)> fadjtimes =
-        [nthreads = nthreads, gradient = gradient](const py::array &inp_) {
-          auto inp{ducc0::to_cfmav<Tenergy>(inp_)};
-          auto inpT{T(inp())};
+        [nthreads = nthreads, gradient_ = gradient_](const py::array &inp_) {
+          const auto inp{ducc0::to_cfmav<Tenergy>(inp_)};
+          const auto inpT{T(inp())};
+          const auto gradient = ducc0::to_cfmav<Tmean>(gradient_);
           auto out_{ducc0::make_Pyarr<Tmean>(gradient.shape())};
           auto out{ducc0::to_vfmav<Tmean>(out_)};
           ducc0::mav_apply(
@@ -185,7 +185,7 @@ public:
     // Metric
     function<py::array(const py::array &)> apply_metric =
         [nthreads = nthreads, icov = icov](const py::array &inp_) {
-          auto inp{ducc0::to_cfmav<Tmean>(inp_)};
+          const auto inp{ducc0::to_cfmav<Tmean>(inp_)};
           auto out_{ducc0::make_Pyarr<Tmean>(inp.shape())};
           auto out{ducc0::to_vfmav<Tmean>(out_)};
           ducc0::mav_apply(
