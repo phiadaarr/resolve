@@ -71,7 +71,7 @@ def polarization_converter(domain, target):
             # Convention: Stokes I 1Jy source leads to 1Jy in LL and 1Jy in RR
             op = ift.ContractionOperator(target, 0).adjoint
             return op.ducktape(domain)
-        if len(target[0].labels) and target[0].labels[0] in ["LL", "RR", "XX", "YY"]:
+        if len(target[0].labels) == 1 and target[0].labels[0] in ["LL", "RR", "XX", "YY"]:
             # Convention: Stokes I 1Jy source leads to 1Jy in LL and 1Jy in RR
             return ift.Operator.identity_operator(target).ducktape(domain)
     if domain[0].labels_eq(["I", "Q", "U"]) or domain[0].labels_eq(["I", "Q", "U", "V"]):
