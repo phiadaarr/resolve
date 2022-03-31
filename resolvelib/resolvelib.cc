@@ -116,11 +116,11 @@ public:
         icov(ducc0::to_cfmav<T>(inverse_covariance_)) {}
 
 private:
-  Tenergy energy_value(const py::array &inp) const {
-    return energy_value(ducc0::to_cfmav<Tmean>(inp));
+  Tenergy value(const py::array &inp) const {
+    return value(ducc0::to_cfmav<Tmean>(inp));
   }
 
-  Tenergy energy_value(const ducc0::cfmav<Tmean> &inp) const {
+  Tenergy value(const ducc0::cfmav<Tmean> &inp) const {
     Tacc acc{0};
     ducc0::mav_apply(
         [&acc](const Tmean &m, const T &ic, const Tmean &l) {
@@ -134,12 +134,12 @@ private:
 
 public:
   py::array apply(const py::array &inp_) const {
-    return py::array(py::cast(energy_value(inp_)));
+    return py::array(py::cast(value(inp_)));
   }
 
   LinearizationWithMetric<py::array> apply_with_jac(const py::array &loc_) {
     const auto loc{ducc0::to_cfmav<Tmean>(loc_)};
-    const auto energy = energy_value(loc);
+    const auto val = value(loc);
 
     // gradient
     // Allocate memory with Python to inform Python's GC
@@ -200,7 +200,7 @@ public:
         };
     // /Metric
 
-    return LinearizationWithMetric<py::array>(py::array(py::cast(energy)),
+    return LinearizationWithMetric<py::array>(py::array(py::cast(val)),
                                               ftimes, fadjtimes, apply_metric);
   }
 };
