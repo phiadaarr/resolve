@@ -91,9 +91,13 @@ void add_linearization_with_metric(py::module_ &msup, const char *name) {
       .def("apply_metric", &LinearizationWithMetric<Tin>::apply_metric);
 }
 
+// Global types for energies
+using Tacc = double;
+using Tenergy = double;
+// /Global types for energies
+
 template <typename T, bool complex_mean,
-          typename Tmean = conditional_t<complex_mean, complex<T>, T>,
-          typename Tacc = long double>
+          typename Tmean = conditional_t<complex_mean, complex<T>, T>>
 class DiagonalGaussianLikelihood {
 private:
   const size_t nthreads;
@@ -103,8 +107,6 @@ private:
 public:
   const ducc0::cfmav<Tmean> mean;
   const ducc0::cfmav<T> icov;
-
-  using Tenergy = double;
 
   DiagonalGaussianLikelihood(const py::array &mean_,
                              const py::array &inverse_covariance_,
@@ -127,7 +129,7 @@ private:
           acc += foo2;
         },
         1, mean, icov, inp);
-    return 0.5 * acc;
+    return Tenergy(0.5) * Tenergy(acc);
   }
 
 public:
@@ -206,7 +208,6 @@ public:
 template <typename T, bool complex_mean,
           typename Tmean = conditional_t<complex_mean, complex<T>, T>>
 class VariableCovarianceDiagonalGaussianLikelihood {
-  using Tenergy = double;
   using Tmask = uint8_t;
 
 private:
@@ -219,8 +220,6 @@ private:
 public:
   const ducc0::cfmav<Tmean> mean;
   const ducc0::cfmav<Tmask> mask;
-
-  using Tacc = double;
 
   VariableCovarianceDiagonalGaussianLikelihood(const py::array &mean_,
                                                const py::str &key_signal_,
@@ -355,7 +354,7 @@ public:
                  T &olic, const Tmask &msk) {
                 T fac{1};
                 if (!complex_mean)
-                  fac *= 0.5;
+                  fac *= T(0.5);
                 const Tmean foo{exp(lic) * ins * T(msk)};
                 const T foo2{inlic * T(msk) * fac};
                 os = foo;
