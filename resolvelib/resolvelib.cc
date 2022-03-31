@@ -253,6 +253,8 @@ public:
   LinearizationWithMetric<py::dict> apply_with_jac(const py::dict &loc_) {
     auto loc_s{ducc0::to_cfmav<Tmean>(loc_[key_signal])};
     auto loc_lic{ducc0::to_cfmav<T>(loc_[key_log_icov])};
+
+    // FIXME Initialize this with python
     auto grad_s{ducc0::vfmav<Tmean>(loc_s.shape(), ducc0::UNINITIALIZED)};
     auto grad_lic{ducc0::vfmav<T>(loc_lic.shape(), ducc0::UNINITIALIZED)};
     Tacc acc{0};
@@ -447,6 +449,7 @@ public:
     };
 
     // Allocate Jacobian
+    // FIXME Initialize this with python
     auto mat = ducc0::vmav<mtx, ndim>(I.shape());
     // /Allocate Jacobian
 
