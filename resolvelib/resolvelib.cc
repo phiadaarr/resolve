@@ -19,6 +19,8 @@
 /* Copyright (C) 2021-2022 Max-Planck-Society, Philipp Arras
    Authors: Philipp Arras */
 
+#define QUICKCOMPILE
+
 // FIXME Release GIL around mav_applys
 #include <iostream>
 // Includes related to pybind11
@@ -96,6 +98,7 @@ using Tacc = double;
 using Tenergy = double;
 // /Global types for energies
 
+#ifndef QUICKCOMPILE
 template <typename T, bool complex_mean,
           typename Tmean = conditional_t<complex_mean, complex<T>, T>>
 class DiagonalGaussianLikelihood {
@@ -780,6 +783,8 @@ public:
   }
 };
 
+#endif
+
 class CfmCore {
 private:
   const py::list amplitude_keys;
@@ -808,6 +813,7 @@ public:
         nthreads(nthreads_) {}
 
   py::array apply(const py::dict &inp_) const {
+    cout << "check" << endl;
     const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
     const auto inp_azm = ducc0::to_cfmav<double>(inp_[key_azm]);
     const auto inp_pspec0{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[0]])};
@@ -815,7 +821,7 @@ public:
 
     const auto n_pspecs = py::len(amplitude_keys);
 
-    cout << "check" << endl;
+    cout << "check0" << endl;
 
     vector<ducc0::cmav<double, 2>> inp_pspec;
     for (size_t i = 0; i < n_pspecs; ++i)
@@ -837,15 +843,15 @@ public:
           size_t first_dim{1};
           for (size_t i = 0; i < n_pspecs; ++i) {
             const auto active_pindex_array = pindex(i);
-            //const int64_t pspec_index{active_pindex(inds[first_dim])};
             const auto current_dims = active_pindex_array.ndim();
 
             vector<size_t> pindex_index_vector;
-            for (size_t j = 0; j < current_dims; ++j){
-              pindex_index_vector.emplace_back(inds[first_dim+j]);
-              }
+            for (size_t j = 0; j < current_dims; ++j) {
+              pindex_index_vector.emplace_back(inds[first_dim + j]);
+            }
             first_dim += current_dims;
-
+            MR_assert(pindex_index_vector.size() == active_pindex_array.ndim(),
+                      "incorrect size");
             const int64_t active_pindex =
                 active_pindex_array(pindex_index_vector);
             foop *= inp_pspec[i](inds[0], active_pindex);
@@ -860,9 +866,11 @@ public:
     cout << "check4" << endl;
 
     // Offset mean
-    vector<ducc0::slice> slcs(3);
-    for (size_t i = 0; i < inp_xi.shape(0); ++i)
-      out(i, 0, 0) += offset_mean;
+    vector<size_t> myinds(out.ndim(), 0);
+    for (size_t i = 0; i < out.shape(0); ++i) {
+      myinds[0] = i;
+      out(myinds) += offset_mean;
+    }
     // /Offset mean
     cout << "check5" << endl;
 
@@ -994,6 +1002,7 @@ PYBIND11_MODULE(resolvelib, m) {
 
   m.attr("__name__") = "resolvelib";
 
+#ifndef QUICKCOMPILE
   py::class_<PolarizationMatrixExponential<double, 1>>(
       m, "PolarizationMatrixExponential1")
       .def(py::init<size_t>())
@@ -1080,6 +1089,7 @@ PYBIND11_MODULE(resolvelib, m) {
                     size_t, double, size_t>())
       .def("apply", &CalibrationDistributor::apply)
       .def("apply_with_jac", &CalibrationDistributor::apply_with_jac);
+#endif
 
   py::class_<CfmCore>(m, "CfmCore")
       .def(py::init<py::list, py::list, py::str, py::str, double, double,
