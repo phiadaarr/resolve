@@ -56,6 +56,10 @@ def calibration_distribution(
     domain = calibration_solutions.target
     pdom, antdom, tdom, fdom = phase_operator.target
     target_fdom = observation.vis.domain[2]
+    if pdom != observation.vis.domain[0]:
+        s = ("PolarizationSpace of calibration solution and data needs to be the same.\n"
+            f"For calibration solution got:\n{pdom}\nData domain:\n{observation.vis.domain[0]}")
+        raise ValueError(s)
     distributor = Pybind11Operator(
         domain,
         target,
