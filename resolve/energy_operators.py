@@ -75,6 +75,11 @@ def DiagonalGaussianLikelihood(data, inverse_covariance, mask=None, nthreads=1):
         inverse_covariance = ift.makeField(data.domain, mask) * inverse_covariance
         assert inverse_covariance.val.dtype == foo
 
+    if np.any(np.isnan(inverse_covariance.val)):
+        raise ValueError("inverse_covariance must not contain NaN.")
+    if np.any(np.isnan(data.val)):
+        raise ValueError("data must not contain NaN.")
+
     return Pybind11LikelihoodEnergyOperator(
         data.domain,
         f(data.val, inverse_covariance.val, nthreads),
