@@ -828,8 +828,6 @@ public:
     cout << "check" << endl;
     const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
     const auto inp_azm = ducc0::to_cfmav<double>(inp_[key_azm]);
-    const auto inp_pspec0{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[0]])};
-    const auto inp_pspec1{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[1]])};
 
     const auto n_pspecs = py::len(amplitude_keys);
 

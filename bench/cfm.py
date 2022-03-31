@@ -75,6 +75,9 @@ def get_cpp_op(nthreads):
 
 pos = ift.from_random(op0.domain)
 
+
+rve.operator_equality(get_cpp_op(1), op0, ntries=2)
+exit()
 # TEMPORARY
 op1 = get_cpp_op(1)
 from time import time
