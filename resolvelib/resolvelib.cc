@@ -20,7 +20,7 @@
    Authors: Philipp Arras */
 
 // FIXME Release GIL around mav_applys
-
+#include <iostream>
 // Includes related to pybind11
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
@@ -200,8 +200,8 @@ public:
         };
     // /Metric
 
-    return LinearizationWithMetric<py::array>(py::array(py::cast(val)),
-                                              ftimes, fadjtimes, apply_metric);
+    return LinearizationWithMetric<py::array>(py::array(py::cast(val)), ftimes,
+                                              fadjtimes, apply_metric);
   }
 };
 
@@ -813,30 +813,61 @@ public:
     const auto inp_pspec0{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[0]])};
     const auto inp_pspec1{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[1]])};
 
+    const auto n_pspecs = py::len(amplitude_keys);
+
+    cout << "check" << endl;
+
+    vector<ducc0::cmav<double, 2>> inp_pspec;
+    for (size_t i = 0; i < n_pspecs; ++i)
+      inp_pspec.emplace_back(
+          ducc0::to_cmav<double, 2>(inp_[amplitude_keys[i]]));
+
+    cout << "check1" << endl;
+
     auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
     auto out = ducc0::to_vfmav<double>(out_);
 
+    cout << "check2" << endl;
+
     // xi and Power distributor
-    const auto p0{pindex(0)};
-    const auto p1{pindex(1)};
+    cout << "check3" << endl;
     ducc0::mav_apply_with_index(
         [&](double &oo, const double &xi, const shape_t &inds) {
-          const int64_t ind0{p0(inds[1])};
-          const int64_t ind1{p1(inds[2])};
-          const double foo{inp_pspec0(inds[0], ind0) *
-                           inp_pspec1(inds[0], ind1) * inp_azm(inds[0]) * xi};
-          oo = foo;
+          double foop{1};
+          size_t first_dim{1};
+          for (size_t i = 0; i < n_pspecs; ++i) {
+            const auto active_pindex_array = pindex(i);
+            //const int64_t pspec_index{active_pindex(inds[first_dim])};
+            const auto current_dims = active_pindex_array.ndim();
+
+            vector<size_t> pindex_index_vector;
+            for (size_t j = 0; j < current_dims; ++j){
+              pindex_index_vector.emplace_back(inds[first_dim+j]);
+              }
+            first_dim += current_dims;
+
+            const int64_t active_pindex =
+                active_pindex_array(pindex_index_vector);
+            foop *= inp_pspec[i](inds[0], active_pindex);
+          }
+
+          const double foozm{inp_azm(inds[0]) * xi};
+
+          oo = foozm * foop;
         },
         nthreads, out, inp_xi);
     // /Power distributor
+    cout << "check4" << endl;
 
     // Offset mean
     vector<ducc0::slice> slcs(3);
     for (size_t i = 0; i < inp_xi.shape(0); ++i)
       out(i, 0, 0) += offset_mean;
     // /Offset mean
+    cout << "check5" << endl;
 
     ducc0::r2r_separable_hartley(out, out, {1, 2}, scalar_dvol, nthreads);
+    cout << "check6" << endl;
 
     return out_;
   }

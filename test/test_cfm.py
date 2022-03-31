@@ -26,14 +26,17 @@ pmp = pytest.mark.parametrize
 @pmp("total_N", [1, 2])
 @pmp("prefix", ["", "b"])
 @pmp("nthreads", [1, 2])
-@pmp("small", [False, True])
-def test_cfm(total_N, prefix, small, nthreads):
-    if small:
+@pmp("cfg", [0, 1, 2])
+def test_cfm(total_N, prefix, cfg, nthreads):
+    if cfg == 0:
         dom0 = ift.RGSpace(20)
         dom1 = ift.RGSpace(22)
-    else:
+    elif cfg == 1:
         dom0 = ift.RGSpace(100, 1000)
         dom1 = ift.RGSpace(200, 1.2)
+    elif cfg == 2:
+        dom0 = ift.RGSpace(20, 1.231)
+        dom1 = ift.RGSpace((12, 12), (0.1, 0.1))
 
     dofdex = list(range(total_N))
     args0 = dict(prefix=prefix, total_N=total_N)
