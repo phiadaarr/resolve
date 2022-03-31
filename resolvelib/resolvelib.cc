@@ -793,6 +793,9 @@ private:
   const py::str key_azm;
   const double offset_mean;
   const double scalar_dvol;
+  vector<ducc0::cfmav<int64_t>> lpindex;
+  vector<size_t> dimlim;
+
   size_t nthreads;
 
   using shape_t = vector<size_t>;
@@ -810,7 +813,16 @@ public:
           const size_t nthreads_)
       : amplitude_keys(amplitude_keys_), pindices(pindices_), key_xi(key_xi_),
         key_azm(key_azm_), offset_mean(offset_mean_), scalar_dvol(scalar_dvol_),
-        nthreads(nthreads_) {}
+        nthreads(nthreads_)
+      {
+      const auto n_pspecs = py::len(amplitude_keys);
+      dimlim.push_back(1);
+      for (size_t i=0; i<n_pspecs; ++i)
+        {
+        lpindex.push_back(pindex(i));
+        dimlim.push_back(dimlim.back()+lpindex.back().ndim());
+        }
+      }
 
   py::array apply(const py::dict &inp_) const {
     cout << "check" << endl;
@@ -840,20 +852,10 @@ public:
     ducc0::mav_apply_with_index(
         [&](double &oo, const double &xi, const shape_t &inds) {
           double foop{1};
-          size_t first_dim{1};
           for (size_t i = 0; i < n_pspecs; ++i) {
-            const auto active_pindex_array = pindex(i);
-            const auto current_dims = active_pindex_array.ndim();
 
-            vector<size_t> pindex_index_vector;
-            for (size_t j = 0; j < current_dims; ++j) {
-              pindex_index_vector.emplace_back(inds[first_dim + j]);
-            }
-            first_dim += current_dims;
-            MR_assert(pindex_index_vector.size() == active_pindex_array.ndim(),
-                      "incorrect size");
             const int64_t active_pindex =
-                active_pindex_array(pindex_index_vector);
+                lpindex[i].val(&inds[dimlim[i]], &inds[dimlim[i+1]]);
             foop *= inp_pspec[i](inds[0], active_pindex);
           }
 
