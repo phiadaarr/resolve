@@ -451,7 +451,7 @@ public:
     };
 
     // Allocate Jacobian
-    // FIXME Initialize this with python
+    // Initialize this with python?
     auto mat = ducc0::vmav<mtx, ndim>(I.shape());
     // /Allocate Jacobian
 
@@ -801,9 +801,7 @@ private:
 
   using shape_t = vector<size_t>;
 
-  ducc0::cfmav<int64_t>
-  pindex(const size_t &index) const { // FIXME @mtr is this type correct? This
-                                      // is at least what python gives me
+  ducc0::cfmav<int64_t> pindex(const size_t &index) const {
     return ducc0::to_cfmav<int64_t>(pindices[index]);
   }
 
