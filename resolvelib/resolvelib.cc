@@ -19,7 +19,7 @@
 /* Copyright (C) 2021-2022 Max-Planck-Society, Philipp Arras
    Authors: Philipp Arras */
 
-// TEMPORARAY!!!
+// FIXME TEMPORARAY!!!
 #define QUICKCOMPILE
 
 // FIXME Release GIL around mav_applys
@@ -830,6 +830,7 @@ public:
     const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
     const auto inp_azm = ducc0::to_cfmav<double>(inp_[key_azm]);
 
+    const size_t total_N = inp_xi.shape(0);
     const auto n_pspecs = py::len(amplitude_keys);
 
     vector<ducc0::cmav<double, 2>> inp_pspec;
@@ -840,7 +841,29 @@ public:
     auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
     auto out = ducc0::to_vfmav<double>(out_);
 
-    // xi and Power distributor
+    // Precompute distributed power spectra
+    // FIXME push_back cfmav
+    vector<ducc0::vfmav<double>> distributed_power_spectra;
+    for (size_t i = 0; i < n_pspecs; ++i) {
+      const auto lshape = combine_shapes(total_N, pindex(i).shape());
+      distributed_power_spectra.emplace_back(lshape);
+    }
+
+    // for (size_t i = 0; i < n_pspecs; ++i) {
+    //  const auto &l_inp_pspec = inp_pspec[i];
+    //  ducc0::mav_apply_with_index(
+    //      [&](double &oo, const shape_t &inds) {
+    //        const int64_t pind =
+    //            lpindex[i].val(&inds[dimlim[i]], &inds[dimlim[i + 1]]);
+    //        oo = l_inp_pspec(inds[0], pind);
+    //      },
+    //      1, pd_pspec);
+    //  // FIXME push_back cfmav
+    //  distributed_power_spectra.push_back(pd_pspec);
+    //}
+    // /Precompute distributed power spectra
+
+    // xi * distributed spectra
     ducc0::mav_apply_with_index(
         [&](double &oo, const double &xi, const shape_t &inds) {
           double foop{1};
@@ -856,11 +879,11 @@ public:
           oo = foozm * foop;
         },
         nthreads, out, inp_xi);
-    // /Power distributor
+    // /xi * distributed spectra
 
     // Offset mean
     vector<size_t> myinds(out.ndim(), 0);
-    for (size_t i = 0; i < out.shape(0); ++i) {
+    for (size_t i = 0; i < total_N; ++i) {
       myinds[0] = i;
       out(myinds) += offset_mean;
     }

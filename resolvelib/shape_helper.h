@@ -49,3 +49,21 @@ template<typename T, size_t L>
   res[L] = s2;
   return res;
   }
+
+vector<size_t> combine_shapes(const vector<size_t> &vec, const size_t s2)
+{
+vector<size_t> out;
+for (auto i: vec)
+  out.push_back(i);
+out.push_back(s2);
+return out;
+}
+
+vector<size_t> combine_shapes(const size_t s1, const vector<size_t> &vec)
+{
+vector<size_t> out;
+out.push_back(s1);
+for (auto i: vec)
+  out.push_back(i);
+return out;
+}
