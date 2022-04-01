@@ -796,6 +796,7 @@ private:
   vector<ducc0::cfmav<int64_t>> lpindex;
   vector<size_t> dimlim;
   vector<size_t> fft_axes;
+  vector<size_t> space_dims;
 
   size_t nthreads;
 
@@ -818,6 +819,7 @@ public:
     for (size_t i = 0; i < n_pspecs; ++i) {
       lpindex.push_back(pindex(i));
       dimlim.push_back(dimlim.back() + lpindex.back().ndim());
+      space_dims.push_back(lpindex.back().ndim());
     }
 
     // FIXME @mtr how to write this nicer?
@@ -850,7 +852,7 @@ public:
 
     for (size_t i = 0; i < n_pspecs; ++i) {
       const auto &l_inp_pspec = inp_pspec[i];
-      const size_t actual_dimensions = lpindex[i].ndim();
+      const size_t actual_dimensions = space_dims[i];
       ducc0::mav_apply_with_index(
           [&](double &oo, const shape_t &inds) {
             const int64_t pind =
@@ -867,14 +869,21 @@ public:
         [&](double &oo, const double &xi, const shape_t &inds) {
           double foop{1};
           for (size_t i = 0; i < n_pspecs; ++i) {
-
-            const int64_t active_pindex =
-                lpindex[i].val(&inds[dimlim[i]], &inds[dimlim[i + 1]]);
-            foop *= inp_pspec[i](inds[0], active_pindex);
+            if (true) { // TEMPORARAY
+              const int64_t active_pindex =
+                  lpindex[i].val(&inds[dimlim[i]], &inds[dimlim[i + 1]]);
+              foop *= inp_pspec[i](inds[0], active_pindex);
+            } else {
+              // Create index
+              vector<size_t> linds;
+              linds.push_back(inds[0]);
+              for (size_t jj = 0; jj < space_dims[i]; ++jj)
+                linds.push_back(inds[jj]);
+              // /Create index
+              foop *= distributed_power_spectra[i](linds);
+            }
           }
-
           const double foozm{inp_azm(inds[0]) * xi};
-
           oo = foozm * foop;
         },
         nthreads, out, inp_xi);
