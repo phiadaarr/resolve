@@ -869,19 +869,13 @@ public:
         [&](double &oo, const double &xi, const shape_t &inds) {
           double foop{1};
           for (size_t i = 0; i < n_pspecs; ++i) {
-            if (true) { // TEMPORARAY
-              const int64_t active_pindex =
-                  lpindex[i].val(&inds[dimlim[i]], &inds[dimlim[i + 1]]);
-              foop *= inp_pspec[i](inds[0], active_pindex);
-            } else {
-              // Create index
-              vector<size_t> linds;
-              linds.push_back(inds[0]);
-              for (size_t jj = 0; jj < space_dims[i]; ++jj)
-                linds.push_back(inds[jj]);
-              // /Create index
-              foop *= distributed_power_spectra[i](linds);
-            }
+            // Create index
+            vector<size_t> linds;
+            linds.push_back(inds[0]);
+            for (size_t jj = dimlim[i]; jj < dimlim[i + 1]; ++jj)
+              linds.push_back(inds[jj]);
+            // /Create index
+            foop *= distributed_power_spectra[i](linds);
           }
           const double foozm{inp_azm(inds[0]) * xi};
           oo = foozm * foop;
