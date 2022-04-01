@@ -72,11 +72,34 @@ def get_cpp_op(nthreads):
     cfm.set_amplitude_total_offset(**args3)
     return cfm.finalize(0)
 
-
 pos = ift.from_random(op0.domain)
 
+max_nthreads = 4
+xs = list(range(1, max_nthreads+1))
+ys0, ys1 = [], []
+from time import time
+for nn in xs:
+    print(nn, "of", xs)
+    ift.set_nthreads(nn)
+    t0 = time()
+    res0 = op0(pos)
+    ys0.append(time()-t0)
 
-rve.operator_equality(get_cpp_op(1), op0, ntries=2)
+    op1 = get_cpp_op(nn)
+    t0 = time()
+    res1 = op1(pos)
+    ys1.append(time()-t0)
+
+    ift.extra.assert_allclose(res0, res1, rtol=1e-5)
+
+import matplotlib.pyplot as plt
+plt.plot(xs, ys0, label="NIFTy times")
+plt.plot(xs, ys1, label="resolvelib times")
+plt.legend()
+plt.tight_layout()
+plt.savefig("cfm_perf.png")
+plt.close()
+
 exit()
 # TEMPORARY
 op1 = get_cpp_op(1)

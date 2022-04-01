@@ -29,6 +29,7 @@
 
 #include "ducc0/bindings/pybind_utils.h"
 #include "ducc0/fft/fft.h"
+#include "ducc0/infra/timers.h"
 using namespace pybind11::literals;
 namespace py = pybind11;
 auto None = py::none();
@@ -829,6 +830,9 @@ public:
   }
 
   py::array apply(const py::dict &inp_) const {
+    auto timer = ducc0::TimerHierarchy("CfmCore::apply");
+
+    timer.push("Startup");
     const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
     const auto inp_azm = ducc0::to_cfmav<double>(inp_[key_azm]);
 
@@ -844,6 +848,7 @@ public:
     auto out = ducc0::to_vfmav<double>(out_);
 
     // Precompute distributed power spectra
+    timer.poppush("Precompute power spectra");
     vector<ducc0::vfmav<double>> distributed_power_spectra;
     for (size_t i = 0; i < n_pspecs; ++i) {
       const auto lshape = combine_shapes(total_N, pindex(i).shape());
@@ -859,12 +864,13 @@ public:
                 lpindex[i].val(&inds[1], &inds[actual_dimensions + 1]);
             oo = inp_pspec[i](inds[0], pind);
           },
-          1, distributed_power_spectra[i]);
+          nthreads, distributed_power_spectra[i]);
     }
     // @mtr distributed_power_spectra are not marked const although they should
     // be /Precompute distributed power spectra
 
     // xi * distributed spectra
+    timer.poppush("xi * outer(pspecs)");
     ducc0::mav_apply_with_index(
         [&](double &oo, const double &xi, const shape_t &inds) {
           double foop{1};
@@ -884,6 +890,7 @@ public:
     // /xi * distributed spectra
 
     // Offset mean
+    timer.poppush("offset mean");
     vector<size_t> myinds(out.ndim(), 0);
     for (size_t i = 0; i < total_N; ++i) {
       myinds[0] = i;
@@ -891,6 +898,7 @@ public:
     }
     // /Offset mean
 
+    timer.poppush("fft");
     for (size_t ispace = 0; ispace < n_pspecs; ++ispace) {
       vector<size_t> fft_axes;
       for (size_t idim = dimlim[ispace]; idim < dimlim[ispace + 1]; ++idim)
@@ -898,7 +906,11 @@ public:
       ducc0::r2r_genuine_hartley(out, out, fft_axes, 1., nthreads);
     }
 
+    timer.poppush("rescale");
     ducc0::mav_apply([&](auto &elem) { elem *= scalar_dvol; }, 1, out);
+    timer.pop();
+
+    timer.report(cout);
 
     return out_;
   }
