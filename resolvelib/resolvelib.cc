@@ -842,26 +842,25 @@ public:
     auto out = ducc0::to_vfmav<double>(out_);
 
     // Precompute distributed power spectra
-    // FIXME push_back cfmav
     vector<ducc0::vfmav<double>> distributed_power_spectra;
     for (size_t i = 0; i < n_pspecs; ++i) {
       const auto lshape = combine_shapes(total_N, pindex(i).shape());
       distributed_power_spectra.emplace_back(lshape);
     }
 
-    // for (size_t i = 0; i < n_pspecs; ++i) {
-    //  const auto &l_inp_pspec = inp_pspec[i];
-    //  ducc0::mav_apply_with_index(
-    //      [&](double &oo, const shape_t &inds) {
-    //        const int64_t pind =
-    //            lpindex[i].val(&inds[dimlim[i]], &inds[dimlim[i + 1]]);
-    //        oo = l_inp_pspec(inds[0], pind);
-    //      },
-    //      1, pd_pspec);
-    //  // FIXME push_back cfmav
-    //  distributed_power_spectra.push_back(pd_pspec);
-    //}
-    // /Precompute distributed power spectra
+    for (size_t i = 0; i < n_pspecs; ++i) {
+      const auto &l_inp_pspec = inp_pspec[i];
+      const size_t actual_dimensions = lpindex[i].ndim();
+      ducc0::mav_apply_with_index(
+          [&](double &oo, const shape_t &inds) {
+            const int64_t pind =
+                lpindex[i].val(&inds[1], &inds[actual_dimensions + 1]);
+            oo = inp_pspec[i](inds[0], pind);
+          },
+          1, distributed_power_spectra[i]);
+    }
+    // @mtr distributed_power_spectra are not marked const although they should
+    // be /Precompute distributed power spectra
 
     // xi * distributed spectra
     ducc0::mav_apply_with_index(
