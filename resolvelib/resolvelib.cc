@@ -19,10 +19,10 @@
 /* Copyright (C) 2021-2022 Max-Planck-Society, Philipp Arras
    Authors: Philipp Arras */
 
+// TEMPORARAY!!!
 #define QUICKCOMPILE
 
 // FIXME Release GIL around mav_applys
-#include <iostream>
 // Includes related to pybind11
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
@@ -795,6 +795,7 @@ private:
   const double scalar_dvol;
   vector<ducc0::cfmav<int64_t>> lpindex;
   vector<size_t> dimlim;
+  vector<size_t> fft_axes;
 
   size_t nthreads;
 
@@ -813,47 +814,42 @@ public:
           const size_t nthreads_)
       : amplitude_keys(amplitude_keys_), pindices(pindices_), key_xi(key_xi_),
         key_azm(key_azm_), offset_mean(offset_mean_), scalar_dvol(scalar_dvol_),
-        nthreads(nthreads_)
-      {
-      const auto n_pspecs = py::len(amplitude_keys);
-      dimlim.push_back(1);
-      for (size_t i=0; i<n_pspecs; ++i)
-        {
-        lpindex.push_back(pindex(i));
-        dimlim.push_back(dimlim.back()+lpindex.back().ndim());
-        }
-      }
+        nthreads(nthreads_) {
+    const auto n_pspecs = py::len(amplitude_keys);
+    dimlim.push_back(1);
+    for (size_t i = 0; i < n_pspecs; ++i) {
+      lpindex.push_back(pindex(i));
+      dimlim.push_back(dimlim.back() + lpindex.back().ndim());
+    }
+
+    // FIXME @mtr how to write this nicer?
+    for (size_t i = 1; i < dimlim.back(); ++i) {
+      fft_axes.emplace_back(i);
+    }
+  }
 
   py::array apply(const py::dict &inp_) const {
-    cout << "check" << endl;
     const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
     const auto inp_azm = ducc0::to_cfmav<double>(inp_[key_azm]);
 
     const auto n_pspecs = py::len(amplitude_keys);
-
-    cout << "check0" << endl;
 
     vector<ducc0::cmav<double, 2>> inp_pspec;
     for (size_t i = 0; i < n_pspecs; ++i)
       inp_pspec.emplace_back(
           ducc0::to_cmav<double, 2>(inp_[amplitude_keys[i]]));
 
-    cout << "check1" << endl;
-
     auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
     auto out = ducc0::to_vfmav<double>(out_);
 
-    cout << "check2" << endl;
-
     // xi and Power distributor
-    cout << "check3" << endl;
     ducc0::mav_apply_with_index(
         [&](double &oo, const double &xi, const shape_t &inds) {
           double foop{1};
           for (size_t i = 0; i < n_pspecs; ++i) {
 
             const int64_t active_pindex =
-                lpindex[i].val(&inds[dimlim[i]], &inds[dimlim[i+1]]);
+                lpindex[i].val(&inds[dimlim[i]], &inds[dimlim[i + 1]]);
             foop *= inp_pspec[i](inds[0], active_pindex);
           }
 
@@ -863,7 +859,6 @@ public:
         },
         nthreads, out, inp_xi);
     // /Power distributor
-    cout << "check4" << endl;
 
     // Offset mean
     vector<size_t> myinds(out.ndim(), 0);
@@ -872,15 +867,21 @@ public:
       out(myinds) += offset_mean;
     }
     // /Offset mean
-    cout << "check5" << endl;
 
-    ducc0::r2r_separable_hartley(out, out, {1, 2}, scalar_dvol, nthreads);
-    cout << "check6" << endl;
+    for (size_t ispace = 0; ispace < n_pspecs; ++ispace) {
+      vector<size_t> fft_axes;
+      for (size_t idim = dimlim[ispace]; idim < dimlim[ispace + 1]; ++idim)
+        fft_axes.emplace_back(idim);
+      ducc0::r2r_genuine_hartley(out, out, fft_axes, 1., nthreads);
+    }
+
+    ducc0::mav_apply([&](auto &elem) { elem *= scalar_dvol; }, 1, out);
 
     return out_;
   }
 
   Linearization<py::dict, py::array> apply_with_jac(const py::dict &inp_) {
+    MR_assert(false, "NotimplementedError");
     const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
     const auto inp_azm = ducc0::to_cfmav<double>(inp_[key_azm]);
     const auto inp_pspec0{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[0]])};
@@ -913,6 +914,7 @@ public:
 
     function<py::array(const py::dict &)> ftimes =
         [=](const py::dict &tangent_) {
+          MR_assert(false, "NotimplementedError");
           // FIXME Check this in all other functions
           // FIXME Do not allocate memory in c++ that survives function call.
           // Check this
@@ -953,6 +955,7 @@ public:
 
     function<py::dict(const py::array &)> fadjtimes =
         [=](const py::array &cotangent_) {
+          MR_assert(false, "NotimplementedError");
           // FIXME Check this in all other functions
           const auto inpcopy =
               inp_; // keep inp_ alive to avoid dangling references

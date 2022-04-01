@@ -26,7 +26,7 @@ pmp = pytest.mark.parametrize
 @pmp("total_N", [1, 2])
 @pmp("prefix", ["", "b"])
 @pmp("nthreads", [1, 2])
-@pmp("cfg", [0, 1, 2])
+@pmp("cfg", [0, 1, 2, 3])
 def test_cfm(total_N, prefix, cfg, nthreads):
     if cfg == 0:
         dom0 = ift.RGSpace(20)
@@ -35,8 +35,11 @@ def test_cfm(total_N, prefix, cfg, nthreads):
         dom0 = ift.RGSpace(100, 1000)
         dom1 = ift.RGSpace(200, 1.2)
     elif cfg == 2:
-        dom0 = ift.RGSpace(20, 1.231)
-        dom1 = ift.RGSpace((12, 12), (0.1, 0.1))
+        dom0 = ift.RGSpace(4, 1.231)
+        dom1 = ift.RGSpace((30, 30), (0.1, 0.1))
+    elif cfg == 3:
+        dom0 = ift.RGSpace((12, 12), (0.1, 0.1))
+        dom1 = ift.RGSpace(20, 1.231)
 
     dofdex = list(range(total_N))
     args0 = dict(prefix=prefix, total_N=total_N)
@@ -58,7 +61,7 @@ def test_cfm(total_N, prefix, cfg, nthreads):
         prefix="dom1",
         dofdex=dofdex,
     )
-    args3 = dict(offset_mean=1.2, offset_std=(1.0, 0.2), dofdex=dofdex)
+    args3 = dict(offset_mean=1.12, offset_std=(1.0, 0.2), dofdex=dofdex)
     cfm = ift.CorrelatedFieldMaker(**args0)
     cfm.add_fluctuations(**args1)
     cfm.add_fluctuations(**args2)
@@ -73,6 +76,21 @@ def test_cfm(total_N, prefix, cfg, nthreads):
     op1 = cfm.finalize(0)
 
     op2 = op1.nifty_equivalent
+
+    # TEMPORARY
+    pos = ift.from_random(op0.domain)
+    # p = ift.Plot()
+    # p.add(op0(pos), title="op0")
+    # p.output(name="op0.png")
+    # p = ift.Plot()
+    # p.add(op1(pos), title="op1")
+    # p.output(name="op1.png")
+    # p = ift.Plot()
+    # p.add(op2(pos), title="op2")
+    # p.output(name="op2.png")
+    ift.extra.assert_allclose(op0(pos), op1(pos), rtol=1e-5)
+    return
+    # /TEMPORARY
 
     rve.operator_equality(op0, op1, rtol=1e-5, ntries=3)  # FIXME Why is the accuracy so low?
     rve.operator_equality(op0, op2, rtol=1e-5, ntries=3)
