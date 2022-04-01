@@ -854,7 +854,6 @@ public:
       const auto lshape = combine_shapes(total_N, pindex(i).shape());
       distributed_power_spectra.emplace_back(lshape);
     }
-
     for (size_t i = 0; i < n_pspecs; ++i) {
       const auto &l_inp_pspec = inp_pspec[i];
       const size_t actual_dimensions = space_dims[i];
@@ -869,7 +868,6 @@ public:
     // @mtr distributed_power_spectra are not marked const although they should
     // be /Precompute distributed power spectra
 
-    // xi * distributed spectra
     timer.poppush("xi * outer(pspecs)");
     ducc0::mav_apply_with_index(
         [&](double &oo, const double &xi, const shape_t &inds) {
@@ -887,28 +885,26 @@ public:
           oo = foozm * foop;
         },
         nthreads, out, inp_xi);
-    // /xi * distributed spectra
 
-    // Offset mean
     timer.poppush("offset mean");
-    vector<size_t> myinds(out.ndim(), 0);
-    for (size_t i = 0; i < total_N; ++i) {
-      myinds[0] = i;
-      out(myinds) += offset_mean;
+    {
+      vector<ducc0::slice> myslc(out.ndim(), 0);
+      myslc[0] = ducc0::slice();
+      ducc0::mav_apply([&](auto &oo) { oo += offset_mean; }, 1,
+                       out.subarray(myslc));
     }
-    // /Offset mean
 
     timer.poppush("fft");
-    for (size_t ispace = 0; ispace < n_pspecs; ++ispace) {
-      vector<size_t> fft_axes;
-      for (size_t idim = dimlim[ispace]; idim < dimlim[ispace + 1]; ++idim)
-        fft_axes.emplace_back(idim);
-      ducc0::r2r_genuine_hartley(out, out, fft_axes, 1., nthreads);
+    {
+      double fct{scalar_dvol};
+      for (size_t ispace = 0; ispace < n_pspecs; ++ispace) {
+        vector<size_t> fft_axes;
+        for (size_t idim = dimlim[ispace]; idim < dimlim[ispace + 1]; ++idim)
+          fft_axes.emplace_back(idim);
+        ducc0::r2r_genuine_hartley(out, out, fft_axes, fct, nthreads);
+        fct = 1;
+      }
     }
-
-    timer.poppush("rescale");
-    ducc0::mav_apply([&](auto &elem) { elem *= scalar_dvol; }, 1, out);
-    timer.pop();
 
     timer.report(cout);
 
