@@ -926,6 +926,8 @@ public:
       }
     }
 
+    timer.pop();
+
     timer.report(cout);
 
     return out_;
