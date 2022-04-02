@@ -867,19 +867,21 @@ public:
     }
     // @mtr distributed_power_spectra are not marked const although they should
     // be /Precompute distributed power spectra
+    vector<ducc0::cfmav<double>> distributed_power_spectra2;
+    for (size_t i = 0; i < n_pspecs; ++i) {
+      ducc0::fmav_info::stride_t newstride(inp_xi.ndim(),0);
+      newstride[0] = distributed_power_spectra[i].stride(0);
+      for (size_t j=1; j<distributed_power_spectra[i].shape().size(); ++j)
+        newstride[dimlim[i]-1+j] = distributed_power_spectra[i].stride(j);
+      distributed_power_spectra2.emplace_back(distributed_power_spectra[i].data(), inp_xi.shape(), newstride);
+    }
 
     timer.poppush("xi * outer(pspecs)");
     ducc0::mav_apply_with_index(
         [&](double &oo, const double &xi, const shape_t &inds) {
           double foop{1};
           for (size_t i = 0; i < n_pspecs; ++i) {
-            // Create index
-            vector<size_t> linds;
-            linds.push_back(inds[0]);
-            for (size_t jj = dimlim[i]; jj < dimlim[i + 1]; ++jj)
-              linds.push_back(inds[jj]);
-            // /Create index
-            foop *= distributed_power_spectra[i](linds);
+            foop *= distributed_power_spectra2[i](inds);
           }
           const double foozm{inp_azm(inds[0]) * xi};
           oo = foozm * foop;
