@@ -855,7 +855,6 @@ public:
       distributed_power_spectra.emplace_back(lshape);
     }
     for (size_t i = 0; i < n_pspecs; ++i) {
-      const auto &l_inp_pspec = inp_pspec[i];
       const size_t actual_dimensions = space_dims[i];
       ducc0::mav_apply_with_index(
           [&](double &oo, const shape_t &inds) {
@@ -867,26 +866,45 @@ public:
     }
     // @mtr distributed_power_spectra are not marked const although they should
     // be /Precompute distributed power spectra
+
+    // blow everything up to full dimensionality
+    ducc0::fmav_info::stride_t azm_newstride(inp_xi.ndim(),0);
+    azm_newstride[0] = inp_azm.stride(0);
+    ducc0::cfmav<double> inp_azm2(inp_azm.data(), inp_xi.shape(), azm_newstride);
     vector<ducc0::cfmav<double>> distributed_power_spectra2;
     for (size_t i = 0; i < n_pspecs; ++i) {
       ducc0::fmav_info::stride_t newstride(inp_xi.ndim(),0);
       newstride[0] = distributed_power_spectra[i].stride(0);
-      for (size_t j=1; j<distributed_power_spectra[i].shape().size(); ++j)
+      for (size_t j=1; j<distributed_power_spectra[i].ndim(); ++j)
         newstride[dimlim[i]-1+j] = distributed_power_spectra[i].stride(j);
       distributed_power_spectra2.emplace_back(distributed_power_spectra[i].data(), inp_xi.shape(), newstride);
     }
 
     timer.poppush("xi * outer(pspecs)");
-    ducc0::mav_apply_with_index(
-        [&](double &oo, const double &xi, const shape_t &inds) {
-          double foop{1};
-          for (size_t i = 0; i < n_pspecs; ++i) {
-            foop *= distributed_power_spectra2[i](inds);
-          }
-          const double foozm{inp_azm(inds[0]) * xi};
-          oo = foozm * foop;
-        },
-        nthreads, out, inp_xi);
+    if (n_pspecs==1)
+      ducc0::mav_apply(
+          [&](double &oo, const double &azm, const double &xi, const double &s1) {
+            oo = azm*xi*s1;
+          },
+          nthreads, out, inp_azm2, inp_xi, distributed_power_spectra2[0]);
+    else if (n_pspecs==2)
+      ducc0::mav_apply(
+          [&](double &oo, const double &azm, const double &xi, const double &s1, const double &s2) {
+            oo = azm*xi*s1*s2;
+          },
+          nthreads, out, inp_azm2, inp_xi, distributed_power_spectra2[0], distributed_power_spectra2[1]);
+    // and so on, as far as we want to go with special cases
+    else
+      ducc0::mav_apply_with_index(
+          [&](double &oo, const double &xi, const shape_t &inds) {
+            double foop{1};
+            for (size_t i = 0; i < n_pspecs; ++i) {
+              foop *= distributed_power_spectra2[i](inds);
+            }
+            const double foozm{inp_azm(inds[0]) * xi};
+            oo = foozm * foop;
+          },
+          nthreads, out, inp_xi);
 
     timer.poppush("offset mean");
     {
