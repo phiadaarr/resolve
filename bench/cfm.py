@@ -74,7 +74,7 @@ def get_cpp_op(nthreads):
 
 pos = ift.from_random(op0.domain)
 
-max_nthreads = 4
+max_nthreads = 16
 xs = list(range(1, max_nthreads+1))
 ys0, ys1 = [], []
 from time import time
@@ -93,8 +93,11 @@ for nn in xs:
     ift.extra.assert_allclose(res0, res1, rtol=1e-5)
 
 import matplotlib.pyplot as plt
-plt.plot(xs, ys0, label="NIFTy times")
-plt.plot(xs, ys1, label="resolvelib times")
+import numpy as np
+plt.plot(xs, np.array(ys0)*1000, label="NIFTy times")
+plt.plot(xs, np.array(ys1)*1000, label="resolvelib times")
+plt.ylabel("Wall time [ms]")
+plt.ylim([0, None])
 plt.legend()
 plt.tight_layout()
 plt.savefig("cfm_perf.png")
