@@ -839,45 +839,31 @@ public:
     const size_t total_N = inp_xi.shape(0);
     const auto n_pspecs = py::len(amplitude_keys);
 
-    vector<ducc0::cmav<double, 2>> inp_pspec;
-    for (size_t i = 0; i < n_pspecs; ++i)
-      inp_pspec.emplace_back(
-          ducc0::to_cmav<double, 2>(inp_[amplitude_keys[i]]));
-
     auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
     auto out = ducc0::to_vfmav<double>(out_);
 
     // Precompute distributed power spectra
     timer.poppush("Precompute power spectra");
-    vector<ducc0::vfmav<double>> distributed_power_spectra;
+    auto inp_azm2 = inp_azm.extend_and_broadcast(inp_xi.shape(), 0);
+    vector<ducc0::cfmav<double>> distributed_power_spectra;
     for (size_t i = 0; i < n_pspecs; ++i) {
+      const auto inp_pspec(ducc0::to_cmav<double, 2>(inp_[amplitude_keys[i]]));
       const auto lshape = combine_shapes(total_N, pindex(i).shape());
-      distributed_power_spectra.emplace_back(lshape);
-    }
-    for (size_t i = 0; i < n_pspecs; ++i) {
+      ducc0::vfmav<double> tmp(lshape);
       const size_t actual_dimensions = space_dims[i];
       ducc0::mav_apply_with_index(
           [&](double &oo, const shape_t &inds) {
             const int64_t pind =
                 lpindex[i].val(&inds[1], &inds[actual_dimensions + 1]);
-            oo = inp_pspec[i](inds[0], pind);
+            oo = inp_pspec(inds[0], pind);
           },
-          nthreads, distributed_power_spectra[i]);
-    }
-    // @mtr distributed_power_spectra are not marked const although they should
-    // be /Precompute distributed power spectra
+          nthreads, tmp);
 
-    // blow everything up to full dimensionality
-    ducc0::fmav_info::stride_t azm_newstride(inp_xi.ndim(),0);
-    azm_newstride[0] = inp_azm.stride(0);
-    ducc0::cfmav<double> inp_azm2(inp_azm.data(), inp_xi.shape(), azm_newstride);
-    vector<ducc0::cfmav<double>> distributed_power_spectra2;
-    for (size_t i = 0; i < n_pspecs; ++i) {
-      ducc0::fmav_info::stride_t newstride(inp_xi.ndim(),0);
-      newstride[0] = distributed_power_spectra[i].stride(0);
-      for (size_t j=1; j<distributed_power_spectra[i].ndim(); ++j)
-        newstride[dimlim[i]-1+j] = distributed_power_spectra[i].stride(j);
-      distributed_power_spectra2.emplace_back(distributed_power_spectra[i].data(), inp_xi.shape(), newstride);
+      ducc0::fmav_info::shape_t axpos;
+      axpos.push_back(0);
+      for (size_t j=dimlim[i]; j<dimlim[i+1]; ++j)
+        axpos.push_back(j);
+      distributed_power_spectra.emplace_back(tmp.extend_and_broadcast(inp_xi.shape(), axpos));
     }
 
     timer.poppush("xi * outer(pspecs)");
@@ -886,20 +872,20 @@ public:
           [&](double &oo, const double &azm, const double &xi, const double &s1) {
             oo = azm*xi*s1;
           },
-          nthreads, out, inp_azm2, inp_xi, distributed_power_spectra2[0]);
+          nthreads, out, inp_azm2, inp_xi, distributed_power_spectra[0]);
     else if (n_pspecs==2)
       ducc0::mav_apply(
           [&](double &oo, const double &azm, const double &xi, const double &s1, const double &s2) {
             oo = azm*xi*s1*s2;
           },
-          nthreads, out, inp_azm2, inp_xi, distributed_power_spectra2[0], distributed_power_spectra2[1]);
+          nthreads, out, inp_azm2, inp_xi, distributed_power_spectra[0], distributed_power_spectra[1]);
     // and so on, as far as we want to go with special cases
     else
       ducc0::mav_apply_with_index(
           [&](double &oo, const double &xi, const shape_t &inds) {
             double foop{1};
             for (size_t i = 0; i < n_pspecs; ++i) {
-              foop *= distributed_power_spectra2[i](inds);
+              foop *= distributed_power_spectra[i](inds);
             }
             const double foozm{inp_azm(inds[0]) * xi};
             oo = foozm * foop;
