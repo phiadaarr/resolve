@@ -867,7 +867,9 @@ public:
     return distributed_power_spectra;
   }
 
-  void A_times_xi(const py::dict &inp_, const vector<ducc0::cfmav<double>> &distributed_power_spectra, ducc0::vfmav<double> &out) const {
+  void A_times_xi(const py::dict &inp_,
+                  const vector<ducc0::cfmav<double>> &distributed_power_spectra,
+                  ducc0::vfmav<double> &out) const {
     const auto inp_azm = ducc0::to_cfmav<double>(inp_[key_azm]);
     const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
     auto inp_azm_broadcasted = inp_azm.extend_and_broadcast(inp_xi.shape(), 0);
@@ -895,6 +897,58 @@ public:
             oo = foozm * foop;
           },
           nthreads, out, inp_xi);
+  }
+
+  void A_times_xi_jac(
+      const py::dict &inp_, const py::dict &tangent_,
+      const vector<ducc0::cfmav<double>> &inp_distributed_power_spectra,
+      const vector<ducc0::cfmav<double>> &tangent_distributed_power_spectra,
+      ducc0::vfmav<double> &out) const {
+
+    const auto inp_azm = ducc0::to_cfmav<double>(inp_[key_azm]);
+    const auto tangent_azm = ducc0::to_cfmav<double>(tangent_[key_azm]);
+
+    const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
+    const auto tangent_xi = ducc0::to_cfmav<double>(tangent_[key_xi]);
+
+    auto inp_azm_broadcasted = inp_azm.extend_and_broadcast(inp_xi.shape(), 0);
+    auto tangent_azm_broadcasted =
+        tangent_azm.extend_and_broadcast(tangent_xi.shape(), 0);
+
+    // if (n_pspecs == 1)
+    //   ducc0::mav_apply([&](double &oo, const double &azm, const double &xi,
+    //                        const double &s1) { oo = azm * xi * s1; },
+    //                    nthreads, out, inp_azm_broadcasted, inp_xi,
+    //                    distributed_power_spectra[0]);
+    // else if (n_pspecs == 2)
+    //   ducc0::mav_apply(
+    //       [&](double &oo, const double &azm, const double &xi, const double
+    //       &s1,
+    //           const double &s2) { oo = azm * xi * s1 * s2; },
+    //       nthreads, out, inp_azm_broadcasted, inp_xi,
+    //       distributed_power_spectra[0], distributed_power_spectra[1]);
+    // // and so on, as far as we want to go with special cases
+    // else
+    ducc0::mav_apply_with_index(
+        [&](double &oo, const double &xi, const shape_t &inds) {
+          double inp_pspec{1.};
+          for (size_t i = 0; i < n_pspecs; ++i) {
+            inp_pspec *= inp_distributed_power_spectra[i](inds);
+          }
+
+          double dpspec{0};
+          for (size_t i = 0; i < n_pspecs; ++i) {
+            const auto tmp{inp_pspec / inp_distributed_power_spectra[i](inds) *
+                           tangent_distributed_power_spectra[i](inds)};
+            dpspec += tmp;
+          }
+
+          const auto term0 = dpspec * inp_azm(inds[0]) * inp_xi(inds);
+          const auto term1 = inp_pspec * tangent_azm(inds[0]) * inp_xi(inds);
+          const auto term2 = inp_pspec * inp_azm(inds[0]) * tangent_xi(inds);
+          oo = term0 + term1 + term2;
+        },
+        nthreads, out, inp_xi);
   }
 
   void add_offset_mean(const double &offset_mean,
@@ -952,10 +1006,13 @@ public:
         [=](const py::dict &tangent_) {
           const auto inpcopy =
               inp_; // keep inp_ alive to avoid dangling references
-          MR_fail("NotImplementedError");
           auto out_ = ducc0::make_Pyarr<double>(out_shape);
           auto out = ducc0::to_vfmav<double>(out_);
-          //A_times_xi_jac(tangent_, inp_, distributed_power_spectra, out);
+
+          const auto tangent_distributed_power_spectra =
+              precompute_distributed_spectra(tangent_);
+          A_times_xi_jac(inp_, tangent_, distributed_power_spectra,
+                         tangent_distributed_power_spectra, out);
           fft(out);
           return out_;
         };
