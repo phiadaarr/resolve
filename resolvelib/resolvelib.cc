@@ -938,6 +938,29 @@ public:
         nthreads, out, inp_xi);
   }
 
+  void A_times_xi_adj_jac(const py::dict &inp, ducc0::vfmav<double> &out_xi) const {
+
+    //  const py::dict &tangent_,
+    //  const vector<ducc0::cfmav<double>> &inp_distributed_power_spectra,
+    //  const vector<ducc0::cfmav<double>> &tangent_distributed_power_spectra,
+    //  ducc0::vfmav<double> &out) const {
+
+    //// xi and Power distributor
+    // ducc0::mav_apply_with_index(
+    //    [&](const double &xi0, double &dxi, const shape_t &inds) {
+    //      const int64_t ind0{p0(inds[1])}, ind1{p1(inds[2])};
+    //      const double fac0{inp_pspec0(inds[0], ind0)},
+    //          fac1{inp_pspec1(inds[0], ind1)}, fac2{inp_azm(inds[0])},
+    //          fac3{xi0};
+    //      out_pspec0(inds[0], ind0) += fac1 * fac2 * fac3 * dxi;
+    //      out_pspec1(inds[0], ind1) += fac0 * fac2 * fac3 * dxi;
+    //      out_azm(inds[0]) += fac0 * fac1 * fac3 * dxi;
+    //      dxi *= fac0 * fac1 * fac2;
+    //    },
+    //    1, inp_xi, out_xi);
+    
+  }
+
   void add_offset_mean(const double &offset_mean,
                        ducc0::vfmav<double> &out) const {
     vector<ducc0::slice> myslc(out.ndim(), 0);
@@ -954,11 +977,15 @@ public:
     }
   }
 
-  void fft_adjoint(ducc0::vfmav<double> &out) const {
-    double fct{scalar_dvol};
-    for (size_t ispace = 0; ispace < n_pspecs; ++ispace) {
-      ducc0::r2r_genuine_hartley(out, out, fft_axes(ispace), fct, nthreads);
-      fct = 1;
+  void fft_adjoint(const ducc0::cfmav<double> &in, ducc0::vfmav<double> &out) const {
+    for (size_t i = 0; i < n_pspecs; ++i) {
+      MR_fail(i + 1 <= n_pspecs);
+      const auto ispace = n_pspecs - (i + 1);
+      if (ispace == 0)
+        ducc0::r2r_genuine_hartley(in, out, fft_axes(ispace), scalar_dvol,
+                                   nthreads);
+      else
+        ducc0::r2r_genuine_hartley(out, out, fft_axes(ispace), 1., nthreads);
     }
   }
 
@@ -1017,41 +1044,27 @@ public:
           const auto cotangent = ducc0::to_cfmav<double>(cotangent_);
           py::dict out_;
 
-          // out_[key_xi] = ducc0::make_Pyarr<double>(inp_xi.shape());
-          // auto out_xi = ducc0::to_vfmav<double>(out_[key_xi]);
-          //// ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_xi);
+          out_[key_xi] = ducc0::make_Pyarr<double>(out_shape);
+          auto out_xi = ducc0::to_vfmav<double>(out_[key_xi]);
+          // ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_xi);
 
-          // out_[key_azm] = ducc0::make_Pyarr<double>(inp_azm.shape());
-          // auto out_azm = ducc0::to_vfmav<double>(out_[key_azm]);
-          // ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_azm);
+          out_[key_azm] = ducc0::make_Pyarr<double>(ducc0::to_cfmav<double>(inp_[key_azm]).shape());  // FIXME Simplify
+          auto out_azm = ducc0::to_vfmav<double>(out_[key_azm]);
+          ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_azm);
 
-          // vector<ducc0::vfmav<double>> out_pspec;
-          // for (size_t i=0; i<n_pspecs; ++i)
-          //{
-          //  out_[amplitude_keys[i]] =
-          //  ducc0::make_Pyarr<double>(inp_pspec0.shape());
-          //  out_pspec.push_back(ducc0::to_vfmav<double>(out_[amplitude_keys[0]]));
-          // ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads,
-          // out_pspec.back());
-          //}
+          vector<ducc0::vfmav<double>> out_pspec;
+          for (size_t i = 0; i < n_pspecs; ++i) {
+            out_[amplitude_keys[i]] =
+                ducc0::make_Pyarr<double>(ducc0::to_cfmav<double>(inp_[amplitude_keys[i]]).shape());
+            out_pspec.push_back(
+                ducc0::to_vfmav<double>(out_[amplitude_keys[i]]));
+            ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads,
+                             out_pspec.back());
+          }
 
-          // ducc0::r2r_separable_hartley(cotangent, out_xi, {1, 2},
-          // scalar_dvol,
-          //                             nthreads);
+          fft_adjoint(cotangent, out_xi);
 
-          //// xi and Power distributor
-          // ducc0::mav_apply_with_index(
-          //    [&](const double &xi0, double &dxi, const shape_t &inds) {
-          //      const int64_t ind0{p0(inds[1])}, ind1{p1(inds[2])};
-          //      const double fac0{inp_pspec0(inds[0], ind0)},
-          //          fac1{inp_pspec1(inds[0], ind1)}, fac2{inp_azm(inds[0])},
-          //          fac3{xi0};
-          //      out_pspec0(inds[0], ind0) += fac1 * fac2 * fac3 * dxi;
-          //      out_pspec1(inds[0], ind1) += fac0 * fac2 * fac3 * dxi;
-          //      out_azm(inds[0]) += fac0 * fac1 * fac3 * dxi;
-          //      dxi *= fac0 * fac1 * fac2;
-          //    },
-          //    1, inp_xi, out_xi);
+          A_times_xi_adj_jac(inp_, out_xi);
 
           return out_;
         };
