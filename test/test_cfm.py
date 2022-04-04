@@ -94,26 +94,10 @@ def test_cfm(total_N, prefix, cfg, nthreads):
             cfm.add_fluctuations(**args2)
     cfm0.set_amplitude_total_offset(**args_zm)
     cfm.set_amplitude_total_offset(**args_zm)
+
     op0 = cfm0.finalize(0)
     op1 = cfm.finalize(0)
-
-    op2 = op1.nifty_equivalent
-
-    # TEMPORARY
-    pos = ift.from_random(op0.domain)
-    # p = ift.Plot()
-    # p.add(op0(pos), title="op0")
-    # p.output(name="op0.png")
-    # p = ift.Plot()
-    # p.add(op1(pos), title="op1")
-    # p.output(name="op1.png")
-    # p = ift.Plot()
-    # p.add(op2(pos), title="op2")
-    # p.output(name="op2.png")
-    ift.extra.assert_allclose(op0(pos), op1(pos), rtol=1e-5)
-    ift.extra.assert_allclose(op0(pos), op2(pos), rtol=1e-5)
-    return
-    # /TEMPORARY
+    op2 = cfm.finalize_nifty_equivalent(0)
 
     rve.operator_equality(op0, op1, rtol=1e-5, ntries=3)  # FIXME Why is the accuracy so low?
     rve.operator_equality(op0, op2, rtol=1e-5, ntries=3)
