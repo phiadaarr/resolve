@@ -867,9 +867,7 @@ public:
     return distributed_power_spectra;
   }
 
-  void A_times_xi(const py::dict &inp_, ducc0::vfmav<double> &out) const {
-    auto distributed_power_spectra = precompute_distributed_spectra(inp_);
-
+  void A_times_xi(const py::dict &inp_, const vector<ducc0::cfmav<double>> &distributed_power_spectra, ducc0::vfmav<double> &out) const {
     const auto inp_azm = ducc0::to_cfmav<double>(inp_[key_azm]);
     const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
     auto inp_azm_broadcasted = inp_azm.extend_and_broadcast(inp_xi.shape(), 0);
@@ -927,126 +925,47 @@ public:
     auto out = ducc0::to_vfmav<double>(out_);
     // Note: "out" is not nulled at this point
 
-    A_times_xi(inp_, out);
+    const auto distributed_power_spectra = precompute_distributed_spectra(inp_);
+    A_times_xi(inp_, distributed_power_spectra, out);
     add_offset_mean(offset_mean, out);
     fft(out);
     return out_;
   }
 
   Linearization<py::dict, py::array> apply_with_jac(const py::dict &inp_) {
-    MR_assert(false, "NotimplementedError");
-    const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
-    const auto inp_azm = ducc0::to_cfmav<double>(inp_[key_azm]);
-    const auto inp_pspec0{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[0]])};
-    const auto inp_pspec1{ducc0::to_cmav<double, 2>(inp_[amplitude_keys[1]])};
+    const auto out_shape =
+        ducc0::to_cfmav<double>(inp_[key_xi]).shape(); // FIXME Simplify
+    MR_assert(py::len(amplitude_keys) == n_pspecs,
+              "Number of input pspecs not equal to length of pindex list");
 
-    auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
+    // FIXME It would be cleaner to instantiate this inside A_times_xi
+    auto out_ = ducc0::make_Pyarr<double>(out_shape);
     auto out = ducc0::to_vfmav<double>(out_);
+    // Note: "out" is not nulled at this point
 
-    // xi and Power distributor
-    const auto p0{pindex(0)};
-    const auto p1{pindex(1)};
-    ducc0::mav_apply_with_index(
-        [&](double &oo, const double &xi, const shape_t &inds) {
-          const int64_t ind0{p0(inds[1])}, ind1{p1(inds[2])};
-          const double fac0{inp_pspec0(inds[0], ind0)},
-              fac1{inp_pspec1(inds[0], ind1)}, fac2{inp_azm(inds[0])}, fac3{xi};
-          const double foo{fac0 * fac1 * fac2 * fac3};
-          oo = foo;
-        },
-        nthreads, out, inp_xi);
-    // /Power distributor
-
-    // Offset mean
-    vector<ducc0::slice> slcs(3);
-    for (size_t i = 0; i < inp_xi.shape(0); ++i)
-      out(i, 0, 0) += offset_mean;
-    // /Offset mean
-
-    ducc0::r2r_separable_hartley(out, out, {1, 2}, scalar_dvol, nthreads);
+    const auto distributed_power_spectra = precompute_distributed_spectra(inp_);
+    A_times_xi(inp_, distributed_power_spectra, out);
+    add_offset_mean(offset_mean, out);
+    fft(out);
 
     function<py::array(const py::dict &)> ftimes =
         [=](const py::dict &tangent_) {
-          MR_assert(false, "NotimplementedError");
-          // FIXME Check this in all other functions
-          // FIXME Do not allocate memory in c++ that survives function call.
-          // Check this
           const auto inpcopy =
               inp_; // keep inp_ alive to avoid dangling references
-          auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
+          MR_fail("NotImplementedError");
+          auto out_ = ducc0::make_Pyarr<double>(out_shape);
           auto out = ducc0::to_vfmav<double>(out_);
-          const auto tangent_xi = ducc0::to_cfmav<double>(tangent_[key_xi]);
-          const auto tangent_azm = ducc0::to_cfmav<double>(tangent_[key_azm]);
-          const auto tangent_pspec0{
-              ducc0::to_cmav<double, 2>(tangent_[amplitude_keys[0]])};
-          const auto tangent_pspec1{
-              ducc0::to_cmav<double, 2>(tangent_[amplitude_keys[1]])};
-
-          // xi and Power distributor
-          ducc0::mav_apply_with_index(
-              [&](double &oo, const double &xi0, const double &dxi,
-                  const shape_t &inds) {
-                const int64_t ind0{p0(inds[1])}, ind1{p1(inds[2])};
-                const double fac0{inp_pspec0(inds[0], ind0)},
-                    fac1{inp_pspec1(inds[0], ind1)}, fac2{inp_azm(inds[0])},
-                    fac3{xi0};
-                const double d0{tangent_pspec0(inds[0], ind0)},
-                    d1{tangent_pspec1(inds[0], ind1)}, d2{tangent_azm(inds[0])},
-                    d3{dxi};
-                const double foo{
-                    d0 * fac1 * fac2 * fac3 + fac0 * d1 * fac2 * fac3 +
-                    fac0 * fac1 * d2 * fac3 + fac0 * fac1 * fac2 * d3};
-                oo = foo;
-              },
-              nthreads, out, inp_xi, tangent_xi);
-          // /Power distributor
-
-          ducc0::r2r_separable_hartley(out, out, {1, 2}, scalar_dvol, nthreads);
-
+          //A_times_xi_jac(tangent_, inp_, distributed_power_spectra, out);
+          fft(out);
           return out_;
         };
 
     function<py::dict(const py::array &)> fadjtimes =
         [=](const py::array &cotangent_) {
-          MR_assert(false, "NotimplementedError");
-          // FIXME Check this in all other functions
           const auto inpcopy =
               inp_; // keep inp_ alive to avoid dangling references
-          const auto cotangent = ducc0::to_cfmav<double>(cotangent_);
+          MR_fail("NotImplementedError");
           py::dict out_;
-          out_[key_xi] = ducc0::make_Pyarr<double>(inp_xi.shape());
-          out_[key_azm] = ducc0::make_Pyarr<double>(inp_azm.shape());
-          out_[amplitude_keys[0]] =
-              ducc0::make_Pyarr<double>(inp_pspec0.shape());
-          out_[amplitude_keys[1]] =
-              ducc0::make_Pyarr<double>(inp_pspec1.shape());
-          auto out_xi = ducc0::to_vfmav<double>(out_[key_xi]);
-          auto out_azm = ducc0::to_vfmav<double>(out_[key_azm]);
-          auto out_pspec0 = ducc0::to_vfmav<double>(out_[amplitude_keys[0]]);
-          auto out_pspec1 = ducc0::to_vfmav<double>(out_[amplitude_keys[1]]);
-
-          // ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_xi);
-          ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_azm);
-          ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_pspec0);
-          ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_pspec1);
-
-          ducc0::r2r_separable_hartley(cotangent, out_xi, {1, 2}, scalar_dvol,
-                                       nthreads);
-
-          // xi and Power distributor
-          ducc0::mav_apply_with_index(
-              [&](const double &xi0, double &dxi, const shape_t &inds) {
-                const int64_t ind0{p0(inds[1])}, ind1{p1(inds[2])};
-                const double fac0{inp_pspec0(inds[0], ind0)},
-                    fac1{inp_pspec1(inds[0], ind1)}, fac2{inp_azm(inds[0])},
-                    fac3{xi0};
-                out_pspec0(inds[0], ind0) += fac1 * fac2 * fac3 * dxi;
-                out_pspec1(inds[0], ind1) += fac0 * fac2 * fac3 * dxi;
-                out_azm(inds[0]) += fac0 * fac1 * fac3 * dxi;
-                dxi *= fac0 * fac1 * fac2;
-              },
-              1, inp_xi, out_xi);
-
           return out_;
         };
 
