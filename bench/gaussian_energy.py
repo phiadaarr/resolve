@@ -28,15 +28,17 @@ else:
     shp = (1000000, 100)  # 100 Mio entries
 
 dom = ift.UnstructuredDomain(shp)
-mean = ift.full(dom, 1.2)
+mean = ift.full(dom, 1.2+1j)
 invcov = ift.full(dom, 142.1)
+
+assert mean.dtype==np.complex128
 
 print("Gaussian energy")
 print("^^^^^^^^^^^^^^^")
 for nthreads in [1, 4, 8]:
     op = rve.DiagonalGaussianLikelihood(mean, invcov, nthreads=nthreads)
     print(f"New implementation (nthreads={nthreads})")
-    ift.exec_time(op)
+    ift.exec_time(op, domain_dtype=mean.dtype)
     print()
 print("Old implementation")
 opold = ift.GaussianEnergy(mean, ift.makeOp(invcov))
@@ -47,9 +49,9 @@ print("Variable covariance Gaussian energy")
 print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
 for nthreads in [1, 4, 8]:
     op = rve.VariableCovarianceDiagonalGaussianLikelihood(mean, "signal", "logicov",
-                                                          nthreads=nthreads)
+                                                          mask=None, nthreads=nthreads)
     print(f"New implementation (nthreads={nthreads})")
-    ift.exec_time(op)
+    ift.exec_time(op, domain_dtype={"signal": mean.dtype, "logicov": rve.dtype_complex2float(mean.dtype, force=True)})
     print()
 
 print("Old implementation")

@@ -5,12 +5,14 @@ from .calibration import CalibrationDistributor, calibration_distribution
 from .config_utils import *
 from .constants import *
 from .cpp2py import *
+from .correlated_field_model import *
 from .data.antenna_positions import AntennaPositions
 from .data.averaging import *
 from .data.direction import *
 from .data.ms_import import *
 from .data.observation import *
 from .data.polarization import Polarization
+from .dirty_image import *
 from .dtype_converter import DtypeConverter
 from .energy_operators import *
 from .extra import mpi_load

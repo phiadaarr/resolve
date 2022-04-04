@@ -17,38 +17,18 @@
 
 from functools import reduce
 from operator import add
-
-import nifty8 as ift
-import numpy as np
-
-from .data.observation import Observation
-from .response import InterferometryResponse
-from .util import _duplicate, _obj2list, my_assert_isinstance
-from .energy_operators import DiagonalGaussianLikelihood, VariableCovarianceDiagonalGaussianLikelihood
-from functools import reduce
-from operator import add
 from warnings import warn
 
 import nifty8 as ift
 import numpy as np
 
 from .data.observation import Observation
+from .dtype_converter import DtypeConverter
+from .energy_operators import (DiagonalGaussianLikelihood,
+                               VariableCovarianceDiagonalGaussianLikelihood)
+from .response import InterferometryResponse
 from .util import (_duplicate, _obj2list, my_assert, my_assert_isinstance,
                    my_asserteq)
-from .energy_operators import DiagonalGaussianLikelihood
-from .dtype_converter import DtypeConverter
-from .energy_operators import VariableCovarianceDiagonalGaussianLikelihood
-
-
-def _get_mask(observation):
-    # Only needed for variable covariance gaussian energy
-    my_assert_isinstance(observation, Observation)
-    vis = observation.vis
-    flags = observation.flags
-    if not np.any(flags.val):
-        return ift.ScalingOperator(vis.domain, 1.0), vis, observation.weight
-    mask = observation.mask_operator
-    return mask, mask(vis), mask(observation.weight)
 
 
 def ImagingLikelihood(
@@ -109,9 +89,7 @@ def ImagingLikelihood(
     my_assert_isinstance(sky_operator, ift.Operator)
     obs = _obj2list(observation, Observation)
     cops = _duplicate(_obj2list(calibration_operator, ift.Operator), len(obs))
-    log_icovs = _duplicate(
-        _obj2list(log_inverse_covariance_operator, ift.Operator), len(obs)
-    )
+    log_icovs = _duplicate(_obj2list(log_inverse_covariance_operator, ift.Operator), len(obs))
     if len(obs) == 0:
         raise ValueError("List of observations is empty")
 
@@ -119,9 +97,6 @@ def ImagingLikelihood(
 
     energy = []
     for ii, (oo, cop, log_icov) in enumerate(zip(obs, cops, log_icovs)):
-        mask, vis, weight = _get_mask(oo)
-        if log_icov is not None:
-            log_icov = mask @ log_icov
         dtype = oo.vis.dtype
 
         R = InterferometryResponse(oo, sky_operator.target, do_wgridding=do_wgridding, epsilon=epsilon, verbosity=verbosity, nthreads=nthreads).ducktape(internal_sky_key)
@@ -129,15 +104,14 @@ def ImagingLikelihood(
             from .dtype_converter import DtypeConverter
             dt = DtypeConverter(cop.target, np.complex128, dtype)
             R = (dt @ cop) * R  # Apply calibration solutions
-        R = mask @ R  # Apply flags  FIXME Move this into cpp likelihoods
 
         if log_icov is None:
-            ee = DiagonalGaussianLikelihood(data=vis, inverse_covariance=weight) @ R
+            ee = DiagonalGaussianLikelihood(data=oo.vis, inverse_covariance=oo.weight, mask=oo.mask) @ R
             ee.name = f"{oo.source_name} (data wgts) {ii}"
         else:
             s0, s1 = "_model_data", "_log_icov"
             ee = VariableCovarianceDiagonalGaussianLikelihood(
-                data=vis, key_signal=s0, key_log_inverse_covariance=s1
+                data=oo.vis, key_signal=s0, key_log_inverse_covariance=s1, mask=oo.mask
             ) @ (log_icov.ducktape_left(s1) + R.ducktape_left(s0))
             ee.name = f"{oo.source_name} (varcov) {ii}"
         energy.append(ee)
@@ -197,15 +171,10 @@ def CalibrationLikelihood(
     dt = DtypeConverter(model_d.target, np.complex128, obs.vis.dtype)
     dt_icov = DtypeConverter(model_d.target, np.float64, obs.weight.dtype)
 
-    mask, vis, wgt = _get_mask(obs)
-    model_d = dt @ mask @ model_d
-    if icov is not None:
-        icov = dt_icov @ mask @ icov
-
     if icov is None:
-        e = DiagonalGaussianLikelihood(data=vis, inverse_covariance=wgt, nthreads=nthreads)
-        return e @ model_d
+        e = DiagonalGaussianLikelihood(data=obs.vis, inverse_covariance=obs.weight, nthreads=nthreads, mask=obs.mask)
+        return e @ dt @ model_d
     else:
         s0, s1 = "model data", "inverse covariance"
-        e = ift.VariableCovarianceDiagonalGaussianLikelihood(vis, s0, s1, nthreads=nthreads)
-        return e @ model_d.ducktape_left(s0) + icov.ducktape_left(s1)
+        e = ift.VariableCovarianceDiagonalGaussianLikelihood(obs.vis, s0, s1, mask=obs.mask, nthreads=nthreads)
+        return e @ (dt @ model_d).ducktape_left(s0) + (dt_icov @ icov).ducktape_left(s1)

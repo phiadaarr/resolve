@@ -3,10 +3,12 @@
 # Run with ./prepare_environment <base_folder> <qname> <resolve_branch> <nifty_branch>
 set -e
 
-source $HOME/.bashrc
+module load python3
 
 mkdir -p $1
 cd $1
+
+echo "Install venv to $1"
 
 python3 -m venv venv$2
 source venv$2/bin/activate

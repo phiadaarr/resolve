@@ -22,12 +22,15 @@ import numpy as np
 
 from ..constants import DEG2RAD
 from ..util import assert_sky_domain
+from ..data.observation import Observation
 
 
 def field2fits(field, file_name, observations=[]):
     import astropy.io.fits as pyfits
     from astropy.time import Time
     
+    if isinstance(observations, Observation):
+        observations = [observations]
     if len(observations) == 0:
         direction = None
     else:

@@ -13,29 +13,69 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 # Copyright(C) 2019-2020 Max-Planck-Society
+# Copyright(C) 2022 Max-Planck-Society, Philipp Arras
 # Author: Philipp Arras
 
 import nifty8 as ift
 import numpy as np
 
 from .data.observation import Observation
-from .util import my_assert, my_assert_isinstance, my_asserteq
+from .util import my_assert, my_assert_isinstance, my_asserteq, replace_array_with_dict
+from .cpp2py import Pybind11Operator
+import resolvelib
 
 
 def calibration_distribution(
-    observation, phase_operator, logamplitude_operator, antenna_dct, time_dct=None
+    observation,
+    phase_operator,
+    logamplitude_operator,
+    antenna_dct,
+    time_dct=None,
+    numpy=False,
+    nthreads=1,
 ):
-    my_assert_isinstance(observation, Observation)
-    my_assert_isinstance(phase_operator, logamplitude_operator, ift.Operator)
-    dom = phase_operator.target
-    my_asserteq(dom, logamplitude_operator.target)
-    tgt = observation.vis.domain
-    ap = observation.antenna_positions
-    cop1 = CalibrationDistributor(dom, tgt, ap.ant1, ap.time, antenna_dct, time_dct)
-    cop2 = CalibrationDistributor(dom, tgt, ap.ant2, ap.time, antenna_dct, time_dct)
-    res0 = (cop1 + cop2).real @ logamplitude_operator
-    res1 = (1j * (cop1 - cop2).real) @ phase_operator
-    return (res0 + res1).exp()
+    if numpy or time_dct is not None:
+        my_assert_isinstance(observation, Observation)
+        my_assert_isinstance(phase_operator, logamplitude_operator, ift.Operator)
+        dom = phase_operator.target
+        my_asserteq(dom, logamplitude_operator.target)
+        tgt = observation.vis.domain
+        ap = observation.antenna_positions
+        cop1 = CalibrationDistributor(dom, tgt, ap.ant1, ap.time, antenna_dct, time_dct)
+        cop2 = CalibrationDistributor(dom, tgt, ap.ant2, ap.time, antenna_dct, time_dct)
+        res0 = (cop1 + cop2).real @ logamplitude_operator
+        res1 = (1j * (cop1 - cop2).real) @ phase_operator
+        return (res0 + res1).exp()
+
+    assert time_dct is None
+    target = observation.vis.domain
+    ant1 = replace_array_with_dict(observation.ant1, antenna_dct).astype(np.int32)
+    ant2 = replace_array_with_dict(observation.ant2, antenna_dct).astype(np.int32)
+    nants = len(set(ant1).union(set(ant2)))
+    calibration_solutions = phase_operator.ducktape_left("ph") + logamplitude_operator.ducktape_left("logampl")
+    domain = calibration_solutions.target
+    pdom, antdom, tdom, fdom = phase_operator.target
+    target_fdom = observation.vis.domain[2]
+    if pdom != observation.vis.domain[0]:
+        s = ("PolarizationSpace of calibration solution and data needs to be the same.\n"
+            f"For calibration solution got:\n{pdom}\nData domain:\n{observation.vis.domain[0]}")
+        raise ValueError(s)
+    distributor = Pybind11Operator(
+        domain,
+        target,
+        resolvelib.CalibrationDistributor(
+            ant1,
+            ant2,
+            observation.time,
+            "logampl",
+            "ph",
+            target_fdom.size,
+            tdom.size,
+            tdom.distances[0],
+            nthreads,
+        ),
+    )
+    return distributor @ calibration_solutions
 
 
 class CalibrationDistributor(ift.LinearOperator):
@@ -115,7 +155,9 @@ class MyLinearInterpolator(ift.LinearOperator):
         my_assert(np.min(time_col) >= 0)
         my_assert(np.max(time_col) < self._domain.shape[1] * dom[0].distances[1])
         my_assert(np.issubdtype(ant_col.dtype, np.integer))
-        my_assert(np.issubdtype(time_col.dtype, np.floating if floattime else np.integer))
+        my_assert(
+            np.issubdtype(time_col.dtype, np.floating if floattime else np.integer)
+        )
 
     def apply(self, x, mode):
         self._check_input(x, mode)

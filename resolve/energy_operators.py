@@ -23,7 +23,7 @@ from .cpp2py import Pybind11LikelihoodEnergyOperator
 from .util import is_single_precision
 
 
-def DiagonalGaussianLikelihood(data, inverse_covariance, nthreads=1):
+def DiagonalGaussianLikelihood(data, inverse_covariance, mask=None, nthreads=1):
     """Gaussian energy as NIFTy operator that is implemented in C++
 
     Parameters
@@ -32,6 +32,8 @@ def DiagonalGaussianLikelihood(data, inverse_covariance, nthreads=1):
 
     inverse_covariance : Field
         Real valued. Needs to have same precision as `data`.
+
+    mask : Field
 
     Note
     ----
@@ -49,12 +51,8 @@ def DiagonalGaussianLikelihood(data, inverse_covariance, nthreads=1):
             inverse_covariance.domain,
         )
     dt = data.dtype
-    if inverse_covariance.dtype != (
-        np.float32 if is_single_precision(dt) else np.float64
-    ):
-        raise ValueError(
-            "Precision of inverse_covariance does not match precision of data."
-        )
+    if inverse_covariance.dtype != (np.float32 if is_single_precision(dt) else np.float64):
+        raise ValueError("Precision of inverse_covariance does not match precision of data.")
 
     if dt == np.float64:
         f = resolvelib.DiagonalGaussianLikelihood_f8
@@ -67,17 +65,33 @@ def DiagonalGaussianLikelihood(data, inverse_covariance, nthreads=1):
     else:
         raise TypeError("Dtype of data not supported. Supported dtypes: c8, c16.")
 
+    if mask is None:
+        mask_operator = ift.Operator.identity_operator(data.domain)
+    else:
+        foo = inverse_covariance.val.dtype
+        mask = mask.val != 0.0
+        # FIXME Somewhen fix this strange NIFTy convention
+        mask_operator = ift.MaskOperator(ift.makeField(data.domain, ~mask))
+        inverse_covariance = ift.makeField(data.domain, mask) * inverse_covariance
+        assert inverse_covariance.val.dtype == foo
+
+    if np.any(np.isnan(inverse_covariance.val)):
+        raise ValueError("inverse_covariance must not contain NaN.")
+    if np.any(np.isnan(data.val)):
+        raise ValueError("data must not contain NaN.")
+
     return Pybind11LikelihoodEnergyOperator(
         data.domain,
         f(data.val, inverse_covariance.val, nthreads),
         nifty_equivalent=ift.GaussianEnergy(
-            data=data, inverse_covariance=ift.makeOp(inverse_covariance, sampling_dtype=dt),
-        ),
+            data=mask_operator(data),
+            inverse_covariance=ift.makeOp(mask_operator(inverse_covariance), sampling_dtype=dt),
+        ) @ mask_operator
     )
 
 
 def VariableCovarianceDiagonalGaussianLikelihood(
-    data, key_signal, key_log_inverse_covariance, nthreads=1
+    data, key_signal, key_log_inverse_covariance, mask, nthreads=1
 ):
     """Variable covariance Gaussian energy as NIFTy operator that is implemented in C++
 
@@ -88,6 +102,8 @@ def VariableCovarianceDiagonalGaussianLikelihood(
     key_signal : str
 
     key_log_inverse_covariance : str
+
+    mask : Field or None
 
     nthreads : int
 
@@ -112,17 +128,27 @@ def VariableCovarianceDiagonalGaussianLikelihood(
     else:
         raise TypeError("Dtype of data not supported. Supported dtypes: c8, c16.")
 
+    if mask is None:
+        mask_operator = ift.Operator.identity_operator(data.domain)
+        mask = np.ones(data.shape, np.uint8)
+    else:
+        mask = mask.val != 0.0
+        # FIXME Somewhen fix this strange NIFTy convention
+        mask_operator = ift.MaskOperator(ift.makeField(data.domain, ~mask))
+        mask = mask.astype(np.uint8)
+
+    flagged_data = mask_operator(data)
+
     return Pybind11LikelihoodEnergyOperator(
         {key_signal: data.domain, key_log_inverse_covariance: data.domain},
-        f(data.val, key_signal, key_log_inverse_covariance, nthreads),
+        f(data.val, key_signal, key_log_inverse_covariance, mask, nthreads),
         nifty_equivalent=ift.VariableCovarianceGaussianEnergy(
-            data.domain, "residual", "icov", data.dtype
+            flagged_data.domain, "residual", "icov", data.dtype
         )
         @ (
-            ift.Adder(data, neg=True).ducktape_left("residual").ducktape(key_signal)
-            + ift.Operator.identity_operator(data.domain)
-            .exp()
-            .ducktape_left("icov")
-            .ducktape(key_log_inverse_covariance)
+            (ift.Adder(flagged_data, neg=True) @ mask_operator)
+            .ducktape_left("residual")
+            .ducktape(key_signal)
+            + (mask_operator @ ift.Operator.identity_operator(data.domain).exp()).ducktape_left("icov").ducktape(key_log_inverse_covariance)
         ),
     )

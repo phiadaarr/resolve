@@ -22,7 +22,7 @@ import pytest
 
 import resolve as rve
 
-from .common import list2fixture, operator_equality, setup_function, teardown_function
+from .common import list2fixture, setup_function, teardown_function
 
 pmp = pytest.mark.parametrize
 
@@ -84,4 +84,4 @@ def test_polarization_matrix_exponential():
     op = rve.polarization_matrix_exponential_mf2f(opold.domain, nthreads)
     assert isinstance(op.domain, ift.MultiDomain)
     assert isinstance(op.target, ift.DomainTuple)
-    operator_equality(opold, op)
+    rve.operator_equality(opold, op)
