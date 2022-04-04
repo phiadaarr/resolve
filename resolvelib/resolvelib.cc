@@ -46,7 +46,6 @@ using Tacc = double;
 using Tenergy = double;
 // /Global types for energies
 
-
 template <typename Tin, typename Tout> class Linearization {
 public:
   Linearization(const Tout &position_, function<Tout(const Tin &)> jac_times_,
@@ -213,7 +212,6 @@ public:
   }
 };
 #endif
-
 
 #ifdef COMPILE_VARCOV_GAUSSIAN_LIKELIHOOD
 template <typename T, bool complex_mean,
@@ -809,11 +807,13 @@ private:
   vector<size_t> dimlim;
   vector<size_t> fft_axes;
   vector<size_t> space_dims;
+  const size_t n_pspecs;
 
   size_t nthreads;
 
   using shape_t = vector<size_t>;
 
+  // FIXME Remove this function
   ducc0::cfmav<int64_t> pindex(const size_t &index) const {
     return ducc0::to_cfmav<int64_t>(pindices[index]);
   }
@@ -825,8 +825,7 @@ public:
           const size_t nthreads_)
       : amplitude_keys(amplitude_keys_), pindices(pindices_), key_xi(key_xi_),
         key_azm(key_azm_), offset_mean(offset_mean_), scalar_dvol(scalar_dvol_),
-        nthreads(nthreads_) {
-    const auto n_pspecs = py::len(amplitude_keys);
+        n_pspecs(py::len(amplitude_keys)), nthreads(nthreads_) {
     dimlim.push_back(1);
     for (size_t i = 0; i < n_pspecs; ++i) {
       lpindex.push_back(pindex(i));
@@ -840,22 +839,11 @@ public:
     }
   }
 
-  py::array apply(const py::dict &inp_) const {
-    auto timer = ducc0::TimerHierarchy("CfmCore::apply");
-
-    timer.push("Startup");
-    const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
-    const auto inp_azm = ducc0::to_cfmav<double>(inp_[key_azm]);
-
-    const size_t total_N = inp_xi.shape(0);
-    const auto n_pspecs = py::len(amplitude_keys);
-
-    auto out_ = ducc0::make_Pyarr<double>(inp_xi.shape());
-    auto out = ducc0::to_vfmav<double>(out_);
-
-    // Precompute distributed power spectra
-    timer.poppush("Precompute power spectra");
-    auto inp_azm2 = inp_azm.extend_and_broadcast(inp_xi.shape(), 0);
+  vector<ducc0::cfmav<double>>
+  precompute_distributed_spectra(const py::dict &inp_) const {
+    const auto out_shape{
+        ducc0::to_cfmav<double>(inp_[key_xi]).shape()}; // FIXME Simplify
+    const size_t total_N = out_shape[0];
     vector<ducc0::cfmav<double>> distributed_power_spectra;
     for (size_t i = 0; i < n_pspecs; ++i) {
       const auto inp_pspec(ducc0::to_cmav<double, 2>(inp_[amplitude_keys[i]]));
@@ -872,24 +860,32 @@ public:
 
       ducc0::fmav_info::shape_t axpos;
       axpos.push_back(0);
-      for (size_t j=dimlim[i]; j<dimlim[i+1]; ++j)
+      for (size_t j = dimlim[i]; j < dimlim[i + 1]; ++j)
         axpos.push_back(j);
-      distributed_power_spectra.emplace_back(tmp.extend_and_broadcast(inp_xi.shape(), axpos));
+      distributed_power_spectra.emplace_back(
+          tmp.extend_and_broadcast(out_shape, axpos));
     }
+    return distributed_power_spectra;
+  }
 
-    timer.poppush("xi * outer(pspecs)");
-    if (n_pspecs==1)
+  void A_times_xi(const py::dict &inp_,
+                  const vector<ducc0::cfmav<double>> &distributed_power_spectra,
+                  ducc0::vfmav<double> &out) const {
+    const auto inp_azm = ducc0::to_cfmav<double>(inp_[key_azm]);
+    const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
+    auto inp_azm_broadcasted = inp_azm.extend_and_broadcast(inp_xi.shape(), 0);
+
+    if (n_pspecs == 1)
+      ducc0::mav_apply([&](double &oo, const double &azm, const double &xi,
+                           const double &s1) { oo = azm * xi * s1; },
+                       nthreads, out, inp_azm_broadcasted, inp_xi,
+                       distributed_power_spectra[0]);
+    else if (n_pspecs == 2)
       ducc0::mav_apply(
-          [&](double &oo, const double &azm, const double &xi, const double &s1) {
-            oo = azm*xi*s1;
-          },
-          nthreads, out, inp_azm2, inp_xi, distributed_power_spectra[0]);
-    else if (n_pspecs==2)
-      ducc0::mav_apply(
-          [&](double &oo, const double &azm, const double &xi, const double &s1, const double &s2) {
-            oo = azm*xi*s1*s2;
-          },
-          nthreads, out, inp_azm2, inp_xi, distributed_power_spectra[0], distributed_power_spectra[1]);
+          [&](double &oo, const double &azm, const double &xi, const double &s1,
+              const double &s2) { oo = azm * xi * s1 * s2; },
+          nthreads, out, inp_azm_broadcasted, inp_xi,
+          distributed_power_spectra[0], distributed_power_spectra[1]);
     // and so on, as far as we want to go with special cases
     else
       ducc0::mav_apply_with_index(
@@ -902,26 +898,50 @@ public:
             oo = foozm * foop;
           },
           nthreads, out, inp_xi);
+  }
+
+  void add_offset_mean(const double &offset_mean,
+                       ducc0::vfmav<double> &out) const {
+    vector<ducc0::slice> myslc(out.ndim(), 0);
+    myslc[0] = ducc0::slice();
+    ducc0::mav_apply([&](auto &oo) { oo += offset_mean; }, 1,
+                     out.subarray(myslc));
+  }
+
+  void fft(ducc0::vfmav<double> &out) const {
+    double fct{scalar_dvol};
+    for (size_t ispace = 0; ispace < n_pspecs; ++ispace) {
+      vector<size_t> fft_axes;
+      for (size_t idim = dimlim[ispace]; idim < dimlim[ispace + 1]; ++idim)
+        fft_axes.emplace_back(idim);
+      ducc0::r2r_genuine_hartley(out, out, fft_axes, fct, nthreads);
+      fct = 1;
+    }
+  }
+
+  py::array apply(const py::dict &inp_) const {
+    auto timer = ducc0::TimerHierarchy("CfmCore::apply");
+
+    timer.push("Startup");
+    const auto out_shape =
+        ducc0::to_cfmav<double>(inp_[key_xi]).shape(); // FIXME Simplify
+    MR_assert(py::len(amplitude_keys) == n_pspecs,
+              "Number of input pspecs not equal to length of pindex list");
+    auto out_ = ducc0::make_Pyarr<double>(out_shape);
+    auto out = ducc0::to_vfmav<double>(out_);
+    // Note: "out" is not nulled at this point
+
+    timer.poppush("Precompute power spectra");
+    auto distributed_power_spectra = precompute_distributed_spectra(inp_);
+
+    timer.poppush("xi * outer(pspecs)");
+    A_times_xi(inp_, distributed_power_spectra, out);
 
     timer.poppush("offset mean");
-    {
-      vector<ducc0::slice> myslc(out.ndim(), 0);
-      myslc[0] = ducc0::slice();
-      ducc0::mav_apply([&](auto &oo) { oo += offset_mean; }, 1,
-                       out.subarray(myslc));
-    }
+    add_offset_mean(offset_mean, out);
 
     timer.poppush("fft");
-    {
-      double fct{scalar_dvol};
-      for (size_t ispace = 0; ispace < n_pspecs; ++ispace) {
-        vector<size_t> fft_axes;
-        for (size_t idim = dimlim[ispace]; idim < dimlim[ispace + 1]; ++idim)
-          fft_axes.emplace_back(idim);
-        ducc0::r2r_genuine_hartley(out, out, fft_axes, fct, nthreads);
-        fct = 1;
-      }
-    }
+    fft(out);
 
     timer.pop();
 
