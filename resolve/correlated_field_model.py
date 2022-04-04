@@ -137,7 +137,7 @@ def CfmCore(
         offset_mean = 0.
     else:
         if not isinstance(offset_mean, float):
-            raise NotImplementedError
+            raise NotImplementedError(f"offset_mean needs to be a float, got {offset_mean}")
         op = ift.Adder(ift.full(op.target, float(offset_mean))) @ op
 
     pindices = [pp[amp_space].pindex for pp in pdomains]
