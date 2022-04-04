@@ -1149,7 +1149,9 @@ PYBIND11_MODULE(resolvelib, m) {
                     size_t, double, size_t>())
       .def("apply", &CalibrationDistributor::apply)
       .def("apply_with_jac", &CalibrationDistributor::apply_with_jac);
+#endif
 
+#ifdef COMPILE_CFM
   py::class_<CfmCore>(m, "CfmCore")
       .def(py::init<py::list, py::list, py::str, py::str, double, double,
                     size_t>())

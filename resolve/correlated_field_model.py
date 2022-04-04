@@ -142,7 +142,7 @@ def CfmCore(
 
     pindices = [pp[amp_space].pindex for pp in pdomains]
 
-    scalar_dvol = ht.domain.scalar_weight((1, 2))
+    scalar_dvol = ht.domain.scalar_weight(spaces)
     offset_mean /= scalar_dvol
 
     res = Pybind11Operator(

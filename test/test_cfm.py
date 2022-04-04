@@ -26,8 +26,11 @@ pmp = pytest.mark.parametrize
 @pmp("total_N", [1, 2])
 @pmp("prefix", ["", "b"])
 @pmp("nthreads", [1, 2])
-@pmp("cfg", [0, 1, 2, 3])
+@pmp("cfg", list(range(7)))
 def test_cfm(total_N, prefix, cfg, nthreads):
+    ift.set_nthreads(nthreads)
+
+    dom1 = dom2 = None
     if cfg == 0:
         dom0 = ift.RGSpace(20)
         dom1 = ift.RGSpace(22)
@@ -40,10 +43,18 @@ def test_cfm(total_N, prefix, cfg, nthreads):
     elif cfg == 3:
         dom0 = ift.RGSpace((12, 12), (0.1, 0.1))
         dom1 = ift.RGSpace(20, 1.231)
+    elif cfg == 4:
+        dom0 = ift.RGSpace((12, 12), (0.1, 0.1))
+    elif cfg == 5:
+        dom0 = ift.RGSpace(20, 1.231)
+    elif cfg == 6:
+        dom0 = ift.RGSpace((12, 12), (0.1, 0.1))
+        dom1 = ift.RGSpace(20, 1.231)
+        dom2 = ift.RGSpace(22)
 
     dofdex = list(range(total_N))
-    args0 = dict(prefix=prefix, total_N=total_N)
-    args1 = dict(
+    args_cfm = dict(prefix=prefix, total_N=total_N)
+    args0 = dict(
         target_subdomain=dom0,
         fluctuations=(1.0, 1.0),
         flexibility=(2.0, 2),
@@ -52,7 +63,7 @@ def test_cfm(total_N, prefix, cfg, nthreads):
         prefix="dom0",
         dofdex=dofdex,
     )
-    args2 = dict(
+    args1 = dict(
         target_subdomain=dom1,
         fluctuations=(2.0, 0.1),
         flexibility=(1.0, 2),
@@ -61,18 +72,29 @@ def test_cfm(total_N, prefix, cfg, nthreads):
         prefix="dom1",
         dofdex=dofdex,
     )
-    args3 = dict(offset_mean=1.12, offset_std=(1.0, 0.2), dofdex=dofdex)
-    cfm = ift.CorrelatedFieldMaker(**args0)
-    cfm.add_fluctuations(**args1)
-    cfm.add_fluctuations(**args2)
-    cfm.set_amplitude_total_offset(**args3)
-    op0 = cfm.finalize(0)
-    ift.set_nthreads(nthreads)
-
-    cfm = rve.CorrelatedFieldMaker(**args0, nthreads=nthreads)
-    cfm.add_fluctuations(**args1)
-    cfm.add_fluctuations(**args2)
-    cfm.set_amplitude_total_offset(**args3)
+    args2 = dict(
+        target_subdomain=dom2,
+        fluctuations=(2.0, 0.1),
+        flexibility=(1.0, 2),
+        asperity=(0.2, 0.1),
+        loglogavgslope=(-3, 0.321),
+        prefix="dom2",
+        dofdex=dofdex,
+    )
+    args_zm = dict(offset_mean=1.12, offset_std=(1.0, 0.2), dofdex=dofdex)
+    cfm0 = ift.CorrelatedFieldMaker(**args_cfm)
+    cfm = rve.CorrelatedFieldMaker(**args_cfm, nthreads=nthreads)
+    cfm0.add_fluctuations(**args0)
+    cfm.add_fluctuations(**args0)
+    if dom1 is not None:
+        cfm0.add_fluctuations(**args1)
+        cfm.add_fluctuations(**args1)
+        if dom2 is not None:
+            cfm0.add_fluctuations(**args2)
+            cfm.add_fluctuations(**args2)
+    cfm0.set_amplitude_total_offset(**args_zm)
+    cfm.set_amplitude_total_offset(**args_zm)
+    op0 = cfm0.finalize(0)
     op1 = cfm.finalize(0)
 
     op2 = op1.nifty_equivalent
@@ -89,6 +111,7 @@ def test_cfm(total_N, prefix, cfg, nthreads):
     # p.add(op2(pos), title="op2")
     # p.output(name="op2.png")
     ift.extra.assert_allclose(op0(pos), op1(pos), rtol=1e-5)
+    ift.extra.assert_allclose(op0(pos), op2(pos), rtol=1e-5)
     return
     # /TEMPORARY
 
