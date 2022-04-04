@@ -915,20 +915,6 @@ public:
     auto tangent_azm_broadcasted =
         tangent_azm.extend_and_broadcast(tangent_xi.shape(), 0);
 
-    // if (n_pspecs == 1)
-    //   ducc0::mav_apply([&](double &oo, const double &azm, const double &xi,
-    //                        const double &s1) { oo = azm * xi * s1; },
-    //                    nthreads, out, inp_azm_broadcasted, inp_xi,
-    //                    distributed_power_spectra[0]);
-    // else if (n_pspecs == 2)
-    //   ducc0::mav_apply(
-    //       [&](double &oo, const double &azm, const double &xi, const double
-    //       &s1,
-    //           const double &s2) { oo = azm * xi * s1 * s2; },
-    //       nthreads, out, inp_azm_broadcasted, inp_xi,
-    //       distributed_power_spectra[0], distributed_power_spectra[1]);
-    // // and so on, as far as we want to go with special cases
-    // else
     ducc0::mav_apply_with_index(
         [&](double &oo, const double &xi, const shape_t &inds) {
           double inp_pspec{1.};
