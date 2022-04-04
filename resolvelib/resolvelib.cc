@@ -804,7 +804,6 @@ private:
   const double scalar_dvol;
   vector<ducc0::cfmav<int64_t>> lpindex;
   vector<size_t> dimlim;
-  vector<size_t> fft_axes;
   vector<size_t> space_dims;
   const size_t n_pspecs;
 
@@ -815,6 +814,13 @@ private:
   // FIXME Remove this function
   ducc0::cfmav<int64_t> pindex(const size_t &index) const {
     return ducc0::to_cfmav<int64_t>(pindices[index]);
+  }
+
+  shape_t fft_axes(const size_t &ispace) const {
+    shape_t out;
+    for (size_t idim = dimlim[ispace]; idim < dimlim[ispace + 1]; ++idim)
+      out.emplace_back(idim);
+    return out;
   }
 
 public:
@@ -830,11 +836,6 @@ public:
       lpindex.push_back(pindex(i));
       dimlim.push_back(dimlim.back() + lpindex.back().ndim());
       space_dims.push_back(lpindex.back().ndim());
-    }
-
-    // FIXME @mtr how to write this nicer?
-    for (size_t i = 1; i < dimlim.back(); ++i) {
-      fft_axes.emplace_back(i);
     }
   }
 
@@ -948,10 +949,15 @@ public:
   void fft(ducc0::vfmav<double> &out) const {
     double fct{scalar_dvol};
     for (size_t ispace = 0; ispace < n_pspecs; ++ispace) {
-      vector<size_t> fft_axes;
-      for (size_t idim = dimlim[ispace]; idim < dimlim[ispace + 1]; ++idim)
-        fft_axes.emplace_back(idim);
-      ducc0::r2r_genuine_hartley(out, out, fft_axes, fct, nthreads);
+      ducc0::r2r_genuine_hartley(out, out, fft_axes(ispace), fct, nthreads);
+      fct = 1;
+    }
+  }
+
+  void fft_adjoint(ducc0::vfmav<double> &out) const {
+    double fct{scalar_dvol};
+    for (size_t ispace = 0; ispace < n_pspecs; ++ispace) {
+      ducc0::r2r_genuine_hartley(out, out, fft_axes(ispace), fct, nthreads);
       fct = 1;
     }
   }
@@ -990,8 +996,8 @@ public:
 
     function<py::array(const py::dict &)> ftimes =
         [=](const py::dict &tangent_) {
-          const auto inpcopy =
-              inp_; // keep inp_ alive to avoid dangling references
+          // keep inp_ alive to avoid dangling references
+          const auto inpcopy = inp_;
           auto out_ = ducc0::make_Pyarr<double>(out_shape);
           auto out = ducc0::to_vfmav<double>(out_);
 
@@ -1005,10 +1011,48 @@ public:
 
     function<py::dict(const py::array &)> fadjtimes =
         [=](const py::array &cotangent_) {
-          const auto inpcopy =
-              inp_; // keep inp_ alive to avoid dangling references
-          MR_fail("NotImplementedError");
+          // keep inp_ alive to avoid dangling references
+          const auto inpcopy = inp_;
+
+          const auto cotangent = ducc0::to_cfmav<double>(cotangent_);
           py::dict out_;
+
+          // out_[key_xi] = ducc0::make_Pyarr<double>(inp_xi.shape());
+          // auto out_xi = ducc0::to_vfmav<double>(out_[key_xi]);
+          //// ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_xi);
+
+          // out_[key_azm] = ducc0::make_Pyarr<double>(inp_azm.shape());
+          // auto out_azm = ducc0::to_vfmav<double>(out_[key_azm]);
+          // ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads, out_azm);
+
+          // vector<ducc0::vfmav<double>> out_pspec;
+          // for (size_t i=0; i<n_pspecs; ++i)
+          //{
+          //  out_[amplitude_keys[i]] =
+          //  ducc0::make_Pyarr<double>(inp_pspec0.shape());
+          //  out_pspec.push_back(ducc0::to_vfmav<double>(out_[amplitude_keys[0]]));
+          // ducc0::mav_apply([](double &inp) { inp = 0; }, nthreads,
+          // out_pspec.back());
+          //}
+
+          // ducc0::r2r_separable_hartley(cotangent, out_xi, {1, 2},
+          // scalar_dvol,
+          //                             nthreads);
+
+          //// xi and Power distributor
+          // ducc0::mav_apply_with_index(
+          //    [&](const double &xi0, double &dxi, const shape_t &inds) {
+          //      const int64_t ind0{p0(inds[1])}, ind1{p1(inds[2])};
+          //      const double fac0{inp_pspec0(inds[0], ind0)},
+          //          fac1{inp_pspec1(inds[0], ind1)}, fac2{inp_azm(inds[0])},
+          //          fac3{xi0};
+          //      out_pspec0(inds[0], ind0) += fac1 * fac2 * fac3 * dxi;
+          //      out_pspec1(inds[0], ind1) += fac0 * fac2 * fac3 * dxi;
+          //      out_azm(inds[0]) += fac0 * fac1 * fac3 * dxi;
+          //      dxi *= fac0 * fac1 * fac2;
+          //    },
+          //    1, inp_xi, out_xi);
+
           return out_;
         };
 
