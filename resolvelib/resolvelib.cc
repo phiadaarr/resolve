@@ -20,7 +20,8 @@
    Authors: Philipp Arras */
 
 // FIXME TEMPORARAY!!!
-#define QUICKCOMPILE
+//#define QUICKCOMPILE
+
 
 // FIXME Release GIL around mav_applys
 // Includes related to pybind11
