@@ -37,7 +37,6 @@ auto None = py::none();
 // Includes related to pybind11
 
 #include "ducc0/fft/fft.h"
-#include "ducc0/infra/timers.h"
 #include "shape_helper.h"
 using namespace std;
 
@@ -868,9 +867,9 @@ public:
     return distributed_power_spectra;
   }
 
-  void A_times_xi(const py::dict &inp_,
-                  const vector<ducc0::cfmav<double>> &distributed_power_spectra,
-                  ducc0::vfmav<double> &out) const {
+  void A_times_xi(const py::dict &inp_, ducc0::vfmav<double> &out) const {
+    auto distributed_power_spectra = precompute_distributed_spectra(inp_);
+
     const auto inp_azm = ducc0::to_cfmav<double>(inp_[key_azm]);
     const auto inp_xi = ducc0::to_cfmav<double>(inp_[key_xi]);
     auto inp_azm_broadcasted = inp_azm.extend_and_broadcast(inp_xi.shape(), 0);
@@ -920,9 +919,6 @@ public:
   }
 
   py::array apply(const py::dict &inp_) const {
-    auto timer = ducc0::TimerHierarchy("CfmCore::apply");
-
-    timer.push("Startup");
     const auto out_shape =
         ducc0::to_cfmav<double>(inp_[key_xi]).shape(); // FIXME Simplify
     MR_assert(py::len(amplitude_keys) == n_pspecs,
@@ -931,22 +927,9 @@ public:
     auto out = ducc0::to_vfmav<double>(out_);
     // Note: "out" is not nulled at this point
 
-    timer.poppush("Precompute power spectra");
-    auto distributed_power_spectra = precompute_distributed_spectra(inp_);
-
-    timer.poppush("xi * outer(pspecs)");
-    A_times_xi(inp_, distributed_power_spectra, out);
-
-    timer.poppush("offset mean");
+    A_times_xi(inp_, out);
     add_offset_mean(offset_mean, out);
-
-    timer.poppush("fft");
     fft(out);
-
-    timer.pop();
-
-    timer.report(cout);
-
     return out_;
   }
 

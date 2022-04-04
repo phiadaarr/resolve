@@ -99,5 +99,12 @@ def test_cfm(total_N, prefix, cfg, nthreads):
     op1 = cfm.finalize(0)
     op2 = cfm.finalize_nifty_equivalent(0)
 
+    # TEMPORARY
+    pos = ift.from_random(op0.domain)
+    ift.extra.assert_allclose(op0(pos), op1(pos), rtol=1e-5);
+    ift.extra.assert_allclose(op0(pos), op2(pos), rtol=1e-5);
+    return
+    # /TEMPORARY
+
     rve.operator_equality(op0, op1, rtol=1e-5, ntries=3)  # FIXME Why is the accuracy so low?
     rve.operator_equality(op0, op2, rtol=1e-5, ntries=3)
