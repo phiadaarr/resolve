@@ -14,11 +14,13 @@
 # Copyright(C) 2022 Max-Planck-Society, Philipp Arras
 # Author: Philipp Arras
 
-import nifty8 as ift
-
-import resolve as rve
 import sys
+
+import matplotlib.pyplot as plt
+import nifty8 as ift
+import numpy as np
 import pytest
+import resolve as rve
 
 pmp = pytest.mark.parametrize
 
@@ -32,9 +34,9 @@ else:
     dom0 = ift.RGSpace(1120)
     dom1 = ift.RGSpace(200)
 
-total_N = 200
-dom0 = ift.RGSpace([42, 42], [0.1, 0.1])
-dom1 = ift.RGSpace(88, 0.893)
+    total_N = 200
+    dom0 = ift.RGSpace([42, 42], [0.1, 0.1])
+    dom1 = ift.RGSpace(88, 0.893)
 
 
 dofdex = list(range(total_N))
@@ -78,6 +80,7 @@ max_nthreads = 16
 xs = list(range(1, max_nthreads+1))
 ys0, ys1 = [], []
 from time import time
+
 for nn in xs:
     print(nn, "of", xs)
     ift.set_nthreads(nn)
@@ -92,8 +95,7 @@ for nn in xs:
 
     ift.extra.assert_allclose(res0, res1, rtol=1e-5)
 
-import matplotlib.pyplot as plt
-import numpy as np
+
 plt.plot(xs, np.array(ys0)*1000, label="NIFTy times")
 plt.plot(xs, np.array(ys1)*1000, label="resolvelib times")
 plt.ylabel("Wall time [ms]")
@@ -103,18 +105,9 @@ plt.tight_layout()
 plt.savefig("cfm_perf.png")
 plt.close()
 
+
+# FIXME TEMPORARY
 exit()
-# TEMPORARY
-op1 = get_cpp_op(1)
-from time import time
-t0 = time()
-op0(pos)
-print("nifty", time()-t0)
-t0 = time()
-op1(pos)
-print("cpp", time()-t0)
-exit()
-# /TEMPORARY
 
 verbose = False
 for nthreads in [1, 8, 16]:
