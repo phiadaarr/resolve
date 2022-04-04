@@ -19,9 +19,11 @@
 /* Copyright (C) 2021-2022 Max-Planck-Society, Philipp Arras
    Authors: Philipp Arras */
 
-// FIXME TEMPORARAY!!!
-//#define QUICKCOMPILE
-
+#define COMPILE_CFM
+#define COMPILE_GAUSSIAN_LIKELIHOOD
+#define COMPILE_VARCOV_GAUSSIAN_LIKELIHOOD
+#define COMPILE_POLARIZATION_MATRIX_EXPONENTIAL
+#define COMPILE_CALIBRATION_DISTRIBUTOR
 
 // FIXME Release GIL around mav_applys
 // Includes related to pybind11
@@ -29,15 +31,21 @@
 #include <pybind11/pybind11.h>
 
 #include "ducc0/bindings/pybind_utils.h"
-#include "ducc0/fft/fft.h"
-#include "ducc0/infra/timers.h"
 using namespace pybind11::literals;
 namespace py = pybind11;
 auto None = py::none();
 // Includes related to pybind11
 
+#include "ducc0/fft/fft.h"
+#include "ducc0/infra/timers.h"
 #include "shape_helper.h"
 using namespace std;
+
+// Global types for energies
+using Tacc = double;
+using Tenergy = double;
+// /Global types for energies
+
 
 template <typename Tin, typename Tout> class Linearization {
 public:
@@ -95,12 +103,7 @@ void add_linearization_with_metric(py::module_ &msup, const char *name) {
       .def("apply_metric", &LinearizationWithMetric<Tin>::apply_metric);
 }
 
-// Global types for energies
-using Tacc = double;
-using Tenergy = double;
-// /Global types for energies
-
-#ifndef QUICKCOMPILE
+#ifdef COMPILE_GAUSSIAN_LIKELIHOOD
 template <typename T, bool complex_mean,
           typename Tmean = conditional_t<complex_mean, complex<T>, T>>
 class DiagonalGaussianLikelihood {
@@ -209,7 +212,10 @@ public:
                                               fadjtimes, apply_metric);
   }
 };
+#endif
 
+
+#ifdef COMPILE_VARCOV_GAUSSIAN_LIKELIHOOD
 template <typename T, bool complex_mean,
           typename Tmean = conditional_t<complex_mean, complex<T>, T>>
 class VariableCovarianceDiagonalGaussianLikelihood {
@@ -374,7 +380,9 @@ public:
                                              ftimes, fadjtimes, apply_metric);
   }
 };
+#endif
 
+#ifdef COMPILE_POLARIZATION_MATRIX_EXPONENTIAL
 template <typename T, size_t ndim> class PolarizationMatrixExponential {
 private:
   const size_t nthreads;
@@ -597,7 +605,9 @@ public:
     return Linearization<py::dict, py::array>(applied_, ftimes, fadjtimes);
   }
 };
+#endif
 
+#ifdef COMPILE_CALIBRATION_DISTRIBUTOR
 class CalibrationDistributor {
 private:
   const py::str key_logamplitude;
@@ -784,9 +794,9 @@ public:
     return Linearization<py::dict, py::array>(applied_, ftimes, fadjtimes);
   }
 };
-
 #endif
 
+#ifdef COMPILE_CFM
 class CfmCore {
 private:
   const py::list amplitude_keys;
@@ -1040,12 +1050,13 @@ public:
     return Linearization<py::dict, py::array>(out_, ftimes, fadjtimes);
   }
 };
+#endif
 
 PYBIND11_MODULE(resolvelib, m) {
 
   m.attr("__name__") = "resolvelib";
 
-#ifndef QUICKCOMPILE
+#ifdef COMPILE_POLARIZATION_MATRIX_EXPONENTIAL
   py::class_<PolarizationMatrixExponential<double, 1>>(
       m, "PolarizationMatrixExponential1")
       .def(py::init<size_t>())
@@ -1070,7 +1081,9 @@ PYBIND11_MODULE(resolvelib, m) {
       .def("apply", &PolarizationMatrixExponential<double, 4>::apply)
       .def("apply_with_jac",
            &PolarizationMatrixExponential<double, 4>::apply_with_jac);
+#endif
 
+#ifdef COMPILE_GAUSSIAN_LIKELIHOOD
   py::class_<DiagonalGaussianLikelihood<double, false>>(
       m, "DiagonalGaussianLikelihood_f8")
       .def(py::init<py::array, py::array, size_t>())
@@ -1095,7 +1108,9 @@ PYBIND11_MODULE(resolvelib, m) {
       .def("apply", &DiagonalGaussianLikelihood<float, true>::apply)
       .def("apply_with_jac",
            &DiagonalGaussianLikelihood<float, true>::apply_with_jac);
+#endif
 
+#ifdef COMPILE_VARCOV_GAUSSIAN_LIKELIHOOD
   py::class_<VariableCovarianceDiagonalGaussianLikelihood<double, false>>(
       m, "VariableCovarianceDiagonalGaussianLikelihood_f8")
       .def(py::init<py::array, py::str, py::str, py::array, size_t>())
@@ -1126,19 +1141,21 @@ PYBIND11_MODULE(resolvelib, m) {
       .def("apply_with_jac",
            &VariableCovarianceDiagonalGaussianLikelihood<float,
                                                          true>::apply_with_jac);
+#endif
 
+#ifdef COMPILE_CALIBRATION_DISTRIBUTOR
   py::class_<CalibrationDistributor>(m, "CalibrationDistributor")
       .def(py::init<py::array, py::array, py::array, py::str, py::str, size_t,
                     size_t, double, size_t>())
       .def("apply", &CalibrationDistributor::apply)
       .def("apply_with_jac", &CalibrationDistributor::apply_with_jac);
-#endif
 
   py::class_<CfmCore>(m, "CfmCore")
       .def(py::init<py::list, py::list, py::str, py::str, double, double,
                     size_t>())
       .def("apply", &CfmCore::apply)
       .def("apply_with_jac", &CfmCore::apply_with_jac);
+#endif
 
   add_linearization<py::array, py::array>(m, "Linearization_field2field");
   add_linearization<py::array, py::dict>(m, "Linearization_field2mfield");
