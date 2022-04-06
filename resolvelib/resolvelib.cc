@@ -871,18 +871,18 @@ public:
   void A_times_xi(ducc0::cfmav<double> inp_xi, ducc0::cfmav<double> inp_azm,
                   const vector<ducc0::cfmav<double>> &distributed_power_spectra,
                   ducc0::vfmav<double> &out) const {
-    auto inp_azm_broadcasted = inp_azm.extend_and_broadcast(inp_xi.shape(), 0);
+    auto inp_azm_broadcast = inp_azm.extend_and_broadcast(inp_xi.shape(), 0);
 
     if (n_pspecs == 1)
       ducc0::mav_apply([&](double &oo, const double &azm, const double &xi,
                            const double &s1) { oo = azm * xi * s1; },
-                       nthreads, out, inp_azm_broadcasted, inp_xi,
+                       nthreads, out, inp_azm_broadcast, inp_xi,
                        distributed_power_spectra[0]);
     else if (n_pspecs == 2)
       ducc0::mav_apply(
           [&](double &oo, const double &azm, const double &xi, const double &s1,
               const double &s2) { oo = azm * xi * s1 * s2; },
-          nthreads, out, inp_azm_broadcasted, inp_xi,
+          nthreads, out, inp_azm_broadcast, inp_xi,
           distributed_power_spectra[0], distributed_power_spectra[1]);
     // and so on, as far as we want to go with special cases
     else
@@ -906,16 +906,16 @@ public:
       const vector<ducc0::cfmav<double>> &tangent_distributed_power_spectra,
       ducc0::vfmav<double> &out) const {
 
-    auto inp_azm_broadcasted = inp_azm.extend_and_broadcast(inp_xi.shape(), 0);
-    auto tangent_azm_broadcasted =
+    auto inp_azm_broadcast = inp_azm.extend_and_broadcast(inp_xi.shape(), 0);
+    auto tangent_azm_broadcast =
         tangent_azm.extend_and_broadcast(inp_xi.shape(), 0);
 
     // FIXME Add specialized cases?
 
     ducc0::mav_apply_with_index(
         [&](double &out, const double &inp_xi,
-            const double &inp_azm_broadcasted, const double &tangent_xi,
-            const double &tangent_azm_broadcasted, const shape_t &inds) {
+            const double &inp_azm_broadcast, const double &tangent_xi,
+            const double &tangent_azm_broadcast, const shape_t &inds) {
           double inp_pspec{1.};
           for (size_t i = 0; i < n_pspecs; ++i) {
             inp_pspec *= inp_distributed_power_spectra[i](inds);
@@ -928,13 +928,13 @@ public:
             dpspec += tmp;
           }
 
-          const auto term0 = dpspec * inp_azm_broadcasted * inp_xi;
-          const auto term1 = inp_pspec * tangent_azm_broadcasted * inp_xi;
-          const auto term2 = inp_pspec * inp_azm_broadcasted * tangent_xi;
+          const auto term0 = dpspec * inp_azm_broadcast * inp_xi;
+          const auto term1 = inp_pspec * tangent_azm_broadcast * inp_xi;
+          const auto term2 = inp_pspec * inp_azm_broadcast * tangent_xi;
           out = term0 + term1 + term2;
         },
-        nthreads, out, inp_xi, inp_azm_broadcasted, tangent_xi,
-        tangent_azm_broadcasted);
+        nthreads, out, inp_xi, inp_azm_broadcast, tangent_xi,
+        tangent_azm_broadcast);
   }
 
   void A_times_xi_adj_jac(
@@ -944,17 +944,17 @@ public:
       ducc0::vfmav<double> &out_azm,
       vector<ducc0::vfmav<double>> &out_pspecs) const {
 
-    const auto inp_azm_broadcasted = inp_azm.extend_and_broadcast(inp_xi.shape(), 0);
+    const auto inp_azm_broadcast = inp_azm.extend_and_broadcast(inp_xi.shape(), 0);
 
     // FIXME Add specialized cases?
 
     ducc0::mav_apply_with_index(
-        [&](const double &inp_xi, const double &inp_azm_broadcasted,
+        [&](const double &inp_xi, const double &inp_azm_broadcast,
             const double &cotangent_in, double &out_xi,
             const shape_t &inds) {
           // Note: it shall be supported that cotangent_in and out_xi points to
           // the same memory. So out_xi is written to at the very end
-          double inp{inp_xi * inp_azm_broadcasted * cotangent_in};
+          double inp{inp_xi * inp_azm_broadcast * cotangent_in};
           for (size_t i = 0; i < n_pspecs; ++i) {
             inp *= inp_distributed_power_spectra[i](inds);
           }
@@ -962,10 +962,10 @@ public:
              const auto pspec_index = lpindex[i].val(&inds[dimlim[i]], &inds[dimlim[i+1]]);
              out_pspecs[i](inds[0], pspec_index) += inp/inp_distributed_power_spectra[i](inds);
           }
-          out_azm(inds[0]) += inp / inp_azm_broadcasted;
+          out_azm(inds[0]) += inp / inp_azm_broadcast;
           out_xi = inp / inp_xi;
         },
-        1, inp_xi, inp_azm_broadcasted, cotangent_in, out_xi);
+        1, inp_xi, inp_azm_broadcast, cotangent_in, out_xi);
   }
 
   void add_offset_mean(const double &offset_mean,
