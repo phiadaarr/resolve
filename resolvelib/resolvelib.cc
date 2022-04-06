@@ -945,14 +945,13 @@ public:
       vector<ducc0::vfmav<double>> &out_pspecs) const {
 
     const auto inp_azm_broadcasted = inp_azm.extend_and_broadcast(inp_xi.shape(), 0);
-    auto out_azm_broadcasted = out_azm.extend_and_broadcast(inp_xi.shape(), 0);
 
     // FIXME Add specialized cases?
 
     ducc0::mav_apply_with_index(
         [&](const double &inp_xi, const double &inp_azm_broadcasted,
             const double &cotangent_in, double &out_xi,
-            double &out_azm_broadcasted, const shape_t &inds) {
+            const shape_t &inds) {
           // Note: it shall be supported that cotangent_in and out_xi points to
           // the same memory. So out_xi is written to at the very end
           double inp{inp_xi * inp_azm_broadcasted * cotangent_in};
@@ -963,11 +962,10 @@ public:
              const auto pspec_index = lpindex[i].val(&inds[dimlim[i]], &inds[dimlim[i+1]]);
              out_pspecs[i](inds[0], pspec_index) += inp/inp_distributed_power_spectra[i](inds);
           }
-          out_azm_broadcasted += inp / inp_azm_broadcasted;
+          out_azm(inds[0]) += inp / inp_azm_broadcasted;
           out_xi = inp / inp_xi;
         },
-        1, inp_xi, inp_azm_broadcasted, cotangent_in, out_xi,
-        out_azm_broadcasted);
+        1, inp_xi, inp_azm_broadcasted, cotangent_in, out_xi);
   }
 
   void add_offset_mean(const double &offset_mean,
