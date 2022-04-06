@@ -113,6 +113,11 @@ def test_cfm(total_N, prefix, cfg, nthreads):
     ift.extra.assert_allclose(op0(pos).jac(pos1), op1(pos).jac(pos1), rtol=1e-5);
     ift.extra.assert_allclose(op0(pos).jac(pos1), op2(pos).jac(pos1), rtol=1e-5);
 
+    pos = ift.Linearization.make_var(ift.from_random(op0.domain))
+    pos1 = ift.from_random(op0.target)
+    ift.extra.assert_allclose(op0(pos).jac.adjoint(pos1), op1(pos).jac.adjoint(pos1), rtol=1e-5);
+    ift.extra.assert_allclose(op0(pos).jac.adjoint(pos1), op2(pos).jac.adjoint(pos1), rtol=1e-5);
+
     return
     # /TEMPORARY
 

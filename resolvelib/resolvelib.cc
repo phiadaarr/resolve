@@ -938,7 +938,7 @@ public:
         nthreads, out, inp_xi, tangent_xi);
   }
 
-  void A_times_xi_adj_jac(const py::dict &inp, ducc0::vfmav<double> &out_xi) const {
+  void A_times_xi_adj_jac(const py::dict &inp_, ducc0::vfmav<double> &out_xi) const {
 
     //  const py::dict &tangent_,
     //  const vector<ducc0::cfmav<double>> &inp_distributed_power_spectra,
@@ -979,13 +979,13 @@ public:
 
   void fft_adjoint(const ducc0::cfmav<double> &in, ducc0::vfmav<double> &out) const {
     for (size_t i = 0; i < n_pspecs; ++i) {
-      MR_fail(i + 1 <= n_pspecs);
-      const auto ispace = n_pspecs - (i + 1);
+      MR_assert(i + 1 <= n_pspecs, "this is a bug");
+      const size_t ispace{n_pspecs - (i + 1)};
       if (ispace == 0)
         ducc0::r2r_genuine_hartley(in, out, fft_axes(ispace), scalar_dvol,
                                    nthreads);
       else
-        ducc0::r2r_genuine_hartley(out, out, fft_axes(ispace), 1., nthreads);
+        ducc0::r2r_genuine_hartley(out, out, fft_axes(ispace), double(1), nthreads);
     }
   }
 
