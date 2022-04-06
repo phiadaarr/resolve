@@ -942,40 +942,47 @@ public:
       const vector<ducc0::cfmav<double>> &inp_distributed_power_spectra,
       const ducc0::vfmav<double> &cotangent_in, ducc0::vfmav<double> &out_xi,
       ducc0::vfmav<double> &out_azm,
-      vector<ducc0::vfmav<double>> &out_pspec) const {
+      vector<ducc0::vfmav<double>> &out_pspecs) const {
 
     auto inp_azm_broadcasted = inp_azm.extend_and_broadcast(inp_xi.shape(), 0);
     auto out_azm_broadcasted = out_azm.extend_and_broadcast(inp_xi.shape(), 0);
 
     // FIXME Add specialized cases?
 
-    // ducc0::mav_apply_with_index(
-    //     [&](const double &inp_xi, const double &inp_azm_broadcasted,
-    //         const double &inp_distributed_power_spectra,
-    //         const double cotangent_in, double out_xi,
-    //         double out_azm_broadcasted, const shape_t &inds) {
-    //     // FIXME Theoretically we could reuse xi*prod_i pd_i(pspec_i) for
-    //     inp_*
+    cout << inp_xi.shape() << endl;
+    cout << inp_azm_broadcasted.shape() << endl;
+    cout << cotangent_in.shape() << endl;
+    cout << out_xi.shape() << endl;
+    cout << out_azm_broadcasted.shape() << endl;
+    for (auto i : inp_distributed_power_spectra)
+      cout << i.shape() << endl;
 
-    //       double inp{1.};
-    //       for (size_t i = 0; i < n_pspecs; ++i) {
-    //         inp *= inp_distributed_power_spectra[i](inds);
-    //       }
-    //       inp *= inp_xi;
-    //       inp *= azm;
+    ducc0::mav_apply_with_index(
+        [&](const double &inp_xi, const double &inp_azm_broadcasted,
+            const double cotangent_in, double out_xi,
+            double out_azm_broadcasted, const shape_t &inds) {
+          // Note: it shall be supported that cotangent_in and out_xi points to
+          // the same memory. So out_xi is written to at the very end
+          double inp{inp_xi * inp_azm_broadcasted * cotangent_in};
+          for (size_t i = 0; i < n_pspecs; ++i) {
+            inp *= inp_distributed_power_spectra[i](inds);
+          }
 
-    //       //      const int64_t ind0{p0(inds[1])}, ind1{p1(inds[2])};
-    //       //      const double fac0{inp_pspec0(inds[0], ind0)},
-    //       //          fac1{inp_pspec1(inds[0], ind1)},
-    //       fac2{inp_azm(inds[0])},
-    //       //          fac3{xi0};
-    //       //      out_pspec0(inds[0], ind0) += fac1 * fac2 * fac3 * dxi;
-    //       //      out_pspec1(inds[0], ind1) += fac0 * fac2 * fac3 * dxi;
-    //       //      out_azm(inds[0]) += fac0 * fac1 * fac3 * dxi;
-    //       //      dxi *= fac0 * fac1 * fac2;
-    //     },
-    //     1, inp_xi, inp_azm_broadcasted, inp_distributed_power_spectra,
-    //     cotangent_in, out_xi, out_azm_broadcasted);
+          for (size_t i = 0; i < n_pspecs; ++i) {
+            // {
+            // cout << "lpindex " << lpindex[i].shape() << endl;
+            // cout << "Current index "; for (auto i:inds) cout << i << " ";
+            // cout << endl;
+            // }
+
+            // out_pspecs[i](lpindex[i](inds)) +=
+            // inp/inp_distributed_power_spectra[i](inds);
+          }
+          out_azm_broadcasted += inp / inp_azm_broadcasted;
+          out_xi = inp / inp_xi;
+        },
+        1, inp_xi, inp_azm_broadcasted, cotangent_in, out_xi,
+        out_azm_broadcasted);
   }
 
   void add_offset_mean(const double &offset_mean,

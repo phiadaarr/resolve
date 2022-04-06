@@ -21,6 +21,7 @@
 
 #include <array>
 #include <algorithm>
+#include <iostream>
 
 using namespace std;
 
@@ -66,4 +67,12 @@ out.push_back(s1);
 for (auto i: vec)
   out.push_back(i);
 return out;
+}
+
+ostream& operator<<(ostream& os, const vector<size_t> &shp)
+{
+  for (auto i: shp)
+    cout << i << " ";
+  cout << endl;
+  return os;
 }
