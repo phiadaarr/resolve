@@ -944,39 +944,24 @@ public:
       ducc0::vfmav<double> &out_azm,
       vector<ducc0::vfmav<double>> &out_pspecs) const {
 
-    auto inp_azm_broadcasted = inp_azm.extend_and_broadcast(inp_xi.shape(), 0);
+    const auto inp_azm_broadcasted = inp_azm.extend_and_broadcast(inp_xi.shape(), 0);
     auto out_azm_broadcasted = out_azm.extend_and_broadcast(inp_xi.shape(), 0);
 
     // FIXME Add specialized cases?
 
-    cout << inp_xi.shape() << endl;
-    cout << inp_azm_broadcasted.shape() << endl;
-    cout << cotangent_in.shape() << endl;
-    cout << out_xi.shape() << endl;
-    cout << out_azm_broadcasted.shape() << endl;
-    for (auto i : inp_distributed_power_spectra)
-      cout << i.shape() << endl;
-
     ducc0::mav_apply_with_index(
         [&](const double &inp_xi, const double &inp_azm_broadcasted,
-            const double cotangent_in, double out_xi,
-            double out_azm_broadcasted, const shape_t &inds) {
+            const double &cotangent_in, double &out_xi,
+            double &out_azm_broadcasted, const shape_t &inds) {
           // Note: it shall be supported that cotangent_in and out_xi points to
           // the same memory. So out_xi is written to at the very end
           double inp{inp_xi * inp_azm_broadcasted * cotangent_in};
           for (size_t i = 0; i < n_pspecs; ++i) {
             inp *= inp_distributed_power_spectra[i](inds);
           }
-
           for (size_t i = 0; i < n_pspecs; ++i) {
-            // {
-            // cout << "lpindex " << lpindex[i].shape() << endl;
-            // cout << "Current index "; for (auto i:inds) cout << i << " ";
-            // cout << endl;
-            // }
-
-            // out_pspecs[i](lpindex[i](inds)) +=
-            // inp/inp_distributed_power_spectra[i](inds);
+             const auto pspec_index = lpindex[i].val(&inds[dimlim[i]], &inds[dimlim[i+1]]);
+             out_pspecs[i](inds[0], pspec_index) += inp/inp_distributed_power_spectra[i](inds);
           }
           out_azm_broadcasted += inp / inp_azm_broadcasted;
           out_xi = inp / inp_xi;

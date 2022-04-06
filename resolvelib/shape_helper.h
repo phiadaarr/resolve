@@ -72,7 +72,7 @@ return out;
 ostream& operator<<(ostream& os, const vector<size_t> &shp)
 {
   for (auto i: shp)
-    cout << i << " ";
-  cout << endl;
+    os << i << " ";
+  os << endl;
   return os;
 }
