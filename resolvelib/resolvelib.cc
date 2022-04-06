@@ -20,10 +20,10 @@
    Authors: Philipp Arras */
 
 #define COMPILE_CFM
-#define COMPILE_GAUSSIAN_LIKELIHOOD
-#define COMPILE_VARCOV_GAUSSIAN_LIKELIHOOD
-#define COMPILE_POLARIZATION_MATRIX_EXPONENTIAL
-#define COMPILE_CALIBRATION_DISTRIBUTOR
+// #define COMPILE_GAUSSIAN_LIKELIHOOD
+// #define COMPILE_VARCOV_GAUSSIAN_LIKELIHOOD
+// #define COMPILE_POLARIZATION_MATRIX_EXPONENTIAL
+// #define COMPILE_CALIBRATION_DISTRIBUTOR
 
 // FIXME Release GIL around mav_applys
 // Includes related to pybind11
@@ -917,7 +917,7 @@ public:
         tangent_azm.extend_and_broadcast(tangent_xi.shape(), 0);
 
     ducc0::mav_apply_with_index(
-        [&](double &oo, const double &xi, const shape_t &inds) {
+        [&](double &out, const double &inp_xi, const double &tangent_xi, const shape_t &inds) {
           double inp_pspec{1.};
           for (size_t i = 0; i < n_pspecs; ++i) {
             inp_pspec *= inp_distributed_power_spectra[i](inds);
@@ -930,12 +930,12 @@ public:
             dpspec += tmp;
           }
 
-          const auto term0 = dpspec * inp_azm(inds[0]) * inp_xi(inds);
-          const auto term1 = inp_pspec * tangent_azm(inds[0]) * inp_xi(inds);
-          const auto term2 = inp_pspec * inp_azm(inds[0]) * tangent_xi(inds);
-          oo = term0 + term1 + term2;
+          const auto term0 = dpspec * inp_azm(inds[0]) * inp_xi;
+          const auto term1 = inp_pspec * tangent_azm(inds[0]) * inp_xi;
+          const auto term2 = inp_pspec * inp_azm(inds[0]) * tangent_xi;
+          out = term0 + term1 + term2;
         },
-        nthreads, out, inp_xi);
+        nthreads, out, inp_xi, tangent_xi);
   }
 
   void A_times_xi_adj_jac(const py::dict &inp, ducc0::vfmav<double> &out_xi) const {
