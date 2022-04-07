@@ -59,7 +59,7 @@ def get_nifty_op(args_cfm, args_lst, args_zm, nthreads):
     return op
 
 
-def perf_nifty_operators(op_dct, file_name, domain_dtype=np.float64):
+def perf_nifty_operators(op_dct, name, domain_dtype=np.float64):
     xs = list(range(1, n_cpus + 1))
 
     def init(keys, n):
@@ -114,12 +114,13 @@ def perf_nifty_operators(op_dct, file_name, domain_dtype=np.float64):
             )
             c = line[0].get_color()
     plt.xlabel("# threads")
-    plt.ylabel("Wall time [ms]")
+    plt.ylabel("Wall time [s]")
     plt.xlim([0, None])
     plt.ylim([0, None])
-    plt.legend()
+    plt.title(name)
+    plt.legend(loc="upper right")
     plt.tight_layout()
-    plt.savefig(file_name)
+    plt.savefig(f"{name}.png")
     plt.close()
 
 
@@ -176,5 +177,5 @@ if __name__ == "__main__":
                 "NIFTy": partial(get_nifty_op, args_cfm, args_lst, args_zm),
                 "resolvelib": partial(get_cpp_op, args_cfm, args_lst, args_zm),
             },
-            f"{nm}.png",
+            nm,
         )
