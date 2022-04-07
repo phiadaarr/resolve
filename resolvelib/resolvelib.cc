@@ -30,6 +30,7 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
+#include "ducc0/infra/timers.h"
 #include "ducc0/bindings/pybind_utils.h"
 using namespace pybind11::literals;
 namespace py = pybind11;
@@ -678,13 +679,10 @@ public:
           [&](double &out, const double &inp_xi, const double &inp_azm_broadcast,
               const double &tangent_xi, const double &tangent_azm_broadcast,
               const double &s0, const double &ts0) {
-            double inp_pspec{s0};
 
-            double dpspec = inp_pspec / s0 * ts0;
-
-            const auto term0 = dpspec * inp_azm_broadcast * inp_xi;
-            const auto term1 = inp_pspec * tangent_azm_broadcast * inp_xi;
-            const auto term2 = inp_pspec * inp_azm_broadcast * tangent_xi;
+            const auto term0 = ts0 * inp_azm_broadcast * inp_xi;
+            const auto term1 = s0 * tangent_azm_broadcast * inp_xi;
+            const auto term2 = s0 * inp_azm_broadcast * tangent_xi;
             out = term0 + term1 + term2;
           },
           nthreads, out, inp_xi, inp_azm_broadcast, tangent_xi,
@@ -696,7 +694,7 @@ public:
               const double &s0, const double &s1, const double &ts0, const double &ts1) {
             double inp_pspec{s0*s1};
 
-            double dpspec = inp_pspec / s0 * ts0 + inp_pspec / s1 * ts1;
+            double dpspec = s1 * ts0 + s0 * ts1;
 
             const auto term0 = dpspec * inp_azm_broadcast * inp_xi;
             const auto term1 = inp_pspec * tangent_azm_broadcast * inp_xi;
@@ -747,6 +745,7 @@ public:
 
     if (n_pspecs<=2)
       {
+ducc0::SimpleTimer t0;
       const auto out_shape{inp_xi.shape()};
       const size_t total_N = out_shape[0];
       vector<ducc0::vfmav<double>> power_spectra_out;
@@ -763,16 +762,16 @@ public:
         distributed_power_spectra_out.emplace_back(
           tmp.extend_and_broadcast(out_shape, axpos));
       }
+cout << "0: "<<t0() << endl;
       if (n_pspecs==1)
         ducc0::mav_apply(
             [](const double &inp_xi, const double &inp_azm_broadcast,
                 const double &cotangent_in, double &out_xi, double &out_azm_broadcast, const double &s0, double &os0) {
               // Note: it shall be supported that cotangent_in and out_xi points to
               // the same memory. So out_xi is written to at the very end
-              double inp{inp_xi * inp_azm_broadcast * cotangent_in * s0};
-              os0 += inp/s0;
-              out_azm_broadcast += inp / inp_azm_broadcast;
-              out_xi = inp / inp_xi;
+              os0 += inp_xi * inp_azm_broadcast * cotangent_in;
+              out_azm_broadcast += inp_xi * cotangent_in * s0;
+              out_xi = inp_azm_broadcast * cotangent_in * s0;
             },
             1, inp_xi, inp_azm_broadcast, cotangent_in, out_xi, out_azm_broadcast, inp_distributed_power_spectra[0], distributed_power_spectra_out[0]);
       else if (n_pspecs==2)
@@ -781,23 +780,23 @@ public:
                 const double &cotangent_in, double &out_xi, double &out_azm_broadcast, const double &s0, const double &s1, double &os0, double &os1) {
               // Note: it shall be supported that cotangent_in and out_xi points to
               // the same memory. So out_xi is written to at the very end
-              double inp{inp_xi * inp_azm_broadcast * cotangent_in * s0 * s1};
-              os0 += inp/s0;
-              os1 += inp/s1;
-              out_azm_broadcast += inp / inp_azm_broadcast;
-              out_xi = inp / inp_xi;
+              os0 += inp_xi * inp_azm_broadcast * cotangent_in * s1;
+              os1 += inp_xi * inp_azm_broadcast * cotangent_in * s0;
+              out_azm_broadcast += inp_xi * cotangent_in * s0 * s1;
+              out_xi = inp_azm_broadcast * cotangent_in * s0 * s1;
             },
             1, inp_xi, inp_azm_broadcast, cotangent_in, out_xi, out_azm_broadcast, inp_distributed_power_spectra[0], inp_distributed_power_spectra[1], distributed_power_spectra_out[0], distributed_power_spectra_out[1]);
+cout << t0() << endl;
       for (size_t i = 0; i < n_pspecs; ++i) {
-        const size_t actual_dimensions = space_dims[i];
+        auto xpindex = lpindex[i].extend_and_broadcast(power_spectra_out[i].shape(),1);
+        auto out_ps(ducc0::vmav<double,2>::from_vfmav(out_pspecs[i]));
         ducc0::mav_apply_with_index(
-            [&](const double &ii, const shape_t &inds) {
-              const int64_t pind =
-                  lpindex[i].val(&inds[1], &inds[actual_dimensions+1]);
-              out_pspecs[i](inds[0], pind) += ii;
+            [&](const double &ii, const int64_t &pind, const shape_t &inds) {
+              out_ps(inds[0], pind) += ii;
             },
-            1, power_spectra_out[i]);
+            1, power_spectra_out[i], xpindex);
       }
+cout << t0() << endl;
       }
     else
       ducc0::mav_apply_with_index(
