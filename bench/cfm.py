@@ -59,6 +59,18 @@ def get_nifty_op(args_cfm, args_lst, args_zm, nthreads):
     return op
 
 
+def get_pspecs_op(args_cfm, args_lst, args_zm, nthreads):
+    cfm = ift.CorrelatedFieldMaker(**args_cfm)
+    for aa in args_lst:
+        cfm.add_fluctuations(**aa)
+    cfm.set_amplitude_total_offset(**args_zm)
+    ampls = cfm.get_normalized_amplitudes()
+    ift.set_nthreads(nthreads)
+    from functools import reduce
+    from operator import add
+    return reduce(add, [aa.ducktape_left(str(ii)) for ii, aa in enumerate(ampls)])
+
+
 def perf_nifty_operators(op_dct, name, domain_dtype=np.float64):
     xs = list(range(1, n_cpus + 1))
 
@@ -176,6 +188,7 @@ if __name__ == "__main__":
             {
                 "NIFTy": partial(get_nifty_op, args_cfm, args_lst, args_zm),
                 "resolvelib": partial(get_cpp_op, args_cfm, args_lst, args_zm),
+                "pspecs": partial(get_pspecs_op, args_cfm, args_lst, args_zm),
             },
             nm,
         )
