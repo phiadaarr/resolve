@@ -14,13 +14,31 @@
 # Copyright(C) 2022 Max-Planck-Society, Philipp Arras
 # Author: Philipp Arras
 
+import os
 import sys
+from time import time
 
+import matplotlib
 import matplotlib.pyplot as plt
 import nifty8 as ift
 import numpy as np
 import pytest
 import resolve as rve
+
+eberas = [
+    "#1f77b4",
+    "#ff7f0e",
+    "#6ce06c",
+    "#d62728",
+    "#b487dd",
+    "#8c564b",
+    "#e377c2",
+    "#7f7f7f",
+    "#bcbd22",
+    "#17becf",
+]
+matplotlib.rcParams["axes.prop_cycle"] = matplotlib.cycler(color=eberas)
+
 
 pmp = pytest.mark.parametrize
 
@@ -60,11 +78,6 @@ args2 = dict(
     dofdex=dofdex,
 )
 args3 = dict(offset_mean=1.2, offset_std=(1.0, 0.2), dofdex=dofdex)
-cfm = ift.CorrelatedFieldMaker(**args0)
-cfm.add_fluctuations(**args1)
-cfm.add_fluctuations(**args2)
-cfm.set_amplitude_total_offset(**args3)
-op0 = cfm.finalize(0)
 
 
 def get_cpp_op(nthreads):
@@ -74,47 +87,76 @@ def get_cpp_op(nthreads):
     cfm.set_amplitude_total_offset(**args3)
     return cfm.finalize(0)
 
-pos = ift.from_random(op0.domain)
 
-max_nthreads = 16
-xs = list(range(1, max_nthreads+1))
-ys0, ys1 = [], []
-from time import time
-
-for nn in xs:
-    print(nn, "of", xs)
-    ift.set_nthreads(nn)
-    t0 = time()
-    res0 = op0(pos)
-    ys0.append(time()-t0)
-
-    op1 = get_cpp_op(nn)
-    t0 = time()
-    res1 = op1(pos)
-    ys1.append(time()-t0)
-
-    ift.extra.assert_allclose(res0, res1, rtol=1e-5)
-
-
-plt.plot(xs, np.array(ys0)*1000, label="NIFTy times")
-plt.plot(xs, np.array(ys1)*1000, label="resolvelib times")
-plt.ylabel("Wall time [ms]")
-plt.ylim([0, None])
-plt.legend()
-plt.tight_layout()
-plt.savefig("cfm_perf.png")
-plt.close()
-
-
-# FIXME TEMPORARY
-exit()
-
-verbose = False
-for nthreads in [1, 8, 16]:
-    print(f"New implementation (nthreads={nthreads})")
-    ift.exec_time(get_cpp_op(nthreads), verbose=verbose)
-
-    print(f"Old implementation (nthreads={nthreads})")
+def get_nifty_op(nthreads):
+    cfm = ift.CorrelatedFieldMaker(**args0)
+    cfm.add_fluctuations(**args1)
+    cfm.add_fluctuations(**args2)
+    cfm.set_amplitude_total_offset(**args3)
+    op = cfm.finalize(0)
     ift.set_nthreads(nthreads)
-    ift.exec_time(op0, verbose=verbose)
-    print()
+    return op
+
+
+def perf_nifty_operators(op_dct, file_name, domain_dtype=np.float64):
+    xs = list(range(1, os.cpu_count() + 1))
+
+    def init(keys, n):
+        return {kk: n * [None] for kk in keys}
+
+    linestyles = list(matplotlib.lines.lineStyles.keys())
+    if len(linestyles) < len(op_dct):
+        raise RuntimeError(
+            f"Too many operators, got {len(op_dct)}. Only {len(linestyles)} are supported."
+        )
+
+    args = op_dct.keys(), os.cpu_count()
+    times = init(*args)
+    times_with_jac = init(*args)
+    jac_times = init(*args)
+    jac_adj_times = init(*args)
+
+    for ii, nthreads in enumerate(xs):
+        # FIXME Check outputs for equality
+        for kk, oo in op_dct.items():
+            oo = oo(nthreads)
+            pos = ift.from_random(oo.domain, dtype=domain_dtype)
+            lin = ift.Linearization.make_var(pos)
+
+            t0 = time()
+            res = oo(pos)
+            times[kk][ii] = time() - t0
+
+            t0 = time()
+            reslin = oo(lin)
+            times_with_jac[kk][ii] = time() - t0
+
+            t0 = time()
+            reslin.jac(pos)
+            jac_times[kk][ii] = time() - t0
+
+            t0 = time()
+            reslin.jac.adjoint(res)
+            jac_adj_times[kk][ii] = time() - t0
+
+    for ys, mode in [
+        (times, "times"),
+        (times_with_jac, "times_with_jac"),
+        (jac_times, "jac_times"),
+        (jac_adj_times, "jac_adj_times"),
+    ]:
+        c = None
+        for iop, kk in enumerate(op_dct.keys()):
+            line = plt.plot(
+                xs, ys[kk], label=f"{kk} {mode}", color=c, linestyle=linestyles[iop]
+            )
+            c = line[0].get_color()
+    plt.ylabel("Wall time [ms]")
+    plt.ylim([0, None])
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(file_name)
+    plt.close()
+
+
+perf_nifty_operators({"NIFTy": get_nifty_op, "resolvelib": get_cpp_op}, "cfm_perf.png")
