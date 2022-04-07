@@ -22,8 +22,9 @@ import matplotlib
 import matplotlib.pyplot as plt
 import nifty8 as ift
 import numpy as np
-import pytest
 import resolve as rve
+
+n_cpus = os.cpu_count()
 
 eberas = [
     "#1f77b4",
@@ -40,66 +41,26 @@ eberas = [
 matplotlib.rcParams["axes.prop_cycle"] = matplotlib.cycler(color=eberas)
 
 
-pmp = pytest.mark.parametrize
-
-
-if len(sys.argv) == 2 and sys.argv[1] == "quick":
-    total_N = 2
-    dom0 = ift.RGSpace(4)
-    dom1 = ift.RGSpace(5)
-else:
-    total_N = 58
-    dom0 = ift.RGSpace(1120)
-    dom1 = ift.RGSpace(200)
-
-    total_N = 200
-    dom0 = ift.RGSpace([42, 42], [0.1, 0.1])
-    dom1 = ift.RGSpace(88, 0.893)
-
-
-dofdex = list(range(total_N))
-args0 = dict(prefix="", total_N=total_N)
-args1 = dict(
-    target_subdomain=dom0,
-    fluctuations=(1.0, 1.0),
-    flexibility=(2.0, 2),
-    asperity=(0.1, 0.1),
-    loglogavgslope=(-2, 0.1),
-    prefix="dom0",
-    dofdex=dofdex,
-)
-args2 = dict(
-    target_subdomain=dom1,
-    fluctuations=(2.0, 0.1),
-    flexibility=(1.0, 2),
-    asperity=(0.2, 0.1),
-    loglogavgslope=(-3, 0.321),
-    prefix="dom1",
-    dofdex=dofdex,
-)
-args3 = dict(offset_mean=1.2, offset_std=(1.0, 0.2), dofdex=dofdex)
-
-
-def get_cpp_op(nthreads):
-    cfm = rve.CorrelatedFieldMaker(**args0, nthreads=nthreads)
-    cfm.add_fluctuations(**args1)
-    cfm.add_fluctuations(**args2)
-    cfm.set_amplitude_total_offset(**args3)
+def get_cpp_op(args_cfm, args_lst, args_zm, nthreads):
+    cfm = rve.CorrelatedFieldMaker(**args_cfm, nthreads=nthreads)
+    for aa in args_lst:
+        cfm.add_fluctuations(**aa)
+    cfm.set_amplitude_total_offset(**args_zm)
     return cfm.finalize(0)
 
 
-def get_nifty_op(nthreads):
-    cfm = ift.CorrelatedFieldMaker(**args0)
-    cfm.add_fluctuations(**args1)
-    cfm.add_fluctuations(**args2)
-    cfm.set_amplitude_total_offset(**args3)
+def get_nifty_op(args_cfm, args_lst, args_zm, nthreads):
+    cfm = ift.CorrelatedFieldMaker(**args_cfm)
+    for aa in args_lst:
+        cfm.add_fluctuations(**aa)
+    cfm.set_amplitude_total_offset(**args_zm)
     op = cfm.finalize(0)
     ift.set_nthreads(nthreads)
     return op
 
 
 def perf_nifty_operators(op_dct, file_name, domain_dtype=np.float64):
-    xs = list(range(1, os.cpu_count() + 1))
+    xs = list(range(1, n_cpus + 1))
 
     def init(keys, n):
         return {kk: n * [None] for kk in keys}
@@ -110,13 +71,14 @@ def perf_nifty_operators(op_dct, file_name, domain_dtype=np.float64):
             f"Too many operators, got {len(op_dct)}. Only {len(linestyles)} are supported."
         )
 
-    args = op_dct.keys(), os.cpu_count()
+    args = op_dct.keys(), n_cpus
     times = init(*args)
     times_with_jac = init(*args)
     jac_times = init(*args)
     jac_adj_times = init(*args)
 
     for ii, nthreads in enumerate(xs):
+        print(f"{nthreads} / {n_cpus}")
         # FIXME Check outputs for equality
         for kk, oo in op_dct.items():
             oo = oo(nthreads)
@@ -151,7 +113,9 @@ def perf_nifty_operators(op_dct, file_name, domain_dtype=np.float64):
                 xs, ys[kk], label=f"{kk} {mode}", color=c, linestyle=linestyles[iop]
             )
             c = line[0].get_color()
+    plt.xlabel("# threads")
     plt.ylabel("Wall time [ms]")
+    plt.xlim([0, None])
     plt.ylim([0, None])
     plt.legend()
     plt.tight_layout()
@@ -159,4 +123,58 @@ def perf_nifty_operators(op_dct, file_name, domain_dtype=np.float64):
     plt.close()
 
 
-perf_nifty_operators({"NIFTy": get_nifty_op, "resolvelib": get_cpp_op}, "cfm_perf.png")
+if __name__ == "__main__":
+    if len(sys.argv) == 2 and sys.argv[1] == "quick":
+        total_Ns = [2]
+        dom0 = [ift.RGSpace(4)]
+        dom1 = [ift.RGSpace(5)]
+        name = ["quick"]
+    else:
+        total_Ns = [58, 200, 4]
+        dom0 = [
+            ift.RGSpace(1120),
+            ift.RGSpace([42, 42], [0.1, 0.1]),
+            ift.RGSpace([4000, 4000], [2e-6, 2e-6]),
+        ]
+        dom1 = [ift.RGSpace(200), ift.RGSpace(88, 0.893), None]
+        name = ["meerkat_calibration", "jroth_calibration", "polarization_imaging"]
+
+    for d0, d1, total_N, nm in zip(dom0, dom1, total_Ns, name):
+        print(f"Working on {nm}")
+        dofdex = list(range(total_N))
+        args_cfm = dict(prefix="", total_N=total_N)
+        args_lst = []
+        if d0 is not None:
+            args_lst.append(
+                dict(
+                    target_subdomain=d0,
+                    fluctuations=(1.0, 1.0),
+                    flexibility=(2.0, 2),
+                    asperity=(0.1, 0.1),
+                    loglogavgslope=(-2, 0.1),
+                    prefix="dom0",
+                    dofdex=dofdex,
+                )
+            )
+        if d1 is not None:
+            args_lst.append(
+                dict(
+                    target_subdomain=d1,
+                    fluctuations=(2.0, 0.1),
+                    flexibility=(1.0, 2),
+                    asperity=(0.2, 0.1),
+                    loglogavgslope=(-3, 0.321),
+                    prefix="dom1",
+                    dofdex=dofdex,
+                )
+            )
+        args_zm = dict(offset_mean=1.2, offset_std=(1.0, 0.2), dofdex=dofdex)
+        from functools import partial
+
+        perf_nifty_operators(
+            {
+                "NIFTy": partial(get_nifty_op, args_cfm, args_lst, args_zm),
+                "resolvelib": partial(get_cpp_op, args_cfm, args_lst, args_zm),
+            },
+            f"{nm}.png",
+        )
