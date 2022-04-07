@@ -811,11 +811,6 @@ private:
 
   using shape_t = vector<size_t>;
 
-  // FIXME Remove this function
-  ducc0::cfmav<int64_t> pindex(const size_t &index) const {
-    return ducc0::to_cfmav<int64_t>(pindices[index]);
-  }
-
   shape_t fft_axes(const size_t &ispace) const {
     shape_t out;
     for (size_t idim = dimlim[ispace]; idim < dimlim[ispace + 1]; ++idim)
@@ -833,7 +828,7 @@ public:
         n_pspecs(py::len(amplitude_keys)), nthreads(nthreads_) {
     dimlim.push_back(1);
     for (size_t i = 0; i < n_pspecs; ++i) {
-      lpindex.push_back(pindex(i));
+      lpindex.push_back(ducc0::to_cfmav<int64_t>(pindices[i]));
       dimlim.push_back(dimlim.back() + lpindex.back().ndim());
       space_dims.push_back(lpindex.back().ndim());
     }
@@ -841,13 +836,12 @@ public:
 
   vector<ducc0::cfmav<double>>
   precompute_distributed_spectra(const py::dict &inp_) const {
-    const auto out_shape{
-        ducc0::to_cfmav<double>(inp_[key_xi]).shape()}; // FIXME Simplify
+    const auto out_shape{copy_shape(inp_[key_xi])};
     const size_t total_N = out_shape[0];
     vector<ducc0::cfmav<double>> distributed_power_spectra;
     for (size_t i = 0; i < n_pspecs; ++i) {
       const auto inp_pspec(ducc0::to_cmav<double, 2>(inp_[amplitude_keys[i]]));
-      const auto lshape = combine_shapes(total_N, pindex(i).shape());
+      const auto lshape = combine_shapes(total_N, lpindex[i].shape());
       ducc0::vfmav<double> tmp(lshape);
       const size_t actual_dimensions = space_dims[i];
       ducc0::mav_apply_with_index(

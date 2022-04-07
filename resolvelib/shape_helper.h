@@ -16,7 +16,7 @@
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-/* Copyright (C) 2022 Max-Planck-Society
+/* Copyright (C) 2020-2022 Max-Planck-Society
    Author: Martin Reinecke */
 
 #include <array>
@@ -76,3 +76,11 @@ ostream& operator<<(ostream& os, const vector<size_t> &shp)
   os << endl;
   return os;
 }
+
+shape_t copy_shape(const py::array &arr)
+  {
+  shape_t res(size_t(arr.ndim()));
+  for (size_t i=0; i<res.size(); ++i)
+    res[i] = size_t(arr.shape(int(i)));
+  return res;
+  }
