@@ -70,13 +70,11 @@ def main():
         op = my_operator(*args, nthreads=nthreads)
         ift.exec_time(op)
 
-        # FIXME THE FOLLOWING LINE INDICATES A BUG
-        #pos = ift.from_random(op.domain)
-        #ift.extra.check_operator(op, pos, ntries=3)
-        #ift.extra.check_operator(op0, pos, ntries=3)
+        pos = ift.from_random(op.domain)
+        ift.extra.check_operator(op, pos, ntries=3)
+        ift.extra.check_operator(op0, pos, ntries=3)
 
-        # FIXME THE FOLLOWING LINE INDICATES A BUG
-        #rve.operator_equality(op0, op, rtol=1e-5, atol=1e-5, ntries=1)
+        rve.operator_equality(op0, op, rtol=1e-5, atol=1e-5, ntries=1)
 
 
 if __name__ == "__main__":
