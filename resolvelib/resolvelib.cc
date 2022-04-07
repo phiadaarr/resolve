@@ -877,13 +877,13 @@ public:
 
     if (n_pspecs == 1)
       ducc0::mav_apply([&](double &oo, const double &azm, const double &xi,
-                           const double &s1) { oo = azm * xi * s1; },
+                           const double &s0) { oo = azm * xi * s0; },
                        nthreads, out, inp_azm_broadcast, inp_xi,
                        distributed_power_spectra[0]);
     else if (n_pspecs == 2)
       ducc0::mav_apply(
-          [&](double &oo, const double &azm, const double &xi, const double &s1,
-              const double &s2) { oo = azm * xi * s1 * s2; },
+          [&](double &oo, const double &azm, const double &xi, const double &s0,
+              const double &s1) { oo = azm * xi * s0 * s1; },
           nthreads, out, inp_azm_broadcast, inp_xi,
           distributed_power_spectra[0], distributed_power_spectra[1]);
     // and so on, as far as we want to go with special cases
@@ -912,31 +912,64 @@ public:
     auto tangent_azm_broadcast =
         tangent_azm.extend_and_broadcast(inp_xi.shape(), 0);
 
-    // FIXME Add specialized cases?
+    if (n_pspecs==1)
+      ducc0::mav_apply(
+          [&](double &out, const double &inp_xi, const double &inp_azm_broadcast,
+              const double &tangent_xi, const double &tangent_azm_broadcast,
+              const double &s0, const double &ts0) {
+            double inp_pspec{s0};
 
-    ducc0::mav_apply_with_index(
-        [&](double &out, const double &inp_xi, const double &inp_azm_broadcast,
-            const double &tangent_xi, const double &tangent_azm_broadcast,
-            const shape_t &inds) {
-          double inp_pspec{1.};
-          for (size_t i = 0; i < n_pspecs; ++i) {
-            inp_pspec *= inp_distributed_power_spectra[i](inds);
-          }
+            double dpspec = inp_pspec / s0 * ts0;
 
-          double dpspec{0};
-          for (size_t i = 0; i < n_pspecs; ++i) {
-            const auto tmp{inp_pspec / inp_distributed_power_spectra[i](inds) *
-                           tangent_distributed_power_spectra[i](inds)};
-            dpspec += tmp;
-          }
+            const auto term0 = dpspec * inp_azm_broadcast * inp_xi;
+            const auto term1 = inp_pspec * tangent_azm_broadcast * inp_xi;
+            const auto term2 = inp_pspec * inp_azm_broadcast * tangent_xi;
+            out = term0 + term1 + term2;
+          },
+          nthreads, out, inp_xi, inp_azm_broadcast, tangent_xi,
+          tangent_azm_broadcast, inp_distributed_power_spectra[0], tangent_distributed_power_spectra[0]);
+    else if (n_pspecs==2)
+      ducc0::mav_apply(
+          [&](double &out, const double &inp_xi, const double &inp_azm_broadcast,
+              const double &tangent_xi, const double &tangent_azm_broadcast,
+              const double &s0, const double &s1, const double &ts0, const double &ts1) {
+            double inp_pspec{s0*s1};
 
-          const auto term0 = dpspec * inp_azm_broadcast * inp_xi;
-          const auto term1 = inp_pspec * tangent_azm_broadcast * inp_xi;
-          const auto term2 = inp_pspec * inp_azm_broadcast * tangent_xi;
-          out = term0 + term1 + term2;
-        },
-        nthreads, out, inp_xi, inp_azm_broadcast, tangent_xi,
-        tangent_azm_broadcast);
+            double dpspec = inp_pspec / s0 * ts0 + inp_pspec / s1 * ts1;
+
+            const auto term0 = dpspec * inp_azm_broadcast * inp_xi;
+            const auto term1 = inp_pspec * tangent_azm_broadcast * inp_xi;
+            const auto term2 = inp_pspec * inp_azm_broadcast * tangent_xi;
+            out = term0 + term1 + term2;
+          },
+          nthreads, out, inp_xi, inp_azm_broadcast, tangent_xi,
+          tangent_azm_broadcast, inp_distributed_power_spectra[0],
+          inp_distributed_power_spectra[1], tangent_distributed_power_spectra[0], tangent_distributed_power_spectra[1]);
+// [...]
+    else
+      ducc0::mav_apply_with_index(
+          [&](double &out, const double &inp_xi, const double &inp_azm_broadcast,
+              const double &tangent_xi, const double &tangent_azm_broadcast,
+              const shape_t &inds) {
+            double inp_pspec{1.};
+            for (size_t i = 0; i < n_pspecs; ++i) {
+              inp_pspec *= inp_distributed_power_spectra[i](inds);
+            }
+  
+            double dpspec{0};
+            for (size_t i = 0; i < n_pspecs; ++i) {
+              const auto tmp{inp_pspec / inp_distributed_power_spectra[i](inds) *
+                             tangent_distributed_power_spectra[i](inds)};
+              dpspec += tmp;
+            }
+  
+            const auto term0 = dpspec * inp_azm_broadcast * inp_xi;
+            const auto term1 = inp_pspec * tangent_azm_broadcast * inp_xi;
+            const auto term2 = inp_pspec * inp_azm_broadcast * tangent_xi;
+            out = term0 + term1 + term2;
+          },
+          nthreads, out, inp_xi, inp_azm_broadcast, tangent_xi,
+          tangent_azm_broadcast);
   }
 
   void A_times_xi_adj_jac(
@@ -948,28 +981,83 @@ public:
 
     const auto inp_azm_broadcast =
         inp_azm.extend_and_broadcast(inp_xi.shape(), 0);
+    const auto out_azm_broadcast =
+        out_azm.extend_and_broadcast(inp_xi.shape(), 0);
 
-    // FIXME Add specialized cases?
-
-    ducc0::mav_apply_with_index(
-        [&](const double &inp_xi, const double &inp_azm_broadcast,
-            const double &cotangent_in, double &out_xi, const shape_t &inds) {
-          // Note: it shall be supported that cotangent_in and out_xi points to
-          // the same memory. So out_xi is written to at the very end
-          double inp{inp_xi * inp_azm_broadcast * cotangent_in};
-          for (size_t i = 0; i < n_pspecs; ++i) {
-            inp *= inp_distributed_power_spectra[i](inds);
-          }
-          for (size_t i = 0; i < n_pspecs; ++i) {
-            const auto pspec_index =
-                lpindex[i].val(&inds[dimlim[i]], &inds[dimlim[i + 1]]);
-            out_pspecs[i](inds[0], pspec_index) +=
-                inp / inp_distributed_power_spectra[i](inds);
-          }
-          out_azm(inds[0]) += inp / inp_azm_broadcast;
-          out_xi = inp / inp_xi;
-        },
-        1, inp_xi, inp_azm_broadcast, cotangent_in, out_xi);
+    if (n_pspecs<=2)
+      {
+      const auto out_shape{inp_xi.shape()};
+      const size_t total_N = out_shape[0];
+      vector<ducc0::vfmav<double>> power_spectra_out;
+      vector<ducc0::vfmav<double>> distributed_power_spectra_out;
+      for (size_t i = 0; i < n_pspecs; ++i) {
+        const auto lshape = combine_shapes(total_N, lpindex[i].shape());
+        ducc0::vfmav<double> tmp(lshape);
+        fill_mav(tmp, 0., nthreads);
+        power_spectra_out.emplace_back(tmp);
+        ducc0::fmav_info::shape_t axpos;
+        axpos.push_back(0);
+        for (size_t j = dimlim[i]; j < dimlim[i + 1]; ++j)
+          axpos.push_back(j);
+        distributed_power_spectra_out.emplace_back(
+          tmp.extend_and_broadcast(out_shape, axpos));
+      }
+      if (n_pspecs==1)
+        ducc0::mav_apply(
+            [](const double &inp_xi, const double &inp_azm_broadcast,
+                const double &cotangent_in, double &out_xi, double &out_azm_broadcast, const double &s0, double &os0) {
+              // Note: it shall be supported that cotangent_in and out_xi points to
+              // the same memory. So out_xi is written to at the very end
+              double inp{inp_xi * inp_azm_broadcast * cotangent_in * s0};
+              os0 += inp/s0;
+              out_azm_broadcast += inp / inp_azm_broadcast;
+              out_xi = inp / inp_xi;
+            },
+            1, inp_xi, inp_azm_broadcast, cotangent_in, out_xi, out_azm_broadcast, inp_distributed_power_spectra[0], distributed_power_spectra_out[0]);
+      else if (n_pspecs==2)
+        ducc0::mav_apply(
+            [](const double &inp_xi, const double &inp_azm_broadcast,
+                const double &cotangent_in, double &out_xi, double &out_azm_broadcast, const double &s0, const double &s1, double &os0, double &os1) {
+              // Note: it shall be supported that cotangent_in and out_xi points to
+              // the same memory. So out_xi is written to at the very end
+              double inp{inp_xi * inp_azm_broadcast * cotangent_in * s0 * s1};
+              os0 += inp/s0;
+              os1 += inp/s1;
+              out_azm_broadcast += inp / inp_azm_broadcast;
+              out_xi = inp / inp_xi;
+            },
+            1, inp_xi, inp_azm_broadcast, cotangent_in, out_xi, out_azm_broadcast, inp_distributed_power_spectra[0], inp_distributed_power_spectra[1], distributed_power_spectra_out[0], distributed_power_spectra_out[1]);
+      for (size_t i = 0; i < n_pspecs; ++i) {
+        const size_t actual_dimensions = space_dims[i];
+        ducc0::mav_apply_with_index(
+            [&](const double &ii, const shape_t &inds) {
+              const int64_t pind =
+                  lpindex[i].val(&inds[1], &inds[actual_dimensions+1]);
+              out_pspecs[i](inds[0], pind) += ii;
+            },
+            1, power_spectra_out[i]);
+      }
+      }
+    else
+      ducc0::mav_apply_with_index(
+          [&](const double &inp_xi, const double &inp_azm_broadcast,
+              const double &cotangent_in, double &out_xi, double &out_azm_broadcast, const shape_t &inds) {
+            // Note: it shall be supported that cotangent_in and out_xi points to
+            // the same memory. So out_xi is written to at the very end
+            double inp{inp_xi * inp_azm_broadcast * cotangent_in};
+            for (size_t i = 0; i < n_pspecs; ++i) {
+              inp *= inp_distributed_power_spectra[i](inds);
+            }
+            for (size_t i = 0; i < n_pspecs; ++i) {
+              const auto pspec_index =
+                  lpindex[i].val(&inds[dimlim[i]], &inds[dimlim[i + 1]]);
+              out_pspecs[i](inds[0], pspec_index) +=
+                  inp / inp_distributed_power_spectra[i](inds);
+            }
+            out_azm_broadcast += inp / inp_azm_broadcast;
+            out_xi = inp / inp_xi;
+          },
+          1, inp_xi, inp_azm_broadcast, cotangent_in, out_xi, out_azm_broadcast);
   }
 
   void add_offset_mean(const double &offset_mean,
