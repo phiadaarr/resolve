@@ -25,6 +25,8 @@
 
 using namespace std;
 
+using shape_t = vector<size_t>;
+
 
 template<typename T, size_t L1, size_t L2>
   array<T,L1+L2> combine_shapes(const array<T, L1> &a1, const array<T, L2> &a2)
@@ -51,25 +53,25 @@ template<typename T, size_t L>
   return res;
   }
 
-vector<size_t> combine_shapes(const vector<size_t> &vec, const size_t s2)
+shape_t combine_shapes(const shape_t &vec, const size_t s2)
 {
-vector<size_t> out;
+shape_t out;
 for (auto i: vec)
   out.push_back(i);
 out.push_back(s2);
 return out;
 }
 
-vector<size_t> combine_shapes(const size_t s1, const vector<size_t> &vec)
+shape_t combine_shapes(const size_t s1, const shape_t &vec)
 {
-vector<size_t> out;
+shape_t out;
 out.push_back(s1);
 for (auto i: vec)
   out.push_back(i);
 return out;
 }
 
-ostream& operator<<(ostream& os, const vector<size_t> &shp)
+ostream& operator<<(ostream& os, const shape_t &shp)
 {
   for (auto i: shp)
     os << i << " ";

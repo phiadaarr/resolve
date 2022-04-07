@@ -40,10 +40,11 @@ auto None = py::none();
 #include "shape_helper.h"
 using namespace std;
 
-// Global types for energies
+// Global types
 using Tacc = double;
 using Tenergy = double;
-// /Global types for energies
+using shape_t = vector<size_t>;
+// /Global types
 
 template <typename Tin, typename Tout> class Linearization {
 public:
@@ -803,13 +804,11 @@ private:
   const double offset_mean;
   const double scalar_dvol;
   vector<ducc0::cfmav<int64_t>> lpindex;
-  vector<size_t> dimlim;
-  vector<size_t> space_dims;
+  shape_t dimlim;
+  shape_t space_dims;
   const size_t n_pspecs;
 
   size_t nthreads;
-
-  using shape_t = vector<size_t>;
 
   shape_t fft_axes(const size_t &ispace) const {
     shape_t out;
@@ -907,9 +906,9 @@ public:
     // FIXME Add specialized cases?
 
     ducc0::mav_apply_with_index(
-        [&](double &out, const double &inp_xi,
-            const double &inp_azm_broadcast, const double &tangent_xi,
-            const double &tangent_azm_broadcast, const shape_t &inds) {
+        [&](double &out, const double &inp_xi, const double &inp_azm_broadcast,
+            const double &tangent_xi, const double &tangent_azm_broadcast,
+            const shape_t &inds) {
           double inp_pspec{1.};
           for (size_t i = 0; i < n_pspecs; ++i) {
             inp_pspec *= inp_distributed_power_spectra[i](inds);
@@ -938,14 +937,14 @@ public:
       ducc0::vfmav<double> &out_azm,
       vector<ducc0::vfmav<double>> &out_pspecs) const {
 
-    const auto inp_azm_broadcast = inp_azm.extend_and_broadcast(inp_xi.shape(), 0);
+    const auto inp_azm_broadcast =
+        inp_azm.extend_and_broadcast(inp_xi.shape(), 0);
 
     // FIXME Add specialized cases?
 
     ducc0::mav_apply_with_index(
         [&](const double &inp_xi, const double &inp_azm_broadcast,
-            const double &cotangent_in, double &out_xi,
-            const shape_t &inds) {
+            const double &cotangent_in, double &out_xi, const shape_t &inds) {
           // Note: it shall be supported that cotangent_in and out_xi points to
           // the same memory. So out_xi is written to at the very end
           double inp{inp_xi * inp_azm_broadcast * cotangent_in};
@@ -953,8 +952,10 @@ public:
             inp *= inp_distributed_power_spectra[i](inds);
           }
           for (size_t i = 0; i < n_pspecs; ++i) {
-             const auto pspec_index = lpindex[i].val(&inds[dimlim[i]], &inds[dimlim[i+1]]);
-             out_pspecs[i](inds[0], pspec_index) += inp/inp_distributed_power_spectra[i](inds);
+            const auto pspec_index =
+                lpindex[i].val(&inds[dimlim[i]], &inds[dimlim[i + 1]]);
+            out_pspecs[i](inds[0], pspec_index) +=
+                inp / inp_distributed_power_spectra[i](inds);
           }
           out_azm(inds[0]) += inp / inp_azm_broadcast;
           out_xi = inp / inp_xi;
