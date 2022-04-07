@@ -1091,8 +1091,7 @@ public:
   }
 
   py::array apply(const py::dict &inp_) const {
-    const auto out_shape =
-        ducc0::to_cfmav<double>(inp_[key_xi]).shape(); // FIXME Simplify
+    const auto out_shape = copy_shape(inp_[key_xi]);
     MR_assert(py::len(amplitude_keys) == n_pspecs,
               "Number of input pspecs not equal to length of pindex list");
     auto out_ = ducc0::make_Pyarr<double>(out_shape);
@@ -1111,8 +1110,7 @@ public:
   }
 
   Linearization<py::dict, py::array> apply_with_jac(const py::dict &inp_) {
-    const auto out_shape =
-        ducc0::to_cfmav<double>(inp_[key_xi]).shape(); // FIXME Simplify
+    const auto out_shape = copy_shape(inp_[key_xi]);
     MR_assert(py::len(amplitude_keys) == n_pspecs,
               "Number of input pspecs not equal to length of pindex list");
 
@@ -1169,10 +1167,8 @@ public:
 
           vector<ducc0::vfmav<double>> out_pspec;
           for (size_t i = 0; i < n_pspecs; ++i) {
-            out_[amplitude_keys[i]] = ducc0::make_Pyarr<double>(
-                ducc0::to_cfmav<double>(inp_[amplitude_keys[i]]).shape());
-            out_pspec.push_back(
-                ducc0::to_vfmav<double>(out_[amplitude_keys[i]]));
+            out_[amplitude_keys[i]] = ducc0::make_Pyarr<double>(copy_shape(inp_[amplitude_keys[i]]));
+            out_pspec.push_back(ducc0::to_vfmav<double>(out_[amplitude_keys[i]]));
             fill_mav(out_pspec.back(), 0., nthreads);
           }
           // /Instantiate output

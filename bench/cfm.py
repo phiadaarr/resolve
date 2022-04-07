@@ -165,8 +165,6 @@ if __name__ == "__main__":
         ]
 
     for d0, d1, total_N, nm in zip(dom0, dom1, total_Ns, name):
-        # if nm != "eht":
-        #     continue
         print(f"Working on {nm}")
         dofdex = list(range(total_N))
         args_cfm = dict(prefix="", total_N=total_N)
