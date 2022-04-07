@@ -27,6 +27,7 @@ import numpy as np
 import resolve as rve
 
 n_cpus = os.cpu_count()
+check_equality = False
 
 eberas = [
     "#1f77b4",
@@ -196,11 +197,11 @@ if __name__ == "__main__":
         args_zm = dict(offset_mean=1.2, offset_std=(1.0, 0.2), dofdex=dofdex)
         from functools import partial
 
-        perf_nifty_operators(
-            {
-                "NIFTy": partial(get_nifty_op, args_cfm, args_lst, args_zm),
-                "resolvelib": partial(get_cpp_op, args_cfm, args_lst, args_zm),
-                "pspecs": partial(get_pspecs_op, args_cfm, args_lst, args_zm),
-            },
-            nm,
-        )
+        operators = {
+            "NIFTy": partial(get_nifty_op, args_cfm, args_lst, args_zm),
+            "resolvelib": partial(get_cpp_op, args_cfm, args_lst, args_zm),
+            "pspecs": partial(get_pspecs_op, args_cfm, args_lst, args_zm),
+        }
+        if check_equality:
+            rve.operator_equality(operators["NIFTy"](1), operators["resolvelib"](1))
+        perf_nifty_operators(operators, nm)
