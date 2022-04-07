@@ -20,10 +20,10 @@
    Authors: Philipp Arras */
 
 #define COMPILE_CFM
-// #define COMPILE_GAUSSIAN_LIKELIHOOD
-// #define COMPILE_VARCOV_GAUSSIAN_LIKELIHOOD
-// #define COMPILE_POLARIZATION_MATRIX_EXPONENTIAL
-// #define COMPILE_CALIBRATION_DISTRIBUTOR
+#define COMPILE_GAUSSIAN_LIKELIHOOD
+#define COMPILE_VARCOV_GAUSSIAN_LIKELIHOOD
+#define COMPILE_POLARIZATION_MATRIX_EXPONENTIAL
+#define COMPILE_CALIBRATION_DISTRIBUTOR
 
 // FIXME Release GIL around mav_applys
 // Includes related to pybind11
@@ -989,7 +989,7 @@ public:
     for (size_t i = 0; i < n_pspecs; ++i) {
       MR_assert(i + 1 <= n_pspecs, "this is a bug");
       const size_t ispace{n_pspecs - (i + 1)};
-      if (ispace == 0)
+      if (i == 0)
         ducc0::r2r_genuine_hartley(in, out, fft_axes(ispace), scalar_dvol,
                                    nthreads);
       else
