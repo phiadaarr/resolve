@@ -48,11 +48,11 @@ using shape_t = vector<size_t>;
 
 template <typename T>
 void fill_mav(ducc0::vfmav<T> &mav, const T &val, const size_t nthreads) {
-  ducc0::mav_apply([&](double &xx) { xx = val; }, nthreads, mav);
+  ducc0::mav_apply([val](T &xx) { xx = val; }, nthreads, mav);
 }
 template <typename T, size_t ndim>
 void fill_mav(ducc0::vmav<T, ndim> &mav, const T &val, const size_t nthreads) {
-  ducc0::mav_apply([&](double &xx) { xx = val; }, nthreads, mav);
+  ducc0::mav_apply([val](T &xx) { xx = val; }, nthreads, mav);
 }
 
 template <typename Tin, typename Tout> class Linearization {
@@ -764,8 +764,8 @@ public:
           out_[key_phase] = ducc0::make_Pyarr<double>(inp_shape);
           auto logampl{ducc0::to_vmav<double, 4>(out_[key_logamplitude])};
           auto logph{ducc0::to_vmav<double, 4>(out_[key_phase])};
-          fill_mav(logampl, 0, nthreads);
-          fill_mav(logph, 0, nthreads);
+          fill_mav(logampl, 0., nthreads);
+          fill_mav(logph, 0., nthreads);
 
           for (size_t i0 = 0; i0 < inp.shape()[0]; ++i0)
             ducc0::execParallel(
@@ -1077,7 +1077,7 @@ public:
 
           out_[key_azm] = ducc0::make_Pyarr<double>(inp_azm.shape());
           auto out_azm = ducc0::to_vfmav<double>(out_[key_azm]);
-          fill_mav(out_azm, 0, nthreads);
+          fill_mav(out_azm, 0., nthreads);
 
           vector<ducc0::vfmav<double>> out_pspec;
           for (size_t i = 0; i < n_pspecs; ++i) {
@@ -1085,7 +1085,7 @@ public:
                 ducc0::to_cfmav<double>(inp_[amplitude_keys[i]]).shape());
             out_pspec.push_back(
                 ducc0::to_vfmav<double>(out_[amplitude_keys[i]]));
-            fill_mav(out_pspec.back(), 0, nthreads);
+            fill_mav(out_pspec.back(), 0., nthreads);
           }
           // /Instantiate output
 
