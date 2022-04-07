@@ -16,6 +16,8 @@
 
 import os
 import sys
+from functools import reduce
+from operator import add
 from time import time
 
 import matplotlib
@@ -66,8 +68,6 @@ def get_pspecs_op(args_cfm, args_lst, args_zm, nthreads):
     cfm.set_amplitude_total_offset(**args_zm)
     ampls = cfm.get_normalized_amplitudes()
     ift.set_nthreads(nthreads)
-    from functools import reduce
-    from operator import add
     return reduce(add, [aa.ducktape_left(str(ii)) for ii, aa in enumerate(ampls)])
 
 
@@ -114,16 +114,20 @@ def perf_nifty_operators(op_dct, name, domain_dtype=np.float64):
             jac_adj_times[kk][ii] = time() - t0
 
     for ys, mode in [
-        (times, "times"),
-        (times_with_jac, "times_with_jac"),
-        (jac_times, "jac_times"),
-        (jac_adj_times, "jac_adj_times"),
+        (times, "op(fld)"),
+        (times_with_jac, "op(lin)"),
+        (jac_times, "Jacobian"),
+        (jac_adj_times, "Adjoint Jacobian"),
     ]:
         c = None
         for iop, kk in enumerate(op_dct.keys()):
-            line = plt.plot(
-                xs, ys[kk], label=f"{kk} {mode}", color=c, linestyle=linestyles[iop]
-            )
+            if mode == "op(fld)":
+                lbl = f"{mode} | {kk}"
+            elif iop == 0:
+                lbl = f"{mode}"
+            else:
+                lbl = None
+            line = plt.plot(xs, ys[kk], label=lbl, color=c, linestyle=linestyles[iop])
             c = line[0].get_color()
     plt.xlabel("# threads")
     plt.ylabel("Wall time [s]")
@@ -143,16 +147,26 @@ if __name__ == "__main__":
         dom1 = [ift.RGSpace(5)]
         name = ["quick"]
     else:
-        total_Ns = [58, 200, 4]
+        total_Ns = [1, 58, 200, 4, 1]
         dom0 = [
+            ift.RGSpace([2000, 2000]),
             ift.RGSpace(1120),
             ift.RGSpace([42, 42], [0.1, 0.1]),
             ift.RGSpace([4000, 4000], [2e-6, 2e-6]),
+            ift.RGSpace([500, 500]),
         ]
-        dom1 = [ift.RGSpace(200), ift.RGSpace(88, 0.893), None]
-        name = ["meerkat_calibration", "jroth_calibration", "polarization_imaging"]
+        dom1 = [None, ift.RGSpace(200), ift.RGSpace(88, 0.893), None, ift.RGSpace(30)]
+        name = [
+            "single freq imaging",
+            "meerkat_calibration",
+            "jroth_calibration",
+            "polarization_imaging",
+            "eht",
+        ]
 
     for d0, d1, total_N, nm in zip(dom0, dom1, total_Ns, name):
+        # if nm != "eht":
+        #     continue
         print(f"Working on {nm}")
         dofdex = list(range(total_N))
         args_cfm = dict(prefix="", total_N=total_N)
