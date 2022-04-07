@@ -716,6 +716,7 @@ public:
       auto npol{inp_ph.shape()[0]};
       auto out_ = ducc0::make_Pyarr<complex<double>>({npol, nrows(), nfreqs});
       auto out = ducc0::to_vmav<complex<double>, 3>(out_);
+      fill_mav(out, complex<double>{0., 0.}, nthreads);
       // /Instantiate output array
 
       for (size_t i0 = 0; i0 < out.shape()[0]; ++i0)
