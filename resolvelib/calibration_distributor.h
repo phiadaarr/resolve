@@ -107,7 +107,7 @@ public:
     auto a1 = ducc0::to_cmav<int, 1>(antenna_indices1);
     auto t = ducc0::to_cmav<double, 1>(time);
 
-    function<py::array(const py::dict &)> ftimes = [=](const py::dict &inp_) {
+    function<py::array(const py::dict &)> ftimes = [=,applied_](const py::dict &inp_) {
       // Parse input
       const auto inp_logampl = ducc0::to_cmav<double, 4>(inp_[key_logamplitude]);
       const auto inp_ph = ducc0::to_cmav<double, 4>(inp_[key_phase]);
@@ -158,7 +158,7 @@ public:
       return out_;
     };
 
-    function<py::dict(const py::array &)> fadjtimes = [=](const py::array &inp_) {
+    function<py::dict(const py::array &)> fadjtimes = [=,applied_](const py::array &inp_) {
       // Parse input
       auto inp{ducc0::to_cmav<complex<double>, 3>(inp_)};
       // /Parse input
@@ -181,6 +181,8 @@ public:
             MR_assert(tind0 < ntime, "time outside region");
             MR_assert(tind1 < ntime, "time outside region");
             const auto diff{frac - double(tind0)};
+            const auto mya0 = a0(i1);
+            const auto mya1 = a1(i1);
 
             for (size_t i2 = lo; i2 < hi; ++i2) {
               const auto tmp{conj(applied(i0, i1, i2)) * inp(i0, i1, i2)};
@@ -192,14 +194,14 @@ public:
               const auto im0{imag(tmp0)};
               const auto im1{imag(tmp1)};
 
-              logampl(i0, a0(i1), tind0, i2) += re0;
-              logampl(i0, a1(i1), tind0, i2) += re0;
-              logph(i0, a0(i1), tind0, i2) += im0;
-              logph(i0, a1(i1), tind0, i2) -= im0;
-              logampl(i0, a0(i1), tind1, i2) += re1;
-              logampl(i0, a1(i1), tind1, i2) += re1;
-              logph(i0, a0(i1), tind1, i2) += im1;
-              logph(i0, a1(i1), tind1, i2) -= im1;
+              logampl(i0, mya0, tind0, i2) += re0;
+              logampl(i0, mya1, tind0, i2) += re0;
+              logph(i0, mya0, tind0, i2) += im0;
+              logph(i0, mya1, tind0, i2) -= im0;
+              logampl(i0, mya0, tind1, i2) += re1;
+              logampl(i0, mya1, tind1, i2) += re1;
+              logph(i0, mya0, tind1, i2) += im1;
+              logph(i0, mya1, tind1, i2) -= im1;
             }
           }
       });
