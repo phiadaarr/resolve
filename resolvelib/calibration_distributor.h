@@ -60,28 +60,33 @@ public:
     const auto a0 = ducc0::to_cmav<int, 1>(antenna_indices0);
     const auto a1 = ducc0::to_cmav<int, 1>(antenna_indices1);
     const auto t = ducc0::to_cmav<double, 1>(time);
-    for (size_t i0 = 0; i0 < out.shape()[0]; ++i0)
-      ducc0::execParallel(out.shape()[1], nthreads, [&](size_t lo, size_t hi) {
-        for (size_t i1 = lo; i1 < hi; ++i1)
-          for (size_t i2 = 0; i2 < out.shape()[2]; ++i2) {
-            const double frac{t(i1) / dt};
-            const auto tind0 = size_t(floor(frac));
-            const size_t tind1{tind0 + 1};
-            MR_assert(tind0 < ntime, "time outside region");
-            MR_assert(tind1 < ntime, "time outside region");
+    ducc0::execParallel(out.shape()[1], nthreads, [&](size_t lo, size_t hi) {
+      for (size_t i0 = 0; i0 < out.shape()[0]; ++i0)
+        for (size_t i1 = lo; i1 < hi; ++i1) {
+          const double frac{t(i1) / dt};
+          const auto tind0 = size_t(floor(frac));
+          const size_t tind1{tind0 + 1};
+          MR_assert(tind0 < ntime, "time outside region");
+          MR_assert(tind1 < ntime, "time outside region");
 
-            const auto getloggain = [&](const size_t tindex) {
-              const auto loggain =
-                  complex<double>(logampl(i0, a0(i1), tindex, i2) + logampl(i0, a1(i1), tindex, i2),
-                                  ph(i0, a0(i1), tindex, i2) - ph(i0, a1(i1), tindex, i2));
-              return loggain;
+          MR_assert(a0(i1) >= 0, "ant1 needs to be positive");
+          MR_assert(a1(i1) >= 0, "ant2 needs to be positive");
+
+          const auto mya0 = size_t(a0(i1));
+          const auto mya1 = size_t(a1(i1));
+
+          for (size_t i2 = 0; i2 < out.shape()[2]; ++i2) {
+            const auto getloggain = [mya0, mya1, &logampl, &ph, i0, i2](const size_t tindex) {
+              return complex<double>(logampl(i0, mya0, tindex, i2) + logampl(i0, mya1, tindex, i2),
+                                     ph(i0, mya0, tindex, i2) - ph(i0, mya1, tindex, i2));
             };
             const auto diff{frac - double(tind0)};
             const auto loggain{(1 - diff) * getloggain(tind0) + diff * getloggain(tind1)};
             const auto gain{exp(loggain)};
             out(i0, i1, i2) = gain;
           }
-      });
+        }
+    });
 
     return out_;
   }
