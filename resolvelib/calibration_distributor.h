@@ -176,19 +176,25 @@ public:
       fill_mav(logampl, 0., nthreads);
       fill_mav(logph, 0., nthreads);
 
-      ducc0::execParallel(inp.shape()[2], nthreads, [&](size_t lo, size_t hi) {
+      size_t n_ant = logampl.shape(1);
+      ducc0::execParallel(logampl.shape(0)*n_ant, nthreads, [&](size_t lo, size_t hi) {
         for (size_t i0 = 0; i0 < inp.shape()[0]; ++i0)
+          {
+          if (((i0+1)*n_ant<=lo) || (i0*n_ant>=hi)) continue;
           for (size_t i1 = 0; i1 < inp.shape()[1]; ++i1) {
+            const auto mya0 = a0(i1);
+            auto crit = mya0+i0*n_ant;
+            if ((crit<lo) || (crit>=hi)) continue;
+            const auto mya1 = a1(i1);
+
             const double frac{t(i1) / dt};
             const auto tind0 = size_t(floor(frac));
             const size_t tind1{tind0 + 1};
             MR_assert(tind0 < ntime, "time outside region");
             MR_assert(tind1 < ntime, "time outside region");
             const auto diff{frac - double(tind0)};
-            const auto mya0 = a0(i1);
-            const auto mya1 = a1(i1);
 
-            for (size_t i2 = lo; i2 < hi; ++i2) {
+            for (size_t i2 = 0; i2 < inp.shape(2); ++i2) {
               const auto tmp{conj(applied(i0, i1, i2)) * inp(i0, i1, i2)};
               const auto tmp0{(1 - diff) * tmp};
               const auto tmp1{diff * tmp};
@@ -208,6 +214,7 @@ public:
               logph(i0, mya1, tind1, i2) -= im1;
             }
           }
+        }
       });
       return out_;
     };
