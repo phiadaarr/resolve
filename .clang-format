@@ -1,0 +1,6 @@
+﻿---
+ColumnLimit: '100'
+Language: Cpp
+Standard: Cpp11
+
+...
