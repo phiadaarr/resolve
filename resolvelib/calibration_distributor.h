@@ -34,9 +34,7 @@ private:
 
   size_t nthreads;
 
-  size_t nrows() const {
-    return ducc0::to_cmav<int, 1>(antenna_indices0).shape()[0];
-  } // FIXME Use unsigned for indices
+  size_t nrows() const { return copy_shape(antenna_indices0)[0]; }
 
 public:
   CalibrationDistributor(const py::array &antenna_indices0_,
