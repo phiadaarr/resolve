@@ -61,3 +61,10 @@ Finally, clone the resolve repository and install resolve on your system:
 - The variable shadow of M87* ([arXiv](https://arxiv.org/abs/2002.05218)).
 - Unified radio interferometric calibration and imaging with joint uncertainty quantification ([doi](https://doi.org/10.1051/0004-6361/201935555), [arXiv](https://arxiv.org/abs/1903.11169)).
 - Radio imaging with information field theory ([doi](https://doi.org/10.23919/EUSIPCO.2018.8553533), [arXiv](https://arxiv.org/abs/1803.02174v1)).
+
+# Developers
+
+## Generate compile-db
+
+    pip3 install compiledb
+    CC=clang CXX=clang python3 setup.py build | compiledb
