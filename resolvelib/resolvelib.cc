@@ -768,9 +768,11 @@ public:
                 const double &cotangent_in, double &out_xi, double &out_azm_broadcast, const double &s0, double &os0) {
               // Note: it shall be supported that cotangent_in and out_xi points to
               // the same memory. So out_xi is written to at the very end
-              os0 += inp_xi * inp_azm_broadcast * cotangent_in;
-              out_azm_broadcast += inp_xi * cotangent_in * s0;
+              double d_os0 = inp_xi * inp_azm_broadcast * cotangent_in;
+              double d_out_azm_broadcast = inp_xi * cotangent_in * s0;
               out_xi = inp_azm_broadcast * cotangent_in * s0;
+              os0 += d_os0;
+              out_azm_broadcast += d_out_azm_broadcast;
             },
             1, inp_xi, inp_azm_broadcast, cotangent_in, out_xi, out_azm_broadcast, inp_distributed_power_spectra[0], distributed_power_spectra_out[0]);
       else if (n_pspecs==2)
@@ -779,10 +781,13 @@ public:
                 const double &cotangent_in, double &out_xi, double &out_azm_broadcast, const double &s0, const double &s1, double &os0, double &os1) {
               // Note: it shall be supported that cotangent_in and out_xi points to
               // the same memory. So out_xi is written to at the very end
-              os0 += inp_xi * inp_azm_broadcast * cotangent_in * s1;
-              os1 += inp_xi * inp_azm_broadcast * cotangent_in * s0;
-              out_azm_broadcast += inp_xi * cotangent_in * s0 * s1;
+              double d_os0 = inp_xi * inp_azm_broadcast * cotangent_in * s1;
+              double d_os1 = inp_xi * inp_azm_broadcast * cotangent_in * s0;
+              double d_out_azm_broadcast = inp_xi * cotangent_in * s0 * s1;
               out_xi = inp_azm_broadcast * cotangent_in * s0 * s1;
+              os0 += d_os0;
+              os1 += d_os1;
+              out_azm_broadcast += d_out_azm_broadcast;
             },
             1, inp_xi, inp_azm_broadcast, cotangent_in, out_xi, out_azm_broadcast, inp_distributed_power_spectra[0], inp_distributed_power_spectra[1], distributed_power_spectra_out[0], distributed_power_spectra_out[1]);
 
