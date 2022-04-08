@@ -1,12 +1,10 @@
-import resolve as rve
 import sys
-import numpy as np
+
 import jax.numpy as jnp
-import resolvelib
 import nifty8 as ift
-
-
-ntries = 5
+import numpy as np
+import resolve as rve
+import resolvelib
 
 
 def my_operator(ant1, ant2, time, tdom, pdom, fdom, key_phase, key_logampl, antenna_dct, nthreads):
@@ -69,11 +67,11 @@ def main():
 
 
     print("Old implementation")
-    ift.exec_time(op0, ntries=ntries)
+    ift.exec_time(op0)
     for nthreads in range(1, 5):
         print(f"New implementation (nthreads={nthreads})")
         op = my_operator(*args, nthreads=nthreads)
-        ift.exec_time(op, ntries=ntries)
+        ift.exec_time(op)
 
         if quick:
             pos = ift.from_random(op.domain)
