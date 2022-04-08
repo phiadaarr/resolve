@@ -6,6 +6,9 @@ import resolvelib
 import nifty8 as ift
 
 
+ntries = 5
+
+
 def my_operator(ant1, ant2, time, tdom, pdom, fdom, key_phase, key_logampl, antenna_dct, nthreads):
     target = pdom, ift.UnstructuredDomain(len(ant1)), fdom
     ant1 = rve.replace_array_with_dict(ant1, antenna_dct)
@@ -32,7 +35,9 @@ def my_operator(ant1, ant2, time, tdom, pdom, fdom, key_phase, key_logampl, ante
 
 def main():
     obs = next(rve.ms2observations_all("/data/CYG-ALL-2052-2MHZ.ms", "DATA"))
+    quick = False
     if len(sys.argv) == 2 and sys.argv[1] == "quick":
+        quick = True
         obs = obs[:50]
     tmin, tmax = rve.tmin_tmax(obs)
     obs = obs.move_time(-tmin)
@@ -64,17 +69,18 @@ def main():
 
 
     print("Old implementation")
-    ift.exec_time(op0)
+    ift.exec_time(op0, ntries=ntries)
     for nthreads in range(1, 5):
         print(f"New implementation (nthreads={nthreads})")
         op = my_operator(*args, nthreads=nthreads)
-        ift.exec_time(op)
+        ift.exec_time(op, ntries=ntries)
 
-        pos = ift.from_random(op.domain)
-        ift.extra.check_operator(op, pos, ntries=3)
-        ift.extra.check_operator(op0, pos, ntries=3)
+        if quick:
+            pos = ift.from_random(op.domain)
+            ift.extra.check_operator(op, pos, ntries=3)
+            ift.extra.check_operator(op0, pos, ntries=3)
 
-        rve.operator_equality(op0, op, rtol=1e-5, atol=1e-5, ntries=1)
+            rve.operator_equality(op0, op, rtol=1e-5, atol=1e-5, ntries=1)
 
 
 if __name__ == "__main__":
