@@ -745,7 +745,6 @@ public:
 
     if (n_pspecs<=2)
       {
-ducc0::SimpleTimer t0;
       const auto out_shape{inp_xi.shape()};
       const size_t total_N = out_shape[0];
       vector<ducc0::vfmav<double>> power_spectra_out;
@@ -762,7 +761,7 @@ ducc0::SimpleTimer t0;
         distributed_power_spectra_out.emplace_back(
           tmp.extend_and_broadcast(out_shape, axpos));
       }
-cout << "0: "<<t0() << endl;
+
       if (n_pspecs==1)
         ducc0::mav_apply(
             [](const double &inp_xi, const double &inp_azm_broadcast,
@@ -786,17 +785,20 @@ cout << "0: "<<t0() << endl;
               out_xi = inp_azm_broadcast * cotangent_in * s0 * s1;
             },
             1, inp_xi, inp_azm_broadcast, cotangent_in, out_xi, out_azm_broadcast, inp_distributed_power_spectra[0], inp_distributed_power_spectra[1], distributed_power_spectra_out[0], distributed_power_spectra_out[1]);
-cout << t0() << endl;
+
+      vector<int64_t> i0(out_xi.shape(0));
+      iota(i0.begin(),i0.end(),0);
+      ducc0::cfmav<int64_t> i0mav(i0.data(), {out_xi.shape(0)});
       for (size_t i = 0; i < n_pspecs; ++i) {
+        auto i0mav2(i0mav.extend_and_broadcast(power_spectra_out[i].shape(),0));
         auto xpindex = lpindex[i].extend_and_broadcast(power_spectra_out[i].shape(),1);
-        auto out_ps(ducc0::vmav<double,2>::from_vfmav(out_pspecs[i]));
-        ducc0::mav_apply_with_index(
-            [&](const double &ii, const int64_t &pind, const shape_t &inds) {
-              out_ps(inds[0], pind) += ii;
+        ducc0::vmav<double,2> out_ps(out_pspecs[i]);
+        ducc0::mav_apply(
+            [&](const double &ii, const int64_t &ind0, const int64_t &pind) {
+              out_ps(ind0, pind) += ii;
             },
-            1, power_spectra_out[i], xpindex);
+            1, power_spectra_out[i], i0mav2, xpindex);
       }
-cout << t0() << endl;
       }
     else
       ducc0::mav_apply_with_index(
