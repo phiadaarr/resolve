@@ -5,10 +5,11 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update -qq && apt-get install -qq git
 
 # Actual dependencies
-RUN apt-get update -qq && apt-get install -qq python3-pip casacore-dev pybind11-dev python3-mpi4py
+RUN apt-get update -qq && apt-get install -qq python3-pip
 RUN pip3 install git+https://gitlab.mpcdf.mpg.de/ift/nifty.git@NIFTy_8 pybind11
 # Optional dependencies
 RUN pip3 install astropy jax jaxlib
+RUN apt-get install -qq python3-mpi4py
 # Testing dependencies
 RUN apt-get install -qq python3-pytest-cov
 # Documentation dependencies
