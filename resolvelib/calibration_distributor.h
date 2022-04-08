@@ -115,23 +115,29 @@ public:
       fill_mav(out, complex<double>{0., 0.}, nthreads);
       // /Instantiate output array
 
-      for (size_t i0 = 0; i0 < out.shape()[0]; ++i0)
-        ducc0::execParallel(out.shape()[1], nthreads, [&](size_t lo, size_t hi) {
-          for (size_t i1 = lo; i1 < hi; ++i1)
+      ducc0::execParallel(out.shape()[1], nthreads, [&](size_t lo, size_t hi) {
+        for (size_t i0 = 0; i0 < out.shape()[0]; ++i0)
+          for (size_t i1 = lo; i1 < hi; ++i1) {
+            const double frac{t(i1) / dt};
+            const auto tind0 = size_t(floor(frac));
+            const size_t tind1{tind0 + 1};
+            MR_assert(t(i1) >= 0, "time outside region");
+            MR_assert(tind0 < ntime, "time outside region");
+            MR_assert(tind1 < ntime, "time outside region");
+            MR_assert(a0(i1) >= 0, "ant1 needs to be positive");
+            MR_assert(a1(i1) >= 0, "ant2 needs to be positive");
+
+            const auto mya0 = size_t(a0(i1));
+            const auto mya1 = size_t(a1(i1));
+
             for (size_t i2 = 0; i2 < out.shape()[2]; ++i2) {
-
-              const double frac{t(i1) / dt};
-              const auto tind0 = size_t(floor(frac));
-              const size_t tind1{tind0 + 1};
-              MR_assert(t(i1) >= 0, "time outside region");
-              MR_assert(tind0 < ntime, "time outside region");
-              MR_assert(tind1 < ntime, "time outside region");
-
-              auto gettmp = [&](const size_t tindex) {
-                return applied(i0, i1, i2) *
-                       (inp_logampl(i0, a0(i1), tindex, i2) + inp_logampl(i0, a1(i1), tindex, i2) +
+              const complex<double> myapplied{applied(i0, i1, i2)};
+              auto gettmp = [i0, i1, i2, myapplied, &inp_logampl, &inp_ph, mya0,
+                             mya1](const size_t tindex) {
+                return myapplied *
+                       (inp_logampl(i0, mya0, tindex, i2) + inp_logampl(i0, mya1, tindex, i2) +
                         complex<double>{0, 1} *
-                            (inp_ph(i0, a0(i1), tindex, i2) - inp_ph(i0, a1(i1), tindex, i2)));
+                            (inp_ph(i0, mya0, tindex, i2) - inp_ph(i0, mya1, tindex, i2)));
               };
 
               const complex<double> tmp0{gettmp(tind0)};
@@ -142,7 +148,8 @@ public:
 
               out(i0, i1, i2) = tmp;
             }
-        });
+          }
+      });
       return out_;
     };
 
@@ -175,14 +182,19 @@ public:
               const auto tmp0{(1 - diff) * tmp};
               const auto tmp1{diff * tmp};
 
-              logampl(i0, a0(i1), tind0, i2) += real(tmp0);
-              logampl(i0, a1(i1), tind0, i2) += real(tmp0);
-              logph(i0, a0(i1), tind0, i2) += imag(tmp0);
-              logph(i0, a1(i1), tind0, i2) -= imag(tmp0);
-              logampl(i0, a0(i1), tind1, i2) += real(tmp1);
-              logampl(i0, a1(i1), tind1, i2) += real(tmp1);
-              logph(i0, a0(i1), tind1, i2) += imag(tmp1);
-              logph(i0, a1(i1), tind1, i2) -= imag(tmp1);
+              const auto re0{real(tmp0)};
+              const auto re1{real(tmp1)};
+              const auto im0{imag(tmp0)};
+              const auto im1{imag(tmp1)};
+
+              logampl(i0, a0(i1), tind0, i2) += re0;
+              logampl(i0, a1(i1), tind0, i2) += re0;
+              logph(i0, a0(i1), tind0, i2) += im0;
+              logph(i0, a1(i1), tind0, i2) -= im0;
+              logampl(i0, a0(i1), tind1, i2) += re1;
+              logampl(i0, a1(i1), tind1, i2) += re1;
+              logph(i0, a0(i1), tind1, i2) += im1;
+              logph(i0, a1(i1), tind1, i2) -= im1;
             }
           }
       });
