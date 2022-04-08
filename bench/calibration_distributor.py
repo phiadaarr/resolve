@@ -1,6 +1,5 @@
 import sys
 
-import jax.numpy as jnp
 import nifty8 as ift
 import numpy as np
 import resolve as rve
@@ -32,7 +31,15 @@ def my_operator(ant1, ant2, time, tdom, pdom, fdom, key_phase, key_logampl, ante
 
 
 def main():
-    obs = next(rve.ms2observations_all("/data/CYG-ALL-2052-2MHZ.ms", "DATA"))
+    if True:
+        obs = next(rve.ms2observations_all("/data/CYG-ALL-2052-2MHZ.ms", "DATA"))
+    else:
+        obs = next(rve.ms2observations_all("/data/meerkat-calibration/ms1_primary_subset.ms", "DATA"))
+        if True:
+            obs = obs.remove_autocorrelations().to_double_precision()
+        else:
+            obs = obs.remove_autocorrelations().restrict_to_polarization("XX").to_double_precision()
+
     quick = False
     if len(sys.argv) == 2 and sys.argv[1] == "quick":
         quick = True
@@ -48,7 +55,7 @@ def main():
     pdom = obs.vis.domain[0]
     fdom = obs.vis.domain[2]
 
-    nt = 10
+    nt = 2*559
     tdom = ift.RGSpace(nt, tmax / nt * 2)
 
     key_phase, key_logampl = "p", "a"
@@ -71,7 +78,7 @@ def main():
     for nthreads in range(1, 5):
         print(f"New implementation (nthreads={nthreads})")
         op = my_operator(*args, nthreads=nthreads)
-        ift.exec_time(op)
+        ift.exec_time(op, ntries=10)
 
         if quick:
             pos = ift.from_random(op.domain)
