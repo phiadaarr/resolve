@@ -68,3 +68,4 @@ Finally, clone the resolve repository and install resolve on your system:
 
     pip3 install compiledb
     CC=clang CXX=clang python3 setup.py build | compiledb
+    rm -rf build
