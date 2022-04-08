@@ -176,15 +176,13 @@ public:
       fill_mav(logampl, 0., nthreads);
       fill_mav(logph, 0., nthreads);
 
-      size_t n_ant = logampl.shape(1);
-      ducc0::execParallel(logampl.shape(0)*n_ant, nthreads, [&](size_t lo, size_t hi) {
+      size_t sz2 = inp.shape(2);
+      ducc0::execParallel(inp.shape(0)*sz2, nthreads, [&](size_t lo, size_t hi) {
         for (size_t i0 = 0; i0 < inp.shape()[0]; ++i0)
           {
-          if (((i0+1)*n_ant<=lo) || (i0*n_ant>=hi)) continue;
+          if (((i0+1)*sz2<=lo) || (i0*sz2>=hi)) continue;
           for (size_t i1 = 0; i1 < inp.shape()[1]; ++i1) {
             const auto mya0 = a0(i1);
-            auto crit = mya0+i0*n_ant;
-            if ((crit<lo) || (crit>=hi)) continue;
             const auto mya1 = a1(i1);
 
             const double frac{t(i1) / dt};
@@ -194,7 +192,9 @@ public:
             MR_assert(tind1 < ntime, "time outside region");
             const auto diff{frac - double(tind0)};
 
-            for (size_t i2 = 0; i2 < inp.shape(2); ++i2) {
+            size_t i2lo = (lo<=i0*sz2) ? 0 : lo-i0*sz2;
+            size_t i2hi = (hi>=(i0+1)*sz2) ? sz2 : hi-i0*sz2;
+            for (size_t i2 = i2lo; i2 < i2hi; ++i2) {
               const auto tmp{conj(applied(i0, i1, i2)) * inp(i0, i1, i2)};
               const auto tmp0{(1 - diff) * tmp};
               const auto tmp1{diff * tmp};
