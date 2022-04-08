@@ -107,7 +107,9 @@ public:
     auto a1 = ducc0::to_cmav<int, 1>(antenna_indices1);
     auto t = ducc0::to_cmav<double, 1>(time);
 
-    function<py::array(const py::dict &)> ftimes = [=,applied_](const py::dict &inp_) {
+    function<py::array(const py::dict &)> ftimes = [=](const py::dict &inp_) {
+      // keep a handle on the applied_ object
+      auto local_applied_ = applied_;
       // Parse input
       const auto inp_logampl = ducc0::to_cmav<double, 4>(inp_[key_logamplitude]);
       const auto inp_ph = ducc0::to_cmav<double, 4>(inp_[key_phase]);
@@ -158,7 +160,9 @@ public:
       return out_;
     };
 
-    function<py::dict(const py::array &)> fadjtimes = [=,applied_](const py::array &inp_) {
+    function<py::dict(const py::array &)> fadjtimes = [=](const py::array &inp_) {
+      // keep a handle on the applied_ object
+      auto local_applied_ = applied_;
       // Parse input
       auto inp{ducc0::to_cmav<complex<double>, 3>(inp_)};
       // /Parse input
