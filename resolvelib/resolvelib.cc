@@ -367,8 +367,8 @@ public:
           const auto pol{sqrt(qq * qq + uu * uu + vv * vv)};
           const auto expii{exp(ii)};
           const auto exppol{exp(pol)};
-          const auto tmp{0.5 * ((expii / pol) * exppol - (expii / pol) / exppol)};
-          const auto tmpi{0.5 * (expii * exppol + expii / exppol)};
+          const auto tmp{0.5 * expii / pol * (exppol - 1. / exppol)};
+          const auto tmpi{0.5 * expii * (exppol + 1. / exppol)};
           const auto tmpq{tmp * qq};
           const auto tmpu{tmp * uu};
           const auto tmpv{tmp * vv};
