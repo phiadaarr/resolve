@@ -24,9 +24,10 @@ from .common import list2fixture, setup_function, teardown_function
 
 dtype = list2fixture([np.complex64, np.complex128, np.float32, np.float64])
 with_mask = list2fixture([False, True])
+with_multiplicative = list2fixture([False, True])
 
 
-def test_gaussian_energy(dtype, with_mask):
+def test_gaussian_energy(dtype, with_mask, with_multiplicative):
     dom = ift.UnstructuredDomain([15])
     mean = ift.from_random(dom, dtype=dtype)
     icov = ift.from_random(
@@ -39,10 +40,18 @@ def test_gaussian_energy(dtype, with_mask):
         mask = ift.makeField(mean.domain, mask)
     else:
         mask = None
-    op1 = rve.DiagonalGaussianLikelihood(data=mean, inverse_covariance=icov, mask=mask, nthreads=1)
-    op2 = rve.DiagonalGaussianLikelihood(data=mean, inverse_covariance=icov, mask=mask, nthreads=2)
-    rve.operator_equality(op1.nifty_equivalent, op1, ntries=5, domain_dtype=dtype)
-    rve.operator_equality(op2.nifty_equivalent, op2, ntries=5, domain_dtype=dtype)
+    if with_multiplicative:
+        multiplicative = ift.from_random(dom, dtype=dtype)
+    else:
+        multiplicative = None
+    op1 = rve.DiagonalGaussianLikelihood(
+        data=mean, inverse_covariance=icov, mask=mask, multiplicative=multiplicative, nthreads=1
+    )
+    op2 = rve.DiagonalGaussianLikelihood(
+        data=mean, inverse_covariance=icov, mask=mask, multiplicative=multiplicative, nthreads=2
+    )
+    rve.operator_equality(op1.nifty_equivalent, op1, ntries=5, domain_dtype=dtype, rtol=1e-4)
+    rve.operator_equality(op2.nifty_equivalent, op2, ntries=5, domain_dtype=dtype, rtol=1e-4)
 
 
 def test_varcov_gaussian_energy(dtype, with_mask):
@@ -54,8 +63,12 @@ def test_varcov_gaussian_energy(dtype, with_mask):
         mask = ift.makeField(mean.domain, mask)
     else:
         mask = None
-    op1 = rve.VariableCovarianceDiagonalGaussianLikelihood(mean, "signal", "logicov", mask=mask, nthreads=1)
-    op2 = rve.VariableCovarianceDiagonalGaussianLikelihood(mean, "signal", "logicov", mask=mask, nthreads=2)
+    op1 = rve.VariableCovarianceDiagonalGaussianLikelihood(
+        mean, "signal", "logicov", mask=mask, nthreads=1
+    )
+    op2 = rve.VariableCovarianceDiagonalGaussianLikelihood(
+        mean, "signal", "logicov", mask=mask, nthreads=2
+    )
     dt = {
         "signal": dtype,
         "logicov": rve.dtype_complex2float(dtype, force=True),
