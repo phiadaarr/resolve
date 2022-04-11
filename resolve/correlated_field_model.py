@@ -46,7 +46,7 @@ class CorrelatedFieldMaker(ift.CorrelatedFieldMaker):
             raise ValueError(f"Only dofdex={wanted} is supported")
         super(CorrelatedFieldMaker, self).set_amplitude_total_offset(*args, **kwargs)
 
-    def finalize(self, prior_info=100):
+    def _finalize(self, prior_info=100):
         n_amplitudes = len(self._a)
         hspace = ift.makeDomain(
             [ift.UnstructuredDomain(self._total_N)]
@@ -78,9 +78,14 @@ class CorrelatedFieldMaker(ift.CorrelatedFieldMaker):
             ],
         )
         op = core.partial_insert(amplitudes)
-        op.nifty_equivalent = core.nifty_equivalent.partial_insert(amplitudes)
         self.statistics_summary(prior_info)
-        return op
+        return op, core.nifty_equivalent.partial_insert(amplitudes)
+
+    def finalize(self, prior_info):
+        return self._finalize(prior_info)[0]
+
+    def finalize_nifty_equivalent(self, prior_info):
+        return self._finalize(prior_info)[1]
 
 
 def CfmCore(
@@ -142,7 +147,7 @@ def CfmCore(
 
     pindices = [pp[amp_space].pindex for pp in pdomains]
 
-    scalar_dvol = ht.domain.scalar_weight((1, 2))
+    scalar_dvol = ht.domain.scalar_weight(spaces)
     offset_mean /= scalar_dvol
 
     res = Pybind11Operator(
