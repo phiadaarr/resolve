@@ -139,7 +139,7 @@ public:
 
             for (size_t i2 = 0; i2 < out.shape()[2]; ++i2) {
               const complex<double> myapplied{applied(i0, i1, i2)};
-              auto gettmp = [i0, i1, i2, myapplied, &inp_logampl, &inp_ph, mya0,
+              auto gettmp = [i0, i2, myapplied, &inp_logampl, &inp_ph, mya0,
                              mya1](const size_t tindex) {
                 return myapplied *
                        (inp_logampl(i0, mya0, tindex, i2) + inp_logampl(i0, mya1, tindex, i2) +
@@ -177,10 +177,10 @@ public:
       fill_mav(logph, 0., nthreads);
 
       size_t sz2 = inp.shape(2);
-      ducc0::execParallel(inp.shape(0)*sz2, nthreads, [&](size_t lo, size_t hi) {
-        for (size_t i0 = 0; i0 < inp.shape()[0]; ++i0)
-          {
-          if (((i0+1)*sz2<=lo) || (i0*sz2>=hi)) continue;
+      ducc0::execParallel(inp.shape(0) * sz2, nthreads, [&](size_t lo, size_t hi) {
+        for (size_t i0 = 0; i0 < inp.shape()[0]; ++i0) {
+          if (((i0 + 1) * sz2 <= lo) || (i0 * sz2 >= hi))
+            continue;
           for (size_t i1 = 0; i1 < inp.shape()[1]; ++i1) {
             const auto mya0 = a0(i1);
             const auto mya1 = a1(i1);
@@ -192,8 +192,8 @@ public:
             MR_assert(tind1 < ntime, "time outside region");
             const auto diff{frac - double(tind0)};
 
-            size_t i2lo = (lo<=i0*sz2) ? 0 : lo-i0*sz2;
-            size_t i2hi = (hi>=(i0+1)*sz2) ? sz2 : hi-i0*sz2;
+            size_t i2lo = (lo <= i0 * sz2) ? 0 : lo - i0 * sz2;
+            size_t i2hi = (hi >= (i0 + 1) * sz2) ? sz2 : hi - i0 * sz2;
             for (size_t i2 = i2lo; i2 < i2hi; ++i2) {
               const auto tmp{conj(applied(i0, i1, i2)) * inp(i0, i1, i2)};
               const auto tmp0{(1 - diff) * tmp};
