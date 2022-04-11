@@ -72,7 +72,7 @@ def get_pspecs_op(args_cfm, args_lst, args_zm, nthreads):
     return reduce(add, [aa.ducktape_left(str(ii)) for ii, aa in enumerate(ampls)])
 
 
-def perf_nifty_operators(op_dct, name, domain_dtype=np.float64):
+def perf_nifty_operators(op_dct, name, domain_dtype=np.float64, ntries=1):
     xs = list(range(1, n_cpus + 1))
 
     def init(keys, n):
@@ -99,20 +99,24 @@ def perf_nifty_operators(op_dct, name, domain_dtype=np.float64):
             lin = ift.Linearization.make_var(pos)
 
             t0 = time()
-            res = oo(pos)
-            times[kk][ii] = time() - t0
+            for _ in range(ntries):
+                res = oo(pos)
+            times[kk][ii] = (time() - t0)/ntries
 
             t0 = time()
-            reslin = oo(lin)
-            times_with_jac[kk][ii] = time() - t0
+            for _ in range(ntries):
+                reslin = oo(lin)
+            times_with_jac[kk][ii] = (time() - t0)/ntries
 
             t0 = time()
-            reslin.jac(pos)
-            jac_times[kk][ii] = time() - t0
+            for _ in range(ntries):
+                reslin.jac(pos)
+            jac_times[kk][ii] = (time() - t0)/ntries
 
             t0 = time()
-            reslin.jac.adjoint(res)
-            jac_adj_times[kk][ii] = time() - t0
+            for _ in range(ntries):
+                reslin.jac.adjoint(res)
+            jac_adj_times[kk][ii] = (time() - t0)/ntries
 
     for ys, mode in [
         (times, "op(fld)"),
@@ -147,6 +151,7 @@ if __name__ == "__main__":
         dom0 = [ift.RGSpace(4)]
         dom1 = [ift.RGSpace(5)]
         name = ["quick"]
+        ntries_lst = [1]
     else:
         total_Ns = [1, 58, 200, 4, 1]
         dom0 = [
@@ -164,8 +169,9 @@ if __name__ == "__main__":
             "polarization_imaging",
             "eht",
         ]
+        ntries_lst = [10, 1, 1, 1, 2]
 
-    for d0, d1, total_N, nm in zip(dom0, dom1, total_Ns, name):
+    for d0, d1, total_N, nm, ntries in zip(dom0, dom1, total_Ns, name, ntries_lst):
         print(f"Working on {nm}")
         dofdex = list(range(total_N))
         args_cfm = dict(prefix="", total_N=total_N)
@@ -204,4 +210,4 @@ if __name__ == "__main__":
         }
         if check_equality:
             rve.operator_equality(operators["NIFTy"](1), operators["resolvelib"](1))
-        perf_nifty_operators(operators, nm)
+        perf_nifty_operators(operators, nm, ntries=ntries)
