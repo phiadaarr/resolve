@@ -37,13 +37,13 @@ private:
   size_t nrows() const { return copy_shape(antenna_indices0)[0]; }
 
 public:
-  CalibrationDistributor(const py::array &antenna_indices0_, const py::array &antenna_indices1_,
-                         const py::array &time_, const py::str &key_logamplitude_,
-                         const py::str &key_phase_, size_t nfreqs_, size_t ntime_, double dt_,
-                         size_t nthreads_)
+  CalibrationDistributor(const py::array &antenna_indices0_,
+                         const py::array &antenna_indices1_, const py::array &time_,
+                         const py::str &key_logamplitude_, const py::str &key_phase_,
+                         size_t nfreqs_, size_t ntime_, double dt_, size_t nthreads_)
       : key_logamplitude(key_logamplitude_), key_phase(key_phase_),
-        antenna_indices0(antenna_indices0_), antenna_indices1(antenna_indices1_), time(time_),
-        nfreqs(nfreqs_), ntime(ntime_), dt(dt_), nthreads(nthreads_) {}
+        antenna_indices0(antenna_indices0_), antenna_indices1(antenna_indices1_),
+        time(time_), nfreqs(nfreqs_), ntime(ntime_), dt(dt_), nthreads(nthreads_) {}
 
   py::array apply(const py::dict &inp_) const {
     // Parse input
@@ -76,12 +76,15 @@ public:
           const auto mya1 = size_t(a1(i1));
 
           for (size_t i2 = 0; i2 < out.shape()[2]; ++i2) {
-            const auto getloggain = [mya0, mya1, &logampl, &ph, i0, i2](const size_t tindex) {
-              return complex<double>(logampl(i0, mya0, tindex, i2) + logampl(i0, mya1, tindex, i2),
-                                     ph(i0, mya0, tindex, i2) - ph(i0, mya1, tindex, i2));
+            const auto getloggain = [mya0, mya1, &logampl, &ph, i0,
+                                     i2](const size_t tindex) {
+              return complex<double>(
+                  logampl(i0, mya0, tindex, i2) + logampl(i0, mya1, tindex, i2),
+                  ph(i0, mya0, tindex, i2) - ph(i0, mya1, tindex, i2));
             };
             const auto diff{frac - double(tind0)};
-            const auto loggain{(1 - diff) * getloggain(tind0) + diff * getloggain(tind1)};
+            const auto loggain{(1 - diff) * getloggain(tind0) +
+                               diff * getloggain(tind1)};
             const auto gain{exp(loggain)};
             out(i0, i1, i2) = gain;
           }

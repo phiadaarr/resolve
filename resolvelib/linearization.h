@@ -41,8 +41,7 @@ class LinearizationWithMetric : public Linearization<Tin, py::array> {
   using Tout = py::array;
 
 public:
-  LinearizationWithMetric(const Tout &position_,
-                          function<Tout(const Tin &)> jac_times_,
+  LinearizationWithMetric(const Tout &position_, function<Tout(const Tin &)> jac_times_,
                           function<Tin(const Tout &)> jac_adjoint_times_,
                           function<Tin(const Tin &)> apply_metric_)
       : Linearization<Tin, Tout>(position_, jac_times_, jac_adjoint_times_),
@@ -70,7 +69,6 @@ void add_linearization_with_metric(py::module_ &msup, const char *name) {
                     function<Tin(const Tout &)>, function<Tin(const Tin &)>>())
       .def("position", &LinearizationWithMetric<Tin>::position)
       .def("jac_times", &LinearizationWithMetric<Tin>::jac_times)
-      .def("jac_adjoint_times",
-           &LinearizationWithMetric<Tin>::jac_adjoint_times)
+      .def("jac_adjoint_times", &LinearizationWithMetric<Tin>::jac_adjoint_times)
       .def("apply_metric", &LinearizationWithMetric<Tin>::apply_metric);
 }
