@@ -16,7 +16,7 @@
 
 import os
 import sys
-from functools import reduce
+from functools import partial, reduce
 from operator import add
 from time import time
 
@@ -92,7 +92,6 @@ def perf_nifty_operators(op_dct, name, domain_dtype=np.float64, ntries=1):
 
     for ii, nthreads in enumerate(xs):
         print(f"{nthreads} / {n_cpus}")
-        # FIXME Check outputs for equality
         for kk, oo in op_dct.items():
             oo = oo(nthreads)
             pos = ift.from_random(oo.domain, dtype=domain_dtype)
@@ -101,22 +100,22 @@ def perf_nifty_operators(op_dct, name, domain_dtype=np.float64, ntries=1):
             t0 = time()
             for _ in range(ntries):
                 res = oo(pos)
-            times[kk][ii] = (time() - t0)/ntries
+            times[kk][ii] = (time() - t0) / ntries
 
             t0 = time()
             for _ in range(ntries):
                 reslin = oo(lin)
-            times_with_jac[kk][ii] = (time() - t0)/ntries
+            times_with_jac[kk][ii] = (time() - t0) / ntries
 
             t0 = time()
             for _ in range(ntries):
                 reslin.jac(pos)
-            jac_times[kk][ii] = (time() - t0)/ntries
+            jac_times[kk][ii] = (time() - t0) / ntries
 
             t0 = time()
             for _ in range(ntries):
                 reslin.jac.adjoint(res)
-            jac_adj_times[kk][ii] = (time() - t0)/ntries
+            jac_adj_times[kk][ii] = (time() - t0) / ntries
 
     for ys, mode in [
         (times, "op(fld)"),
@@ -201,7 +200,6 @@ if __name__ == "__main__":
                 )
             )
         args_zm = dict(offset_mean=1.2, offset_std=(1.0, 0.2), dofdex=dofdex)
-        from functools import partial
 
         operators = {
             "NIFTy": partial(get_nifty_op, args_cfm, args_lst, args_zm),
