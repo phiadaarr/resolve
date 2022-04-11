@@ -141,17 +141,18 @@ public:
               const complex<double> myapplied{applied(i0, i1, i2)};
               auto gettmp = [i0, i2, myapplied, &inp_logampl, &inp_ph, mya0,
                              mya1](const size_t tindex) {
-                return myapplied *
-                       (inp_logampl(i0, mya0, tindex, i2) + inp_logampl(i0, mya1, tindex, i2) +
-                        complex<double>{0, 1} *
-                            (inp_ph(i0, mya0, tindex, i2) - inp_ph(i0, mya1, tindex, i2)));
+                const double re{inp_logampl(i0, mya0, tindex, i2) +
+                                inp_logampl(i0, mya1, tindex, i2)};
+                const double im{inp_ph(i0, mya0, tindex, i2) -
+                                inp_ph(i0, mya1, tindex, i2)};
+                return myapplied * complex<double>{re, im};
               };
 
-              const complex<double> tmp0{gettmp(tind0)};
-              const complex<double> tmp1{gettmp(tind1)};
+              const complex<double> left{gettmp(tind0)};
+              const complex<double> right{gettmp(tind1)};
 
               const auto diff{frac - double(tind0)};
-              const auto tmp{(1 - diff) * tmp0 + diff * tmp1};
+              const auto tmp{(1 - diff) * left + diff * right};
 
               out(i0, i1, i2) = tmp;
             }
