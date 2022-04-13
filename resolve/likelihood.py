@@ -39,7 +39,7 @@ def ImagingLikelihood(
     log_inverse_covariance_operator=None,
     calibration_operator=None,
     verbosity=0,
-    nthreads=1
+    nthreads=1,
 ):
     """Versatile likelihood class.
 
@@ -89,7 +89,9 @@ def ImagingLikelihood(
     my_assert_isinstance(sky_operator, ift.Operator)
     obs = _obj2list(observation, Observation)
     cops = _duplicate(_obj2list(calibration_operator, ift.Operator), len(obs))
-    log_icovs = _duplicate(_obj2list(log_inverse_covariance_operator, ift.Operator), len(obs))
+    log_icovs = _duplicate(
+        _obj2list(log_inverse_covariance_operator, ift.Operator), len(obs)
+    )
     if len(obs) == 0:
         raise ValueError("List of observations is empty")
 
@@ -99,14 +101,27 @@ def ImagingLikelihood(
     for ii, (oo, cop, log_icov) in enumerate(zip(obs, cops, log_icovs)):
         dtype = oo.vis.dtype
 
-        R = InterferometryResponse(oo, sky_operator.target, do_wgridding=do_wgridding, epsilon=epsilon, verbosity=verbosity, nthreads=nthreads).ducktape(internal_sky_key)
+        R = InterferometryResponse(
+            oo,
+            sky_operator.target,
+            do_wgridding=do_wgridding,
+            epsilon=epsilon,
+            verbosity=verbosity,
+            nthreads=nthreads,
+        ).ducktape(internal_sky_key)
         if cop is not None:
             from .dtype_converter import DtypeConverter
+
             dt = DtypeConverter(cop.target, np.complex128, dtype)
             R = (dt @ cop) * R  # Apply calibration solutions
 
         if log_icov is None:
-            ee = DiagonalGaussianLikelihood(data=oo.vis, inverse_covariance=oo.weight, mask=oo.mask) @ R
+            ee = (
+                DiagonalGaussianLikelihood(
+                    data=oo.vis, inverse_covariance=oo.weight, mask=oo.mask
+                )
+                @ R
+            )
             ee.name = f"{oo.source_name} (data wgts) {ii}"
         else:
             s0, s1 = "_model_data", "_log_icov"
@@ -125,7 +140,7 @@ def CalibrationLikelihood(
     calibration_operator,
     model_visibilities,
     inverse_covariance_operator=None,
-    nthreads=1
+    nthreads=1,
 ):
     """Versatile calibration likelihood class
 
@@ -159,8 +174,7 @@ def CalibrationLikelihood(
     """
     obs = _obj2list(observation, Observation)
     cops = _duplicate(_obj2list(calibration_operator, ift.Operator), len(obs))
-    icovs = _duplicate(_obj2list(inverse_covariance_operator, ift.Operator),
-                       len(obs))
+    icovs = _duplicate(_obj2list(inverse_covariance_operator, ift.Operator), len(obs))
     model_d = _duplicate(_obj2list(model_visibilities, ift.Field), len(obs))
     model_d = [ift.makeOp(mm) @ cop for mm, cop in zip(model_d, cops)]
 
@@ -172,9 +186,16 @@ def CalibrationLikelihood(
     dt_icov = DtypeConverter(model_d.target, np.float64, obs.weight.dtype)
 
     if icov is None:
-        e = DiagonalGaussianLikelihood(data=obs.vis, inverse_covariance=obs.weight, nthreads=nthreads, mask=obs.mask)
+        e = DiagonalGaussianLikelihood(
+            data=obs.vis,
+            inverse_covariance=obs.weight,
+            nthreads=nthreads,
+            mask=obs.mask,
+        )
         return e @ dt @ model_d
     else:
         s0, s1 = "model data", "inverse covariance"
-        e = ift.VariableCovarianceDiagonalGaussianLikelihood(obs.vis, s0, s1, mask=obs.mask, nthreads=nthreads)
+        e = ift.VariableCovarianceDiagonalGaussianLikelihood(
+            obs.vis, s0, s1, mask=obs.mask, nthreads=nthreads
+        )
         return e @ (dt @ model_d).ducktape_left(s0) + (dt_icov @ icov).ducktape_left(s1)
