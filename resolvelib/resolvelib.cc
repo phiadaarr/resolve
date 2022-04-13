@@ -70,16 +70,20 @@ private:
   const size_t nthreads;
   const py::array pymean;
   const py::array pyicov;
+  const py::array pymultiplicative;
 
 public:
   const ducc0::cfmav<Tmean> mean;
   const ducc0::cfmav<T> icov;
+  const ducc0::cfmav<Tmean> multiplicative;
 
   DiagonalGaussianLikelihood(const py::array &mean_,
-                             const py::array &inverse_covariance_, size_t nthreads_ = 1)
+                             const py::array &inverse_covariance_,
+                             const py::array &multiplicative_, size_t nthreads_ = 1)
       : nthreads(nthreads_), pymean(mean_), pyicov(inverse_covariance_),
-        mean(ducc0::to_cfmav<Tmean>(mean_)),
-        icov(ducc0::to_cfmav<T>(inverse_covariance_)) {}
+        pymultiplicative(multiplicative_), mean(ducc0::to_cfmav<Tmean>(mean_)),
+        icov(ducc0::to_cfmav<T>(inverse_covariance_)),
+        multiplicative(ducc0::to_cfmav<Tmean>(pymultiplicative)) {}
 
 private:
   Tenergy value(const py::array &inp) const {
@@ -89,12 +93,12 @@ private:
   Tenergy value(const ducc0::cfmav<Tmean> &inp) const {
     Tacc acc{0};
     ducc0::mav_apply(
-        [&acc](const Tmean &m, const T &ic, const Tmean &l) {
-          const auto foo{ic * norm(l - m)};
+        [&acc](const Tmean &m, const T &ic, const Tmean &l, const Tmean &mult) {
+          const auto foo{ic * norm(l * mult - m)};
           const auto foo2 = Tacc(foo);
           acc += foo2;
         },
-        1, mean, icov, inp);
+        1, mean, icov, inp, multiplicative);
     return Tenergy(0.5) * Tenergy(acc);
   }
 
@@ -111,11 +115,16 @@ public:
     // Allocate memory with Python to inform Python's GC
     auto gradient_ = py::array_t<Tmean>(loc.shape());
     ducc0::mav_apply(
-        [](const Tmean &m, const T &ic, const Tmean &l, Tmean &g) {
-          const auto tmp2{(l - m) * ic};
-          g = tmp2;
+        [](const Tmean &m, const T &ic, const Tmean &l, const Tmean &mult, Tmean &g) {
+          if constexpr (complex_mean) {
+            const Tmean tmp2{(l * mult - m) * ic * conj(mult)};
+            g = tmp2;
+          } else {
+            const auto tmp2{(l * mult - m) * ic * mult};
+            g = tmp2;
+          }
         },
-        nthreads, mean, icov, loc, ducc0::to_vfmav<Tmean>(gradient_));
+        nthreads, mean, icov, loc, multiplicative, ducc0::to_vfmav<Tmean>(gradient_));
     // /gradient
 
     // Jacobian
@@ -152,16 +161,17 @@ public:
 
     // Metric
     function<py::array(const py::array &)> apply_metric =
-        [nthreads = nthreads, icov = icov](const py::array &inp_) {
+        [nthreads = nthreads, icov = icov,
+         multiplicative = multiplicative](const py::array &inp_) {
           const auto inp{ducc0::to_cfmav<Tmean>(inp_)};
           auto out_{ducc0::make_Pyarr<Tmean>(inp.shape())};
           auto out{ducc0::to_vfmav<Tmean>(out_)};
           ducc0::mav_apply(
-              [](const Tmean &i, const T &ic, Tmean &o) {
-                const Tmean foo{i * ic};
+              [](const Tmean &i, const T &ic, const Tmean &mult, Tmean &o) {
+                const Tmean foo{i * ic * norm(mult)};
                 o = foo;
               },
-              nthreads, inp, icov, out);
+              nthreads, inp, icov, multiplicative, out);
           return out_;
         };
     // /Metric
@@ -952,23 +962,23 @@ PYBIND11_MODULE(resolvelib, m) {
 #ifdef COMPILE_GAUSSIAN_LIKELIHOOD
   py::class_<DiagonalGaussianLikelihood<double, false>>(m,
                                                         "DiagonalGaussianLikelihood_f8")
-      .def(py::init<py::array, py::array, size_t>())
+      .def(py::init<py::array, py::array, py::array, size_t>())
       .def("apply", &DiagonalGaussianLikelihood<double, false>::apply)
       .def("apply_with_jac",
            &DiagonalGaussianLikelihood<double, false>::apply_with_jac);
   py::class_<DiagonalGaussianLikelihood<float, false>>(m,
                                                        "DiagonalGaussianLikelihood_f4")
-      .def(py::init<py::array, py::array, size_t>())
+      .def(py::init<py::array, py::array, py::array, size_t>())
       .def("apply", &DiagonalGaussianLikelihood<float, false>::apply)
       .def("apply_with_jac", &DiagonalGaussianLikelihood<float, false>::apply_with_jac);
   py::class_<DiagonalGaussianLikelihood<double, true>>(m,
                                                        "DiagonalGaussianLikelihood_c16")
-      .def(py::init<py::array, py::array, size_t>())
+      .def(py::init<py::array, py::array, py::array, size_t>())
       .def("apply", &DiagonalGaussianLikelihood<double, true>::apply)
       .def("apply_with_jac", &DiagonalGaussianLikelihood<double, true>::apply_with_jac);
   py::class_<DiagonalGaussianLikelihood<float, true>>(m,
                                                       "DiagonalGaussianLikelihood_c8")
-      .def(py::init<py::array, py::array, size_t>())
+      .def(py::init<py::array, py::array, py::array, size_t>())
       .def("apply", &DiagonalGaussianLikelihood<float, true>::apply)
       .def("apply_with_jac", &DiagonalGaussianLikelihood<float, true>::apply_with_jac);
 #endif

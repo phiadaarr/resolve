@@ -17,9 +17,11 @@
 
 from functools import reduce
 from operator import add, mul
+
 import nifty8 as ift
-import resolvelib
 import numpy as np
+import resolvelib
+
 from .cpp2py import Pybind11Operator
 
 
@@ -33,17 +35,11 @@ class CorrelatedFieldMaker(ift.CorrelatedFieldMaker):
     def add_fluctuations(self, *args, **kwargs):
         if "dofdex" not in kwargs:
             raise RuntimeError("Need to specify dofdex")
-        wanted = list(range(self._total_N))
-        if list(kwargs["dofdex"]) != wanted:
-            raise ValueError(f"Only dofdex={wanted} is supported")
         super(CorrelatedFieldMaker, self).add_fluctuations(*args, **kwargs)
 
     def set_amplitude_total_offset(self, *args, **kwargs):
         if "dofdex" not in kwargs:
             raise RuntimeError("Need to specify dofdex")
-        wanted = list(range(self._total_N))
-        if list(kwargs["dofdex"]) != wanted:
-            raise ValueError(f"Only dofdex={wanted} is supported")
         super(CorrelatedFieldMaker, self).set_amplitude_total_offset(*args, **kwargs)
 
     def _finalize(self, prior_info=100):
@@ -136,7 +132,7 @@ def CfmCore(
 
     azm_key = azm.domain.keys()[0]
 
-    op = ht((expander @ distributor @ azm) * corr * xi)
+    op = ht((expander @ ift.Operator.identity_operator(distributor.target).ducktape(azm_key)) * corr * xi)
 
     if offset_mean is None:
         offset_mean = 0.
@@ -154,6 +150,8 @@ def CfmCore(
         op.domain,
         op.target,
         resolvelib.CfmCore(pindices, power_keys, excitation_field_key, azm_key, offset_mean, scalar_dvol, nthreads),
-    ).partial_insert(azm.ducktape_left(azm_key))
-    res.nifty_equivalent = op
+    )
+    azm_insert = (distributor @ azm).ducktape_left(azm_key)
+    res = res.partial_insert(azm_insert)
+    res.nifty_equivalent = op.partial_insert(azm_insert)
     return res

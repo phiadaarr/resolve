@@ -23,7 +23,9 @@ from .cpp2py import Pybind11LikelihoodEnergyOperator
 from .util import is_single_precision
 
 
-def DiagonalGaussianLikelihood(data, inverse_covariance, mask=None, nthreads=1):
+def DiagonalGaussianLikelihood(
+    data, inverse_covariance, mask=None, multiplicative=None, nthreads=1
+):
     """Gaussian energy as NIFTy operator that is implemented in C++
 
     Parameters
@@ -33,7 +35,10 @@ def DiagonalGaussianLikelihood(data, inverse_covariance, mask=None, nthreads=1):
     inverse_covariance : Field
         Real valued. Needs to have same precision as `data`.
 
-    mask : Field
+    mask : Field or None
+
+    multiplicative : Field or None
+        Field that is multiplied to the input before computing the residual.
 
     Note
     ----
@@ -75,6 +80,15 @@ def DiagonalGaussianLikelihood(data, inverse_covariance, mask=None, nthreads=1):
         inverse_covariance = ift.makeField(data.domain, mask) * inverse_covariance
         assert inverse_covariance.val.dtype == foo
 
+    if multiplicative is None:
+        mask_operator_and_multiplicative = mask_operator
+        multiplicative = np.broadcast_to(np.ones((1,), dtype=data.dtype), data.shape)
+    else:
+        assert multiplicative.domain == data.domain
+        assert multiplicative.dtype == data.dtype
+        mask_operator_and_multiplicative = mask_operator @ ift.makeOp(multiplicative)
+        multiplicative = multiplicative.val
+
     if np.any(np.isnan(inverse_covariance.val)):
         raise ValueError("inverse_covariance must not contain NaN.")
     if np.any(np.isnan(data.val)):
@@ -82,11 +96,11 @@ def DiagonalGaussianLikelihood(data, inverse_covariance, mask=None, nthreads=1):
 
     return Pybind11LikelihoodEnergyOperator(
         data.domain,
-        f(data.val, inverse_covariance.val, nthreads),
+        f(data.val, inverse_covariance.val, multiplicative, nthreads),
         nifty_equivalent=ift.GaussianEnergy(
             data=mask_operator(data),
             inverse_covariance=ift.makeOp(mask_operator(inverse_covariance), sampling_dtype=dt),
-        ) @ mask_operator
+        ) @ mask_operator_and_multiplicative
     )
 
 

@@ -134,7 +134,7 @@ setup(
     packages=find_packages(include=["resolve", "resolve.*"]),
     zip_safe=True,
     dependency_links=[],
-    install_requires=["ducc0", "matplotlib", "h5py", "mpi4py", "python-casacore"],  # FIXME nifty8
+    install_requires=["ducc0", "matplotlib", "h5py", "mpi4py", "python-casacore", "scipy"],  # FIXME nifty8
     ext_modules=extensions,
     entry_points={"console_scripts":
         [
