@@ -107,6 +107,54 @@ def test_imaging_likelihood(obs):
     try_lh(obs, rve.ImagingLikelihood, obs, sky, 1e-6, False)
 
 
+def test_imaging_likelihood_calibration_field():
+    obs = rve.ms2observations(
+        f"{direc}AM754_A030124_flagged.ms",
+        "DATA",
+        True,
+        spectral_window=0,
+        polarizations="stokesi",
+    )
+    t0, _ = rve.tmin_tmax(*obs)
+    obs = [oo.move_time(-t0) for oo in obs]
+    uants = rve.unique_antennas(*obs)
+
+    _, tmax = rve.tmin_tmax(*obs)
+    antenna_dct = {aa: ii for ii, aa in enumerate(uants)}
+    time_domain = ift.RGSpace(50, tmax / 50 * 2)
+    nants = len(uants)
+    npol, nfreq = obs[0].npol, obs[0].nfreq
+    total_N = npol * nants * nfreq
+    dom = [
+        obs[0].polarization.space,
+        ift.UnstructuredDomain(len(uants)),
+        time_domain,
+        ift.UnstructuredDomain(nfreq),
+    ]
+    mean, std = 0, np.pi / 2
+    phase = ift.Adder(mean, domain=dom) @ ift.ducktape(
+        dom, None, "calibration_phases"
+    ).scale(std)
+    mean, std = 0, 1
+    logampl = ift.Adder(mean, domain=dom) @ ift.ducktape(
+        dom, None, "calibration_logamplitudes"
+    ).scale(std)
+    abc = rve.calibration_distribution(obs[0], phase, logampl, antenna_dct)
+    lh = rve.ImagingLikelihood(
+        obs[0], sky, calibration_operator=abc, epsilon=1e-6, do_wgridding=False
+    )
+    try_operator(lh)
+    pos = ift.from_random(lh.domain)
+    calib_field = abc.force(pos)
+    calib_field = rve.DtypeConverter(
+        calib_field.domain, calib_field.dtype, obs[0].vis.dtype
+    )(calib_field)
+    lh1 = rve.ImagingLikelihood(
+        obs[0], sky, calibration_field=calib_field, epsilon=1e-6, do_wgridding=False
+    )
+    ift.extra.assert_allclose(lh(pos), lh1.force(pos))
+
+
 @pmp("obs", OBS)
 def test_varcov_imaging_likelihood(obs):
     var = rve.divide_where_possible(1, obs.weight)

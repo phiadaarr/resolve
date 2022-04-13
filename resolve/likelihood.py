@@ -24,11 +24,12 @@ import numpy as np
 
 from .data.observation import Observation
 from .dtype_converter import DtypeConverter
-from .energy_operators import (DiagonalGaussianLikelihood,
-                               VariableCovarianceDiagonalGaussianLikelihood)
+from .energy_operators import (
+    DiagonalGaussianLikelihood,
+    VariableCovarianceDiagonalGaussianLikelihood,
+)
 from .response import InterferometryResponse
-from .util import (_duplicate, _obj2list, my_assert, my_assert_isinstance,
-                   my_asserteq)
+from .util import _duplicate, _obj2list, my_assert, my_assert_isinstance, my_asserteq
 
 
 def ImagingLikelihood(
@@ -38,6 +39,7 @@ def ImagingLikelihood(
     do_wgridding,
     log_inverse_covariance_operator=None,
     calibration_operator=None,
+    calibration_field=None,
     verbosity=0,
     nthreads=1
 ):
@@ -82,13 +84,22 @@ def ImagingLikelihood(
     calibration_operator : Operator or list of Operator
         Optional. Target needs to be the same as observation.vis.
 
+    calibration_field: Field or list of Field
+        Optional. Domain needs to be the same as observation.vis.
+
     verbosity : int
 
     nthreads : int
+
+    Note
+    ----
+    For each observation only either calibration_operator or calibration_field
+    can be set.
     """
     my_assert_isinstance(sky_operator, ift.Operator)
     obs = _obj2list(observation, Observation)
     cops = _duplicate(_obj2list(calibration_operator, ift.Operator), len(obs))
+    cflds = _duplicate(_obj2list(calibration_field, ift.Field), len(obs))
     log_icovs = _duplicate(_obj2list(log_inverse_covariance_operator, ift.Operator), len(obs))
     if len(obs) == 0:
         raise ValueError("List of observations is empty")
@@ -96,14 +107,34 @@ def ImagingLikelihood(
     internal_sky_key = "_sky"
 
     energy = []
-    for ii, (oo, cop, log_icov) in enumerate(zip(obs, cops, log_icovs)):
+    for ii, (oo, cop, cfld, log_icov) in enumerate(zip(obs, cops, cflds, log_icovs)):
         dtype = oo.vis.dtype
 
-        R = InterferometryResponse(oo, sky_operator.target, do_wgridding=do_wgridding, epsilon=epsilon, verbosity=verbosity, nthreads=nthreads).ducktape(internal_sky_key)
+        if cfld is not None and cop is not None:
+            raise ValueError(
+                "Setting a calibration field and a calibration operator at the "
+                "same time, does not work."
+            )
+
+        R = InterferometryResponse(
+            oo,
+            sky_operator.target,
+            do_wgridding=do_wgridding,
+            epsilon=epsilon,
+            verbosity=verbosity,
+            nthreads=nthreads,
+        ).ducktape(internal_sky_key)
         if cop is not None:
             from .dtype_converter import DtypeConverter
             dt = DtypeConverter(cop.target, np.complex128, dtype)
             R = (dt @ cop) * R  # Apply calibration solutions
+        if cfld is not None:
+            if cfld.dtype != dtype:
+                raise ValueError(
+                    f"Calibration solution field ({cfld.dtype}) needs "
+                    "to have the same dtype as the observation ({dtype})."
+                )
+            R = ift.makeOp(cfld) @ R  # Apply calibration solutions
 
         if log_icov is None:
             ee = DiagonalGaussianLikelihood(data=oo.vis, inverse_covariance=oo.weight, mask=oo.mask) @ R
