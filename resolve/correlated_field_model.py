@@ -17,9 +17,11 @@
 
 from functools import reduce
 from operator import add, mul
+
 import nifty8 as ift
-import resolvelib
 import numpy as np
+import resolvelib
+
 from .cpp2py import Pybind11Operator
 
 
