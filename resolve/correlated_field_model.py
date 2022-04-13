@@ -20,7 +20,7 @@ from operator import add, mul
 
 import nifty8 as ift
 import numpy as np
-import resolvelib
+import resolve_support
 
 from .cpp2py import Pybind11Operator
 
@@ -149,7 +149,7 @@ def CfmCore(
     res = Pybind11Operator(
         op.domain,
         op.target,
-        resolvelib.CfmCore(pindices, power_keys, excitation_field_key, azm_key, offset_mean, scalar_dvol, nthreads),
+        resolve_support.CfmCore(pindices, power_keys, excitation_field_key, azm_key, offset_mean, scalar_dvol, nthreads),
     )
     azm_insert = (distributor @ azm).ducktape_left(azm_key)
     res = res.partial_insert(azm_insert)

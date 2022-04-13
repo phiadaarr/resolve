@@ -932,9 +932,9 @@ public:
 };
 #endif
 
-PYBIND11_MODULE(resolvelib, m) {
+PYBIND11_MODULE(resolve_support, m) {
 
-  m.attr("__name__") = "resolvelib";
+  m.attr("__name__") = "resolve_support";
 
 #ifdef COMPILE_POLARIZATION_MATRIX_EXPONENTIAL
   py::class_<PolarizationMatrixExponential<double, 1>>(m,
