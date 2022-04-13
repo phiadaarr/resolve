@@ -27,7 +27,8 @@ pmp = pytest.mark.parametrize
 @pmp("prefix", ["", "b"])
 @pmp("nthreads", [1, 2])
 @pmp("cfg", list(range(7)))
-def test_cfm(total_N, prefix, cfg, nthreads):
+@pmp("dofdex_mode", [0, 1])
+def test_cfm(total_N, prefix, cfg, nthreads, dofdex_mode):
     ift.set_nthreads(nthreads)
 
     dom1 = dom2 = None
@@ -52,7 +53,11 @@ def test_cfm(total_N, prefix, cfg, nthreads):
         dom1 = ift.RGSpace(20, 1.231)
         dom2 = ift.RGSpace(22)
 
-    dofdex = list(range(total_N))
+    if dofdex_mode == 0:
+        dofdex = list(range(total_N))
+    else:
+        dofdex = total_N * [0]
+
     args_cfm = dict(prefix=prefix, total_N=total_N)
     args0 = dict(
         target_subdomain=dom0,
