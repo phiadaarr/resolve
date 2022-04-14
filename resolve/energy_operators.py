@@ -17,7 +17,7 @@
 import nifty8 as ift
 import numpy as np
 
-import resolvelib
+import resolve_support
 
 from .cpp2py import Pybind11LikelihoodEnergyOperator
 from .util import is_single_precision
@@ -60,13 +60,13 @@ def DiagonalGaussianLikelihood(
         raise ValueError("Precision of inverse_covariance does not match precision of data.")
 
     if dt == np.float64:
-        f = resolvelib.DiagonalGaussianLikelihood_f8
+        f = resolve_support.DiagonalGaussianLikelihood_f8
     elif dt == np.float32:
-        f = resolvelib.DiagonalGaussianLikelihood_f4
+        f = resolve_support.DiagonalGaussianLikelihood_f4
     elif dt == np.complex64:
-        f = resolvelib.DiagonalGaussianLikelihood_c8
+        f = resolve_support.DiagonalGaussianLikelihood_c8
     elif dt == np.complex128:
-        f = resolvelib.DiagonalGaussianLikelihood_c16
+        f = resolve_support.DiagonalGaussianLikelihood_c16
     else:
         raise TypeError("Dtype of data not supported. Supported dtypes: c8, c16.")
 
@@ -132,13 +132,13 @@ def VariableCovarianceDiagonalGaussianLikelihood(
     dt = data.dtype
 
     if dt == np.float64:
-        f = resolvelib.VariableCovarianceDiagonalGaussianLikelihood_f8
+        f = resolve_support.VariableCovarianceDiagonalGaussianLikelihood_f8
     elif dt == np.float32:
-        f = resolvelib.VariableCovarianceDiagonalGaussianLikelihood_f4
+        f = resolve_support.VariableCovarianceDiagonalGaussianLikelihood_f4
     elif dt == np.complex64:
-        f = resolvelib.VariableCovarianceDiagonalGaussianLikelihood_c8
+        f = resolve_support.VariableCovarianceDiagonalGaussianLikelihood_c8
     elif dt == np.complex128:
-        f = resolvelib.VariableCovarianceDiagonalGaussianLikelihood_c16
+        f = resolve_support.VariableCovarianceDiagonalGaussianLikelihood_c16
     else:
         raise TypeError("Dtype of data not supported. Supported dtypes: c8, c16.")
 

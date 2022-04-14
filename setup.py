@@ -59,7 +59,7 @@ def _get_files_by_suffix(directory, suffix):
     return list(itertools.chain.from_iterable(iterable_sources))
 
 
-include_dirs = ['./resolvelib/ducc/src',
+include_dirs = ['./resolve_support/ducc/src',
                 pybind11.get_include(True),
                 pybind11.get_include(False)]
 
@@ -115,9 +115,9 @@ depfiles = (_get_files_by_suffix('.', 'h') +
             _get_files_by_suffix('.', 'cc') +
             ['setup.py'])
 
-extensions = [Extension("resolvelib",
-                        sources=['resolvelib/resolvelib.cc',
-                                 'resolvelib/ducc/src/ducc0/infra/threading.cc'],
+extensions = [Extension("resolve_support",
+                        sources=['resolve_support/main.cc',
+                                 'resolve_support/ducc/src/ducc0/infra/threading.cc'],
                         depends=depfiles,
                         include_dirs=include_dirs,
                         extra_compile_args=extra_compile_args,

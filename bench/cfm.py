@@ -203,9 +203,9 @@ if __name__ == "__main__":
 
         operators = {
             "NIFTy": partial(get_nifty_op, args_cfm, args_lst, args_zm),
-            "resolvelib": partial(get_cpp_op, args_cfm, args_lst, args_zm),
+            "resolve_support": partial(get_cpp_op, args_cfm, args_lst, args_zm),
             "pspecs": partial(get_pspecs_op, args_cfm, args_lst, args_zm),
         }
         if check_equality:
-            rve.operator_equality(operators["NIFTy"](1), operators["resolvelib"](1))
+            rve.operator_equality(operators["NIFTy"](1), operators["resolve_support"](1))
         perf_nifty_operators(operators, nm, ntries=ntries)

@@ -1,7 +1,7 @@
 import resolve as rve
 import numpy as np
 import jax.numpy as jnp
-import resolvelib
+import resolve_support
 import nifty8 as ift
 
 
@@ -15,7 +15,7 @@ def my_operator(ant1, ant2, time, tdom, pdom, fdom, key_phase, key_logampl, ante
     return rve.Pybind11Operator(
         dom,
         target,
-        resolvelib.CalibrationDistributor(
+        resolve_support.CalibrationDistributor(
             ant1.astype(np.int32),
             ant2.astype(np.int32),
             time,

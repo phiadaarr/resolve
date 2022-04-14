@@ -19,7 +19,7 @@ from warnings import warn
 
 import nifty8 as ift
 
-import resolvelib
+import resolve_support
 
 from .cpp2py import Pybind11Operator
 from .polarization_space import PolarizationSpace
@@ -43,13 +43,13 @@ def polarization_matrix_exponential_mf2f(domain, nthreads=1):
     assert all(dd == restdom for dd in domain.values())
     target = (pdom,) + tuple(restdom)
     if len(restdom.shape) == 1:
-        f = resolvelib.PolarizationMatrixExponential1
+        f = resolve_support.PolarizationMatrixExponential1
     elif len(restdom.shape) == 2:
-        f = resolvelib.PolarizationMatrixExponential2
+        f = resolve_support.PolarizationMatrixExponential2
     elif len(restdom.shape) == 3:
-        f = resolvelib.PolarizationMatrixExponential3
+        f = resolve_support.PolarizationMatrixExponential3
     elif len(restdom.shape) == 4:
-        f = resolvelib.PolarizationMatrixExponential4
+        f = resolve_support.PolarizationMatrixExponential4
     else:
         raise NotImplementedError("Not compiled for this shape")
     return Pybind11Operator(domain, target, f(nthreads))

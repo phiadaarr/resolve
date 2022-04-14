@@ -22,7 +22,7 @@ import numpy as np
 from .data.observation import Observation
 from .util import my_assert, my_assert_isinstance, my_asserteq, replace_array_with_dict
 from .cpp2py import Pybind11Operator
-import resolvelib
+import resolve_support
 
 
 def calibration_distribution(
@@ -63,7 +63,7 @@ def calibration_distribution(
     distributor = Pybind11Operator(
         domain,
         target,
-        resolvelib.CalibrationDistributor(
+        resolve_support.CalibrationDistributor(
             ant1,
             ant2,
             observation.time,
