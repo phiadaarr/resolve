@@ -139,7 +139,7 @@ def _extent(sdom, offset=None):
         return [-xlim+ox, xlim+ox, -ylim+oy, ylim+oy]
 
 
-def polarization_quiver(ax, sky_field, nquivers=100, pfrac=0.001):
+def polarization_quiver(ax, sky_field, nquivers=100, pfrac=0.001, vmin=None, vmax=None):
     assert_sky_domain(sky_field.domain)
     pdom, tdom, fdom, sdom = sky_field.domain
     assert all((pol in pdom.labels) for pol in ["I", "Q", "U"])
@@ -147,7 +147,7 @@ def polarization_quiver(ax, sky_field, nquivers=100, pfrac=0.001):
     ang = polarization_angle(sky_field).val[0, 0]
     lin = linear_polarization(sky_field).val[0, 0]
 
-    im = ax.imshow(lin.T, cmap="inferno", norm=LogNorm(), origin="lower",
+    im = ax.imshow(lin.T, cmap="inferno", norm=LogNorm(vmin=vmin, vmax=vmax), origin="lower",
                    extent=_extent(sdom))
     scale = np.max(lin)*max(lin.shape) * 5
 
@@ -169,6 +169,24 @@ def polarization_quiver(ax, sky_field, nquivers=100, pfrac=0.001):
               scale=1.1/dst/skip, scale_units="xy",
               alpha=.6,
               )
+    plt.colorbar(im, ax=ax, orientation="horizontal", label="Linear polarized flux [Jy/sr]")
+
+
+def polarized_fraction(ax, sky_field, pfrac=0.001, vmax=None):
+    assert_sky_domain(sky_field.domain)
+    pdom, tdom, fdom, sdom = sky_field.domain
+    assert all((pol in pdom.labels) for pol in ["I", "Q", "U"])
+    assert tdom.size == fdom.size == 1
+    lin = linear_polarization(sky_field).val[0, 0]
+    total_int = sky_field.val[pdom.label2index("I"), 0, 0]
+
+    frac = lin/total_int
+    frac = np.ma.masked_where(lin < pfrac * np.max(lin), frac)
+
+    im = ax.imshow(frac.T, cmap="viridis_r", origin="lower", vmin=0, vmax=vmax,
+                   extent=_extent(sdom))
+
+    plt.colorbar(im, ax=ax, orientation="horizontal", label="Polarized fraction [1]")
 
 
 def polarization_angle(sky_field, faradaycorrection=0):
