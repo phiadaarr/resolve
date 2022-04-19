@@ -77,7 +77,6 @@ def log_weighting_model(cfg, obs, sky_domain):
                     tmpop.append(foo.ducktape(key).ducktape_left(key))
             linear_interpolation = reduce(add, tmpop)
             restructure = _CustomRestructure(linear_interpolation.target, oo.vis.domain)
-            ift.extra.check_linear_operator(restructure)
             tmpop = (restructure @ linear_interpolation @ log_weights).scale(-2)
             if oo.is_single_precision():
                 tmpop = DtypeConverter(tmpop.target, np.float64, np.float32) @ tmpop
