@@ -77,11 +77,10 @@ def log_weighting_model(cfg, obs, sky_domain):
                     tmpop.append(foo.ducktape(key).ducktape_left(key))
             linear_interpolation = reduce(add, tmpop)
             restructure = _CustomRestructure(linear_interpolation.target, oo.vis.domain)
-            ift.extra.check_linear_operator(restructure)
             tmpop = (restructure @ linear_interpolation @ log_weights).scale(-2)
             if oo.is_single_precision():
                 tmpop = DtypeConverter(tmpop.target, np.float64, np.float32) @ tmpop
-            tmpop = ift.Adder(oo.weight.log()) @ tmpop
+            tmpop = ift.Adder(_log_if_not_zero(oo.weight)) @ tmpop
             op.append(tmpop)
         return op, additional
     if cfg["model"] == "independent gamma":
@@ -126,3 +125,9 @@ class _CustomRestructure(ift.LinearOperator):
                 for ii in range(self.target.shape[2]):
                     res[_polfreq_key(pp, ii)] = x[pp, :, ii]
         return ift.makeField(self._tgt(mode), res)
+
+
+def _log_if_not_zero(fld):
+    res = fld.log().val_rw()
+    res[fld.val == 0.] = 0.
+    return ift.makeField(fld.domain, res)
