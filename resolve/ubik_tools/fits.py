@@ -44,13 +44,25 @@ def field2fits(field, file_name, observations=[]):
     if tdom.size > 1:
         raise NotImplementedError
     h = pyfits.Header()
+    h["ORIGIN"] = "resolve"
     h["BUNIT"] = "Jy/sr"
+    # h["BTYPE"] = "INTENSITY"
+    # h["BSCALE"] = 1.
+    # h["BZERO"] = 0.
+    # h["BMAJ"] = 0.
+    # h["BMIN"] = 0.
+    # h["BPA"] = 0.
+    # h["DATE-OBS"] = '2019-05-08T20:32:19.1'  # TEMPORARY
+    # #h["TELESCOPE"] = "MEERKAT" # TEMPORARY
+    # h["OBSERVER"] = "xxx" # TEMPORARY
+    # h["OBJECT"] = "xxx" # TEMPORARY
+    # h["SPECSYS"] = "TOPOCENT"
     h["CTYPE1"] = "RA---SIN"
     h["CRVAL1"] = direction.phase_center[0] * 180 / np.pi if direction is not None else 0.0
     h["CDELT1"] = -sdom.distances[0] * 180 / np.pi
     h["CRPIX1"] = sdom.shape[0] / 2
     h["CUNIT1"] = "deg"
-    h["CTYPE2"] = "DEC---SIN"
+    h["CTYPE2"] = "DEC--SIN"
     h["CRVAL2"] = direction.phase_center[1] * 180 / np.pi if direction is not None else 0.0
     h["CDELT2"] = sdom.distances[1] * 180 / np.pi
     h["CRPIX2"] = sdom.shape[1] / 2
@@ -70,9 +82,9 @@ def field2fits(field, file_name, observations=[]):
     h["CRPIX3"] = "0"
     h["CUNIT3"] = "Hz"
     h["CTYPE4"] = "STOKES"
-    h["CRVAL4"] = ""
-    h["CDELT4"] = ""
-    h["CRPIX4"] = ""
+    h["CRVAL4"] = 1.
+    h["CDELT4"] = 1.
+    h["CRPIX4"] = 1.
     h["CUNIT4"] = ""
     h["NAXIS"] = 4
     h["NAXIS1"] = sdom.shape[0]
@@ -85,6 +97,8 @@ def field2fits(field, file_name, observations=[]):
     for t_ind, t_val in enumerate(tdom.coordinates):
         val = field.val[:, t_ind]  # Select time
         val = np.transpose(val, (0, 1, 3, 2))  # Switch spatial axes
+        val = val.astype(np.float32)
+        val = np.require(val, dtype=np.float32, requirements="F")
         hdu = pyfits.PrimaryHDU(val, header=h)
         hdulist = pyfits.HDUList([hdu])
         base, ext = splitext(file_name)
