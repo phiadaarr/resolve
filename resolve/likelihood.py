@@ -161,7 +161,7 @@ def CalibrationLikelihood(
     observation,
     calibration_operator,
     model_visibilities,
-    inverse_covariance_operator=None,
+    log_inverse_covariance_operator=None,
     nthreads=1,
 ):
     """Versatile calibration likelihood class
@@ -188,7 +188,7 @@ def CalibrationLikelihood(
         Known model visiblities that are used for calibration. Needs to be
         defined on the same domain as `observation.vis`.
 
-    inverse_covariance_operator : Operator or list of Operators
+    log_inverse_covariance_operator : Operator or list of Operators
         Optional. Target needs to be the same space as observation.vis. If it is
         not specified, observation.wgt is taken as covariance.
 
@@ -196,18 +196,18 @@ def CalibrationLikelihood(
     """
     obs = _obj2list(observation, Observation)
     cops = _duplicate(_obj2list(calibration_operator, ift.Operator), len(obs))
-    icovs = _duplicate(_obj2list(inverse_covariance_operator, ift.Operator), len(obs))
+    log_icovs = _duplicate(_obj2list(log_inverse_covariance_operator, ift.Operator), len(obs))
     model_d = _duplicate(_obj2list(model_visibilities, ift.Field), len(obs))
     model_d = [ift.makeOp(mm) @ cop for mm, cop in zip(model_d, cops)]
 
     if len(obs) > 1:
         raise NotImplementedError
-    obs, model_d, icov = obs[0], model_d[0], icovs[0]
+    obs, model_d, log_icov = obs[0], model_d[0], log_icovs[0]
 
     dt = DtypeConverter(model_d.target, np.complex128, obs.vis.dtype)
     dt_icov = DtypeConverter(model_d.target, np.float64, obs.weight.dtype)
 
-    if icov is None:
+    if log_icov is None:
         e = DiagonalGaussianLikelihood(
             data=obs.vis,
             inverse_covariance=obs.weight,
@@ -220,4 +220,4 @@ def CalibrationLikelihood(
         e = VariableCovarianceDiagonalGaussianLikelihood(
             obs.vis, s0, s1, mask=obs.mask, nthreads=nthreads
         )
-        return e @ (dt @ model_d).ducktape_left(s0) + (dt_icov @ icov).ducktape_left(s1)
+        return e @ (dt @ model_d).ducktape_left(s0) + (dt_icov @ log_icov).ducktape_left(s1)
