@@ -220,4 +220,4 @@ def CalibrationLikelihood(
         e = VariableCovarianceDiagonalGaussianLikelihood(
             obs.vis, s0, s1, mask=obs.mask, nthreads=nthreads
         )
-        return e @ (dt @ model_d).ducktape_left(s0) + (dt_icov @ log_icov).ducktape_left(s1)
+        return e @ ((dt @ model_d).ducktape_left(s0) + (dt_icov @ log_icov).ducktape_left(s1))
