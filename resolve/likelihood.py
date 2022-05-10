@@ -217,7 +217,7 @@ def CalibrationLikelihood(
         return e @ dt @ model_d
     else:
         s0, s1 = "model data", "inverse covariance"
-        e = ift.VariableCovarianceDiagonalGaussianLikelihood(
+        e = VariableCovarianceDiagonalGaussianLikelihood(
             obs.vis, s0, s1, mask=obs.mask, nthreads=nthreads
         )
         return e @ (dt @ model_d).ducktape_left(s0) + (dt_icov @ icov).ducktape_left(s1)
