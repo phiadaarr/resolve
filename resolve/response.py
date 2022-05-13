@@ -63,8 +63,12 @@ class _InterferometryResponse(ift.LinearOperator):
         f_binbounds = fdom.binbounds()
 
         if min(f_binbounds) > min(observation.freq) or max(f_binbounds) < max(observation.freq):
-            raise ValueError(f"Sky frequency domain (min: {min(f_binbounds)/1e6:.1f} MHz, max: {max(f_binbounds)/1e6:.1f} MHz) is incompatible with data frequencies (min: {min(observation.freq)/1e6:.1f} MHz, max: {max(observation.freq)/1e6:.1f} MHz)")
-        
+            s = (f"Sky frequency domain (min: {min(f_binbounds)/1e6:.1f} MHz, "
+                 f"max: {max(f_binbounds)/1e6:.1f} MHz) is incompatible with data frequencies "
+                 f"(min: {min(observation.freq)/1e6:.1f} MHz, "
+                 f"max: {max(observation.freq)/1e6:.1f} MHz)")
+            raise ValueError(s)
+
         sr = []
         row_indices, freq_indices = [], []
         for tt in range(n_time_bins):
