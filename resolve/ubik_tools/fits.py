@@ -107,4 +107,7 @@ def field2fits(field, file_name, observations=[], header_override={}):
         hdu = pyfits.PrimaryHDU(val, header=h)
         hdulist = pyfits.HDUList([hdu])
         base, ext = splitext(file_name)
-        hdulist.writeto(base + f"time{t_val}" + ext, overwrite=True)
+        if len(tdom.coordinates) == 1:
+            hdulist.writeto(base + ext, overwrite=True)
+        else:
+            hdulist.writeto(base + f"time{t_val}" + ext, overwrite=True)
