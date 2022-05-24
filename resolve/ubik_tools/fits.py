@@ -96,7 +96,8 @@ def field2fits(field, file_name, observations=[], header_override={}):
     if direction is not None:
         h["EQUINOX"] = direction.equinox
 
-    h = {**h, **header_override}
+    for kk, vv in header_override.items():
+        h[kk] = vv
 
     for t_ind, t_val in enumerate(tdom.coordinates):
         val = field.val[:, t_ind]  # Select time
