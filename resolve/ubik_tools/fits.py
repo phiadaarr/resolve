@@ -25,7 +25,7 @@ from ..util import assert_sky_domain
 from ..data.observation import Observation
 
 
-def field2fits(field, file_name, observations=[]):
+def field2fits(field, file_name, observations=[], header_override={}):
     import astropy.io.fits as pyfits
     from astropy.time import Time
     
@@ -55,7 +55,8 @@ def field2fits(field, file_name, observations=[]):
     # h["DATE-OBS"] = '2019-05-08T20:32:19.1'  # TEMPORARY
     # #h["TELESCOPE"] = "MEERKAT" # TEMPORARY
     # h["OBSERVER"] = "xxx" # TEMPORARY
-    # h["OBJECT"] = "xxx" # TEMPORARY
+    h["OBSRA"] = direction.phase_center[0] * 180 / np.pi if direction is not None else 0.0
+    h["OBSDEC"] = direction.phase_center[1] * 180 / np.pi if direction is not None else 0.0
     # h["SPECSYS"] = "TOPOCENT"
     h["CTYPE1"] = "RA---SIN"
     h["CRVAL1"] = direction.phase_center[0] * 180 / np.pi if direction is not None else 0.0
@@ -94,6 +95,9 @@ def field2fits(field, file_name, observations=[]):
     h["DATE-MAP"] = Time(time.time(), format="unix").iso.split()[0]
     if direction is not None:
         h["EQUINOX"] = direction.equinox
+
+    h = {**h, **header_override}
+
     for t_ind, t_val in enumerate(tdom.coordinates):
         val = field.val[:, t_ind]  # Select time
         val = np.transpose(val, (0, 1, 3, 2))  # Switch spatial axes
