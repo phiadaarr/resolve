@@ -137,6 +137,7 @@ setup(
     author_email="parras@mpa-garching.mpg.de",
     description="Radio imaging with information field theory",
     long_description=long_description,
+    long_description_content_type='text/markdown',
     url="https://gitlab.mpcdf.mpg.de/ift/resolve",
     packages=find_packages(include=["resolve", "resolve.*", "resolve_support", "resolve_support.*"]),
     zip_safe=True,
