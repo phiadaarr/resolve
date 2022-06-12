@@ -127,12 +127,16 @@ extensions = [Extension("resolve_support",
 
 _print_env()
 
+with open("README.md") as f:
+    long_description = f.read()
+
 setup(
     name="ift-resolve",
     version=__version__,
     author="Philipp Arras",
     author_email="parras@mpa-garching.mpg.de",
     description="Radio imaging with information field theory",
+    long_description=long_description,
     url="https://gitlab.mpcdf.mpg.de/ift/resolve",
     packages=find_packages(include=["resolve", "resolve.*", "resolve_support", "resolve_support.*"]),
     zip_safe=True,
