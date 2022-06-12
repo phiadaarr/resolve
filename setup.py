@@ -127,8 +127,6 @@ extensions = [Extension("resolve_support",
 
 _print_env()
 
-__version__ = "0.0"
-
 setup(
     name="ift-resolve",
     version=__version__,
