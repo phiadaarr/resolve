@@ -130,7 +130,7 @@ _print_env()
 __version__ = "0.0"
 
 setup(
-    name="resolve",
+    name="ift-resolve",
     version=__version__,
     author="Philipp Arras",
     author_email="parras@mpa-garching.mpg.de",
