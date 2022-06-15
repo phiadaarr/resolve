@@ -8,7 +8,7 @@ RUN apt-get update -qq && apt-get install -qq git
 RUN apt-get update -qq && apt-get install -qq python3-pip
 RUN pip3 install pybind11
 # Optional dependencies
-RUN pip3 install astropy jax jaxlib
+RUN pip3 install astropy
 RUN apt-get install -qq python3-mpi4py
 # Testing dependencies
 RUN apt-get install -qq python3-pytest-cov

@@ -55,7 +55,7 @@ def polarization_matrix_exponential_mf2f(domain, nthreads=1):
     return Pybind11Operator(domain, target, f(nthreads))
 
 
-def polarization_matrix_exponential(domain, jax=False):
+def polarization_matrix_exponential(domain):
     """
 
     Deprecated.
@@ -73,9 +73,6 @@ def polarization_matrix_exponential(domain, jax=False):
 
     if pdom.labels_eq("I"):
         return ift.ScalingOperator(domain, 1.).exp()
-
-    if jax:
-        return _jax_pol(domain)
 
     mfs = MultiFieldStacker(domain, 0, domain[0].labels)
     op = PolarizationMatrixExponential(mfs.domain)
@@ -116,36 +113,3 @@ class PolarizationMatrixExponential(ift.Operator):
         if with_v:
             return I.unite(U.unite(Q.unite(V)))
         return I.unite(U.unite(Q))
-
-
-def _jax_pol(domain):
-    from jax.numpy import cosh, empty, exp, float64, sinh, sqrt, zeros
-
-    domain = ift.makeDomain(domain)
-    pdom = domain[0]
-    assert isinstance(pdom, PolarizationSpace)
-
-    with_v = "V" in pdom.labels
-
-    I = pdom.label2index("I")
-    Q = pdom.label2index("Q")
-    U = pdom.label2index("U")
-    if with_v:
-        V = pdom.label2index("V")
-
-    def func(x):
-        sq = x[Q] ** 2 + x[U] ** 2
-        if with_v:
-            sq += x[V] ** 2
-        log_p = sqrt(sq)
-        tmpi = exp(x[I])
-        res = empty(domain.shape, float64)
-        res = res.at[I].set(tmpi * cosh(log_p))
-        tmp = tmpi * sinh(log_p) / log_p
-        res = res.at[U].set(tmp * x[U])
-        res = res.at[Q].set(tmp * x[Q])
-        if with_v:
-            res = res.at[V].set(tmp * x[V])
-        return res
-
-    return ift.JaxOperator(domain, domain, func)

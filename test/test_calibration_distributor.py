@@ -1,6 +1,5 @@
 import resolve as rve
 import numpy as np
-import jax.numpy as jnp
 import resolve_support
 import nifty8 as ift
 

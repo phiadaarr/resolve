@@ -35,7 +35,6 @@ Automatically installed by installation script:
 Optional dependencies:
 
 - astropy
-- jax, jaxlib
 
 ## Installation
 
@@ -48,7 +47,7 @@ First install the necessary dependencies, for example via:
 
 Optionally install afterwards:
 
-    pip3 install astropy jax jaxlib
+    pip3 install astropy
 
 Finally, clone the resolve repository and install resolve on your system:
 

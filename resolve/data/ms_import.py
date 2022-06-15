@@ -27,7 +27,10 @@ from .polarization import Polarization
 
 
 def ms_table(path):
-    from casacore.tables import table
+    try:
+        from casacore.tables import table
+    except ImportError:
+        raise ImportError("You need to install python-casacore for working with measurement sets")
     return table(path, readonly=True, ack=False)
 
 

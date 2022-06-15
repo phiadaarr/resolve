@@ -33,17 +33,6 @@ from .simple_operators import MultiFieldStacker
 from .util import assert_sky_domain
 
 
-def _has_jax():
-    try:
-        import jax
-        print("Will use jax in double precision on the CPU")
-        jax.config.update("jax_platform_name", "cpu")
-        jax.config.update("jax_enable_x64", True)
-        return True
-    except ImportError:
-        return False
-
-
 def sky_model_diffuse(cfg, observations=[], nthreads=1):
     sdom = _spatial_dom(cfg)
     pdom = PolarizationSpace(cfg["polarization"].split(","))
