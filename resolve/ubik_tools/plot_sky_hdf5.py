@@ -19,7 +19,6 @@ import os
 import pickle
 from warnings import warn
 
-import h5py
 import matplotlib.pyplot as plt
 import nifty8 as ift
 import numpy as np
@@ -85,6 +84,11 @@ def visualize_sky_hdf5(hdf5_file, output_file, what, stokes, norm="linear", vmin
 
     dpi : int
     """
+    try:
+        import h5py
+    except ImportError:
+        raise ImportError("Need to install the optional dependency h5py")
+
     with h5py.File(hdf5_file, "r") as f:
         if what == "mean":
             if "stats" in f.keys() and "mean" in f["stats"].keys():
