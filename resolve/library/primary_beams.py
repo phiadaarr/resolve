@@ -16,7 +16,6 @@
 
 import nifty8 as ift
 import numpy as np
-import scipy.special as sc
 
 from ..constants import ARCMIN2RAD, SPEEDOFLIGHT
 from ..util import assert_sky_domain, my_assert
@@ -283,6 +282,8 @@ def alma_beam_func(D, d, freq, x, use_cache=False):
 
 
 def _compute_alma_beam(D, d, freq, x):
+    import scipy.special as sc
+
     a = freq / SPEEDOFLIGHT
     b = d / D
     x = np.pi * a * D * x

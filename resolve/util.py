@@ -20,7 +20,6 @@ import pstats
 from pstats import SortKey
 from time import time
 
-import matplotlib.pyplot as plt
 import nifty8 as ift
 import numpy as np
 
@@ -106,6 +105,8 @@ def divide_where_possible(a, b):
 
 
 def imshow(arr, ax=None, **kwargs):
+    import matplotlib.pyplot as plt
+
     if ax is None:
         ax = plt.gca()
     return ax.imshow(arr.T, origin="lower", **kwargs)

@@ -16,12 +16,8 @@
 
 import pickle
 
-import matplotlib as mpl
-import matplotlib.pyplot as plt
 import nifty8 as ift
 import numpy as np
-from matplotlib.colors import LogNorm
-from matplotlib.ticker import PercentFormatter, StrMethodFormatter
 
 from ..irg_space import IRGSpace
 from ..util import assert_sky_domain
@@ -34,6 +30,10 @@ def polarization_overview(sky_field, name=None, offset=None):
 
     # Wikipedia says (https://en.wikipedia.org/wiki/Stokes_parameters): Q = 0
     # and U = 1 corresponds to bottom left to upper right.
+
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import LogNorm
 
     assert_sky_domain(sky_field.domain)
     pdom, tdom, fdom, sdom = sky_field.domain
@@ -106,6 +106,7 @@ def polarization_overview(sky_field, name=None, offset=None):
         norm = mpl.colors.Normalize(vmin=-90, vmax=90)
         im = axx.imshow(foo, cmap="hsv", origin="lower", norm=norm, extent=_extent(sdom, offset))
         if colorbar:
+            from matplotlib.ticker import StrMethodFormatter
             plt.colorbar(im, orientation="horizontal", ax=axx, format=StrMethodFormatter("{x:.0f}°")).set_ticks([-90, -45, 0, 45, 90])
 
 
@@ -118,6 +119,8 @@ def polarization_overview(sky_field, name=None, offset=None):
 
 
 def _plot_single_freq(axx, field, title, colorbar=True, offset=None, **kwargs):
+    import matplotlib.pyplot as plt
+
     assert len(field.shape) == 2
     im = axx.imshow(field.val.T, extent=_extent(field.domain, offset), origin="lower", **kwargs)
     axx.set_title(title)
@@ -140,6 +143,9 @@ def _extent(sdom, offset=None):
 
 
 def polarization_quiver(ax, sky_field, nquivers=100, pfrac=0.001, vmin=None, vmax=None):
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import LogNorm
+
     assert_sky_domain(sky_field.domain)
     pdom, tdom, fdom, sdom = sky_field.domain
     assert all((pol in pdom.labels) for pol in ["I", "Q", "U"])
@@ -173,6 +179,8 @@ def polarization_quiver(ax, sky_field, nquivers=100, pfrac=0.001, vmin=None, vma
 
 
 def polarized_fraction(ax, sky_field, pfrac=0.001, vmax=None):
+    import matplotlib.pyplot as plt
+
     assert_sky_domain(sky_field.domain)
     pdom, tdom, fdom, sdom = sky_field.domain
     assert all((pol in pdom.labels) for pol in ["I", "Q", "U"])

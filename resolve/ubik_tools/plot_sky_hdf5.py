@@ -19,10 +19,8 @@ import os
 import pickle
 from warnings import warn
 
-import matplotlib.pyplot as plt
 import nifty8 as ift
 import numpy as np
-from matplotlib.colors import CenteredNorm, LogNorm, Normalize
 # For eval() spaces
 from nifty8 import DomainTuple, MultiDomain
 from nifty8.domains import *
@@ -31,9 +29,7 @@ from ..irg_space import IRGSpace
 from ..polarization_space import PolarizationSpace
 from ..sky_model import assert_sky_domain, default_sky_domain
 from .fits import field2fits
-
 # /For eval() spaces
-
 
 def cmdline_visualize_sky_hdf5():
     parser = argparse.ArgumentParser()
@@ -164,6 +160,13 @@ def visualize_sky_hdf5(hdf5_file, output_file, what, stokes, norm="linear", vmin
 
 
 def _plot_with_mpl(fld, norm, vmin, vmax, output_file, dpi):
+    try:
+        import matplotlib.pyplot as plt
+        from matplotlib.colors import CenteredNorm, LogNorm, Normalize
+    except ImportError:
+        from warnings import warn
+        warn("Matplotlib could not be imported. Skip the plot")
+
     # Assume that only one polarization is present and get rid of the polarization dimension
     assert fld.shape[0] == 1
     fld = ift.ContractionOperator(fld.domain, 0)(fld)

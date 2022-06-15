@@ -142,8 +142,8 @@ setup(
     packages=find_packages(include=["resolve", "resolve.*", "resolve_support", "resolve_support.*"]),
     zip_safe=True,
     dependency_links=[],
-    install_requires=["ducc0", "matplotlib", "scipy", "nifty8"],
-    extras_require={"full": ("astropy", "pytest", "pytest-cov", "mpi4py", "python-casacore", "h5py")},
+    install_requires=["ducc0", "numpy", "nifty8"],
+    extras_require={"full": ("astropy", "pytest", "pytest-cov", "mpi4py", "python-casacore", "h5py", "matplotlib")},
     ext_modules=extensions,
     entry_points={"console_scripts":
         [
