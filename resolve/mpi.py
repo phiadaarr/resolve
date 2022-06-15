@@ -39,7 +39,7 @@ try:
         comm_self = None
         rank = 0
 except ImportError:
-    logger.warn("Could not import MPI")
+    logger.warning("Could not import MPI")
     master = True
     mpi = False
     comm = None

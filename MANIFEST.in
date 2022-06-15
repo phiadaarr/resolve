@@ -1,0 +1,10 @@
+prune .
+
+include COPYING
+include README.md
+include pyproject.toml
+include setup.py
+
+recursive-include resolve *.py
+recursive-include test *.py
+recursive-include resolve_support *.h *.cc

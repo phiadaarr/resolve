@@ -21,21 +21,21 @@ For running the installation script:
 - C++17 capable compiler, e.g. g++ 7 or later.
 - pybind11>=2.6
 - setuptools
-- nifty8
 
 Automatically installed by installation script:
 
-- h5py
-- matplotlib
-- mpi4py
+- ducc0
+- nifty8
 - numpy
-- python-casacore
-- scipy
 
 Optional dependencies:
 
 - astropy
-- jax, jaxlib
+- pytest, pytest-cov (for testing)
+- mpi4py
+- python-casacore (for reading measurement sets)
+- h5py
+- matplotlib
 
 ## Installation
 
@@ -44,11 +44,7 @@ For a blueprint how to install resolve, you may look at the [Dockerfile](./Docke
 For installing resolve on a Linux machine, the following steps are necessary.
 First install the necessary dependencies, for example via:
 
-    pip3 install --upgrade git+https://gitlab.mpcdf.mpg.de/ift/nifty.git@NIFTy_8 pybind11 setuptools
-
-Optionally install afterwards:
-
-    pip3 install astropy jax jaxlib
+    pip3 install --upgrade pybind11 setuptools
 
 Finally, clone the resolve repository and install resolve on your system:
 
@@ -61,11 +57,3 @@ Finally, clone the resolve repository and install resolve on your system:
 - The variable shadow of M87* ([arXiv](https://arxiv.org/abs/2002.05218)).
 - Unified radio interferometric calibration and imaging with joint uncertainty quantification ([doi](https://doi.org/10.1051/0004-6361/201935555), [arXiv](https://arxiv.org/abs/1903.11169)).
 - Radio imaging with information field theory ([doi](https://doi.org/10.23919/EUSIPCO.2018.8553533), [arXiv](https://arxiv.org/abs/1803.02174v1)).
-
-# Developers
-
-## Generate compile-db
-
-    pip3 install compiledb
-    CC=clang CXX=clang python3 setup.py build | compiledb
-    rm -rf build

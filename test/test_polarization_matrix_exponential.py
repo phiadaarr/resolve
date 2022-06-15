@@ -38,14 +38,11 @@ restdom = list2fixture([[ift.UnstructuredDomain(7)],
 
 def test_different_implementations(pdom, restdom):
     dom = tuple((pdom,)) + tuple(restdom)
-    op0 = rve.polarization_matrix_exponential(dom, False)
-    op1 = rve.polarization_matrix_exponential(dom, True)
+    op0 = rve.polarization_matrix_exponential(dom)
 
     loc = ift.from_random(op0.domain)
 
     ift.extra.check_operator(op0, loc, ntries=3)
-    ift.extra.check_operator(op1, loc, ntries=3)
-    ift.extra.assert_allclose(op0(loc), op1(loc))
 
     if pdom.labels_eq(["I", "Q", "U", "V"]):
         op2 = rve.polarization_matrix_exponential_mf2f({kk: restdom for kk in pdom.labels})
@@ -57,19 +54,9 @@ def test_different_implementations(pdom, restdom):
 @pmp("pol", ("I", ["I", "Q", "U"], ["I", "Q", "U", "V"]))
 def test_polarization(pol):
     dom = rve.PolarizationSpace(pol), rve.IRGSpace([0]), rve.IRGSpace([0]), ift.RGSpace([10, 20])
-    op = rve.polarization_matrix_exponential(dom, False)
+    op = rve.polarization_matrix_exponential(dom)
     pos = ift.from_random(op.domain)
     ift.extra.check_operator(op, pos, ntries=5)
-    try:
-        op_jax = rve.polarization_matrix_exponential(dom, True)
-
-        assert op.domain is op_jax.domain
-        assert op.target is op_jax.target
-
-        ift.extra.assert_allclose(op(pos), op_jax(pos))
-        ift.extra.check_operator(op_jax, pos, ntries=5)
-    except ImportError:
-        pass
 
 
 def test_polarization_matrix_exponential():

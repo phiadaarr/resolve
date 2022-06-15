@@ -15,19 +15,19 @@
 # Author: Philipp Arras
 
 import os
+from warnings import warn
 
-import matplotlib.pyplot as plt
 import nifty8 as ift
 import numpy as np
-from matplotlib.colors import LogNorm
 
 from ..constants import ARCMIN2RAD
 from ..data.observation import unique_antennas
 from ..ubik_tools.plot_sky_hdf5 import _optimal_subplot_distribution
 from ..util import assert_sky_domain
 
-
 def baseline_histogram(file_name, vis, observation, bins, weight):
+    import matplotlib.pyplot as plt
+
     assert vis.domain == observation.vis.domain
     uvwlen = observation.effective_uvwlen().val
     pdom = vis.domain[0]
@@ -82,6 +82,9 @@ def _red_chi_sq_limits(mi, ma):
 
 
 def antenna_matrix(file_name, vis, observation, weight):
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import LogNorm
+
     ant1 = observation.ant1
     ant2 = observation.ant2
     pdom = vis.domain[0]
@@ -159,6 +162,8 @@ def antenna_matrix(file_name, vis, observation, weight):
 
 
 def scatter_vis(file_name, vis, observation, weight, lim):
+    import matplotlib.pyplot as plt
+
     fig, axs = plt.subplots(**_optimal_subplot_distribution(observation.npol))
     axs = list(np.array(axs).ravel())
     lim = abs(float(lim))
@@ -190,6 +195,7 @@ def visualize_weighted_residuals(obs_science, sl, iglobal, sky, weights, output_
     from ..response import InterferometryResponse
     from ..dirty_image import dirty_image
     from .sky import plot_dirty
+    import matplotlib.pyplot as plt
 
     sky_mean = sl.average(sky)
 

@@ -34,7 +34,6 @@ dom = rve.default_sky_domain(pdom=pdom, sdom=sdom)
 dom = {kk: dom[1:] for kk in pdom.labels}
 tgt = rve.default_sky_domain(pdom=pdom, sdom=sdom)
 opold = rve.polarization_matrix_exponential(tgt)
-opold_jax = rve.polarization_matrix_exponential(tgt, jax=True)
 
 for nthreads in [1, 4, 8]:
     op = rve.polarization_matrix_exponential_mf2f(dom, nthreads)
@@ -43,6 +42,3 @@ for nthreads in [1, 4, 8]:
     print()
 print("Old implementation")
 ift.exec_time(opold)
-print()
-print("Old implementation (jax)")
-ift.exec_time(opold_jax)

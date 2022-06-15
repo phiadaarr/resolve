@@ -25,6 +25,8 @@ from glob import iglob
 import pybind11
 from setuptools import Extension, find_packages, setup
 
+exec(open('resolve/version.py').read())
+
 tmp = os.getenv("DUCC0_CFLAGS", "").split(" ")
 user_cflags = [x for x in tmp if x != ""]
 tmp = os.getenv("DUCC0_LFLAGS", "").split(" ")
@@ -125,16 +127,23 @@ extensions = [Extension("resolve_support",
 
 _print_env()
 
+with open("README.md") as f:
+    long_description = f.read()
+
 setup(
-    name="resolve",
+    name="ift-resolve",
+    version=__version__,
     author="Philipp Arras",
     author_email="parras@mpa-garching.mpg.de",
     description="Radio imaging with information field theory",
+    long_description=long_description,
+    long_description_content_type='text/markdown',
     url="https://gitlab.mpcdf.mpg.de/ift/resolve",
-    packages=find_packages(include=["resolve", "resolve.*"]),
+    packages=find_packages(include=["resolve", "resolve.*", "resolve_support", "resolve_support.*"]),
     zip_safe=True,
     dependency_links=[],
-    install_requires=["ducc0", "matplotlib", "h5py", "mpi4py", "python-casacore", "scipy"],  # FIXME nifty8
+    install_requires=["ducc0>=0.23.0", "numpy", "nifty8>=8.0"],
+    extras_require={"full": ("astropy", "pytest", "pytest-cov", "mpi4py", "python-casacore", "h5py", "matplotlib")},
     ext_modules=extensions,
     entry_points={"console_scripts":
         [
@@ -143,7 +152,7 @@ setup(
         ]},
     license="GPLv3",
     classifiers=[
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",
         "Topic :: Utilities",
         "License :: OSI Approved :: GNU General Public License v3 " "or later (GPLv3+)",
     ],

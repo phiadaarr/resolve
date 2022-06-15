@@ -1,3 +1,5 @@
+from .version import __version__
+
 from .logger import logger
 
 from . import ubik_tools
@@ -34,4 +36,3 @@ from .simple_operators import *
 from .sky_model import *
 from .util import *
 from .weighting_model import *
-

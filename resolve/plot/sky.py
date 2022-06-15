@@ -15,14 +15,14 @@
 # Copyright(C) 2022 Max-Planck-Society, Philipp Arras
 # Author: Philipp Arras
 
-import matplotlib.pyplot as plt
 from ..util import assert_sky_domain
 from ..ubik_tools.plot_sky_hdf5 import _optimal_subplot_distribution
 import numpy as np
-from matplotlib.colors import CenteredNorm, LogNorm
 
 
 def plot_dirty(fld, file_name):
+    import matplotlib.pyplot as plt
+
     assert_sky_domain(fld.domain)
     pdom, tdom, fdom, sdom = fld.domain
     
@@ -46,6 +46,9 @@ def plot_dirty(fld, file_name):
 
 
 def plot_sky(fld, file_name):
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import CenteredNorm, LogNorm
+
     assert_sky_domain(fld.domain)
     pdom, tdom, fdom, sdom = fld.domain
     

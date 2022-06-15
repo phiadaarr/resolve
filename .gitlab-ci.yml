@@ -34,7 +34,7 @@ build_docker_from_cache:
     - docker push $CONTAINER_TEST_IMAGE
 
 before_script:
-  - python3 setup.py install --user
+  - pip3 install .[full]
 
 test_resolve:
   stage: testing
